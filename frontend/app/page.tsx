@@ -51,10 +51,41 @@ export default function Home() {
     <div className="max-w-3xl mx-auto px-4 py-16">
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-foreground mb-4">
-          What do you want to learn?
+          Welcome to LearnOS 🎓
         </h1>
-        <p className="text-lg text-secondary">
-          Enter your learning goal. LearnOS will build a personalized concept graph and guide you to mastery.
+        <p className="text-lg text-secondary mb-6">
+          An agentic learning operating system that adapts to your psychology, expertise, and learning style.
+        </p>
+        
+        {/* Onboarding CTA */}
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-200 rounded-xl p-6 mb-8">
+          <h2 className="text-xl font-semibold text-gray-800 mb-2">
+            ✨ New to LearnOS?
+          </h2>
+          <p className="text-gray-600 mb-4">
+            Complete our 10-minute onboarding to personalize your learning experience based on your style, expertise, and goals.
+          </p>
+          <button
+            onClick={() => router.push('/onboarding')}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold
+              hover:bg-blue-700 transition-colors shadow-md hover:shadow-lg inline-flex items-center gap-2"
+          >
+            <span>Start Personalized Onboarding</span>
+            <span>→</span>
+          </button>
+        </div>
+        
+        <div className="border-t border-gray-300 my-8 relative">
+          <span className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-4 text-sm text-gray-500">
+            or jump right in
+          </span>
+        </div>
+        
+        <h3 className="text-2xl font-bold text-foreground mb-2">
+          What do you want to learn?
+        </h3>
+        <p className="text-base text-secondary">
+          Enter your learning goal and we'll create a personalized concept graph.
         </p>
       </div>
 

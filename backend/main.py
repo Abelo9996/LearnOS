@@ -1,12 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import goals, sessions, progress
+from routers import goals, sessions, progress, onboarding, assignments, resources
 from database import init_db
 
 app = FastAPI(
     title="LearnOS API",
-    description="Agentic Learning Operating System",
-    version="1.0.0"
+    description="Agentic Learning Operating System - Enhanced with Personalization",
+    version="2.0.0"
 )
 
 app.add_middleware(
@@ -17,9 +17,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Original routers
 app.include_router(goals.router, prefix="/api", tags=["goals"])
 app.include_router(sessions.router, prefix="/api", tags=["sessions"])
 app.include_router(progress.router, prefix="/api", tags=["progress"])
+
+# New personalization routers
+app.include_router(onboarding.router, prefix="/api", tags=["onboarding"])
+app.include_router(assignments.router, prefix="/api", tags=["assignments"])
+app.include_router(resources.router, prefix="/api", tags=["resources"])
 
 @app.on_event("startup")
 async def startup_event():
