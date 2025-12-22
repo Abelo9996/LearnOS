@@ -1,6 +1,6 @@
 # LearnOS
 
-**A production-grade, agentic learning operating system**
+**A production-grade, agentic learning operating system.**
 
 LearnOS is an AI-native learning platform that converts high-level learning goals into structured concept dependency graphs, actively adapts to learner understanding, and forces mastery through explanation and application—not passive consumption.
 
