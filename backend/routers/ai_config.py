@@ -5,8 +5,8 @@ Handles API key setup and AI feature configuration
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Dict
-from models_ai import OpenAIConfig, AIFeatureToggle, ConfigureOpenAIRequest
+from typing import Dict, Any
+from models_ai import OpenAIConfig, AIFeatureToggle, ConfigureOpenAIRequest, AIGeneratedAssignment
 from services.openai_service import get_openai_service
 from datetime import datetime
 
@@ -15,6 +15,7 @@ router = APIRouter(prefix="/ai/config", tags=["ai-config"])
 # In-memory storage (move to database in production)
 openai_configs: Dict[str, OpenAIConfig] = {}
 feature_toggles: Dict[str, AIFeatureToggle] = {}
+assignments_storage: Dict[str, AIGeneratedAssignment] = {}  # assignment_id -> assignment
 
 class ConfigResponse(BaseModel):
     message: str

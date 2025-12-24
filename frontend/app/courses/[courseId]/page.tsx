@@ -23,14 +23,54 @@ interface Course {
   };
 }
 
+interface WebResource {
+  url: string;
+  title: string;
+  resource_type: string;
+  description?: string;
+  author?: string;
+  platform?: string;
+  estimated_time_minutes?: number;
+  difficulty?: string;
+  is_free?: boolean;
+  rating?: number;
+  why_recommended?: string;
+}
+
+interface LearningStep {
+  step_id: string;
+  order: number;
+  title: string;
+  description: string;
+  learning_objectives: string[];
+  key_concepts: string[];
+  content: string;
+  video_resources: WebResource[];
+  reading_resources: WebResource[];
+  interactive_resources: WebResource[];
+  action_items: string[];
+  practice_exercises: string[];
+  quiz_questions?: any[];
+  estimated_minutes: number;
+  difficulty: string;
+  completed: boolean;
+  notes?: string;
+}
+
 interface Milestone {
   milestone_id: string;
   title: string;
   description: string;
+  overview?: string;
   concepts: string[];
   estimated_hours: number;
   completed: boolean;
   completion_date?: string;
+  web_resources?: WebResource[];
+  learning_steps?: LearningStep[];
+  why_important?: string;
+  real_world_applications?: string[];
+  recommended_projects?: string[];
 }
 
 interface Roadmap {
@@ -43,11 +83,32 @@ interface Roadmap {
 
 interface Assignment {
   assignment_id: string;
+  user_id: string;
+  course_id: string;
+  milestone_id: string;
+  roadmap_id: string;
+  assignment_type: string;
   title: string;
   description: string;
-  difficulty: number;
-  completed: boolean;
-  estimated_hours: number;
+  learning_objectives: string[];
+  instructions: string[];
+  requirements: string[];
+  questions: string[];
+  starter_materials?: string;
+  test_cases: any[];
+  rubric: any[];
+  hints: string[];
+  resources: string[];
+  estimated_time_hours: number;
+  difficulty: string;
+  status: string;
+  submission?: string;
+  submission_date?: string;
+  score?: number;
+  feedback?: string;
+  created_at: string;
+  completed_at?: string;
+  ai_model: string;
 }
 
 interface Session {
@@ -83,34 +144,45 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
   }, [userId, params.courseId]);
 
   const loadCourseData = async () => {
-    console.log('📚 Loading course data for:', params.courseId);
     setLoading(true);
     setError('');
     try {
       const response = await fetch(`http://localhost:8000/api/courses/${params.courseId}`);
-      console.log('📥 Course data response status:', response.status);
       
       if (response.ok) {
         const data = await response.json();
-        console.log('📦 Course data received:', data);
-        console.log('🗺️ Roadmap in response:', data.roadmap ? 'YES' : 'NO');
-        
         setCourse(data.course);
         setRoadmap(data.roadmap);
         setAssignments(data.assignments || []);
         setSessions(data.recent_sessions || []);
         setStats(data.stats);
-        
-        console.log('✅ State updated - Roadmap:', data.roadmap ? 'SET' : 'NULL');
       } else {
         setError('Failed to load course');
-        console.error('❌ Failed to load course');
       }
     } catch (err) {
       setError('Failed to load course');
-      console.error('💥 Error loading course:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchAssignments = async () => {
+    if (!userId || !course) return;
+    
+    try {
+      const response = await fetch(
+        `http://localhost:8000/api/ai/assignments/list/${userId}?course_id=${course.course_id}`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAssignments(data.assignments || []);
+        alert(`✅ Loaded ${data.assignments?.length || 0} assignments`);
+      } else {
+        alert('Failed to fetch assignments');
+      }
+    } catch (err) {
+      alert('Error fetching assignments');
     }
   };
 
@@ -126,7 +198,95 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
         await loadCourseData();
       }
     } catch (err) {
-      console.error('Error toggling milestone:', err);
+      // Silent error
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const generateMilestoneAssignment = async (milestone: Milestone) => {
+    if (!userId || !course) {
+      alert('User ID or course not found');
+      return;
+    }
+    
+    if (!roadmap) {
+      alert('No roadmap found. Generate a roadmap first.');
+      return;
+    }
+    
+    setActionLoading(true);
+    setError('');
+    
+    try {
+      const response = await fetch('http://localhost:8000/api/ai/assignments/generate-milestone', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          course_id: course.course_id,
+          milestone_id: milestone.milestone_id,
+          roadmap_id: roadmap.roadmap_id,
+          milestone_title: milestone.title,
+          milestone_description: milestone.description || milestone.overview || '',
+          concepts: milestone.concepts || [],
+          learning_steps: milestone.learning_steps || [],
+          difficulty: 'intermediate'
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const assignment = data.assignment;
+        
+        // Format assignment display based on type
+        let assignmentText = `
+🎯 ${assignment.assignment_type.toUpperCase().replace('_', ' ')}
+📚 ${assignment.title}
+
+📝 ${assignment.description}
+
+� Learning Objectives:
+${assignment.learning_objectives.map((obj: string, i: number) => `${i + 1}. ${obj}`).join('\n')}
+
+📋 Instructions:
+${assignment.instructions.map((inst: string, i: number) => `${i + 1}. ${inst}`).join('\n')}
+
+✅ Requirements:
+${assignment.requirements.map((req: string) => `• ${req}`).join('\n')}
+`;
+
+        // Add questions if present (for essays, quizzes, reading analysis)
+        if (assignment.questions && assignment.questions.length > 0) {
+          assignmentText += `\n❓ Questions to Answer:\n${assignment.questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n')}\n`;
+        }
+
+        assignmentText += `
+💡 Hints:
+${assignment.hints.map((hint: string) => `• ${hint}`).join('\n')}
+
+⏱️ Estimated Time: ${assignment.estimated_time_hours} hours
+📊 Difficulty: ${assignment.difficulty}
+
+📌 Grading Rubric:
+${assignment.rubric.map((r: any) => `• ${r.criterion} (${r.points} pts): ${r.description}`).join('\n')}
+
+✅ Assignment saved! ID: ${data.assignment_id}
+View it in the Assignments tab to start working on it.
+        `.trim();
+        
+        alert(assignmentText);
+        
+        // Reload assignments list
+        await fetchAssignments();
+        
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to generate assignment: ${errorData.detail || 'Unknown error'}`);
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate assignment';
+      alert(`Error: ${errorMessage}`);
     } finally {
       setActionLoading(false);
     }
@@ -182,17 +342,10 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
       return;
     }
     
-    console.log('🚀 Generate Roadmap button clicked!');
-    console.log('Course ID:', course.course_id);
-    console.log('User ID:', userId);
-    console.log('Goal:', course.goal);
-    console.log('Target weeks:', course.target_weeks);
-    
     setActionLoading(true);
     setError('');
     
     try {
-      console.log('📡 Calling roadmap generation API...');
       const response = await fetch('http://localhost:8000/api/ai/roadmap/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -203,45 +356,23 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
         })
       });
       
-      console.log('📥 Roadmap API response status:', response.status);
-      console.log('📥 Roadmap API response headers:', response.headers);
-      
-      // Get response text first for debugging
       const responseText = await response.text();
-      console.log('📄 Raw response text:', responseText);
       
       if (response.ok) {
         let data;
         try {
           data = JSON.parse(responseText);
         } catch (parseError) {
-          console.error('❌ Failed to parse JSON:', parseError);
           throw new Error('Invalid JSON response from server');
         }
         
-        console.log('✅ FULL ROADMAP RESPONSE:');
-        console.log(JSON.stringify(data, null, 2));
-        console.log('📊 Roadmap data:', data);
-        console.log('🗺️ Roadmap object:', data.roadmap);
-        console.log('🆔 Roadmap ID:', data.roadmap?.roadmap_id);
-        console.log('📋 Roadmap goal:', data.roadmap?.goal);
-        console.log('📍 Number of milestones:', data.roadmap?.milestones?.length);
-        
         const newRoadmap = data.roadmap;
         
-        if (!newRoadmap) {
-          console.error('❌ No roadmap in response!');
-          throw new Error('No roadmap in response');
+        if (!newRoadmap || !newRoadmap.roadmap_id) {
+          throw new Error('Invalid roadmap data received');
         }
         
-        if (!newRoadmap.roadmap_id) {
-          console.error('❌ Roadmap has no ID!');
-          console.error('Roadmap object:', newRoadmap);
-          throw new Error('Invalid roadmap data received - no roadmap_id');
-        }
-        
-        console.log('✅ Roadmap validated successfully');
-        console.log('🔗 Linking roadmap to course...');
+        // Link roadmap to course
         const updateResponse = await fetch(`http://localhost:8000/api/courses/${course.course_id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -250,46 +381,23 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
           })
         });
         
-        console.log('📥 Course update response status:', updateResponse.status);
-        
-        if (updateResponse.ok) {
-          const updateData = await updateResponse.json();
-          console.log('✅ FULL COURSE UPDATE RESPONSE:');
-          console.log(JSON.stringify(updateData, null, 2));
-          console.log('📚 Updated course:', updateData.course);
-          console.log('🗺️ Updated course roadmap_id:', updateData.course?.roadmap_id);
-        } else {
-          console.error('❌ Failed to link roadmap to course');
-          const errorData = await updateResponse.json();
-          console.error('Error details:', errorData);
+        if (!updateResponse.ok) {
+          throw new Error('Failed to link roadmap to course');
         }
         
         // Small delay to ensure backend is ready
-        console.log('⏱️ Waiting 500ms before reload...');
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        console.log('🔄 Reloading course data...');
         await loadCourseData();
         
-        console.log('🎉 Roadmap generation complete!');
-        console.log('📊 Current roadmap state:', roadmap);
-        console.log('📚 Current course state:', course);
-        
-        // Force tab to roadmap view if successful
+        // Switch to roadmap tab
         if (roadmap) {
-          console.log('✨ Switching to roadmap tab');
           setActiveTab('roadmap');
-        } else {
-          console.warn('⚠️ Roadmap state is still null after reload!');
         }
         
         alert('✅ Roadmap generated successfully! Check the Roadmap tab.');
       } else {
         const errorData = JSON.parse(responseText);
-        console.error('❌ Roadmap generation failed');
-        console.error('Status:', response.status);
-        console.error('Error response:', errorData);
-        console.error('Raw error text:', responseText);
         
         const errorMsg = errorData.detail || 'Failed to generate roadmap';
         
@@ -315,7 +423,6 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
         }
       }
     } catch (err) {
-      console.error('💥 Error during roadmap generation:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate roadmap';
       setError(errorMessage);
       alert('❌ Error: ' + errorMessage);
@@ -337,7 +444,7 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
         await loadCourseData();
       }
     } catch (err) {
-      console.error('Error updating status:', err);
+      // Silent error
     } finally {
       setActionLoading(false);
     }
@@ -616,6 +723,22 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
 
               {roadmap && (
                 <div className="space-y-4">
+                  {/* Debug Info */}
+                  {roadmap.milestones && roadmap.milestones.length > 0 && (
+                    <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
+                      <h3 className="font-bold text-blue-900 mb-2">📊 Roadmap Status:</h3>
+                      <div className="text-sm text-blue-800 space-y-1">
+                        <div>✅ Total Modules: {roadmap.milestones.length}</div>
+                        <div>📚 Total Lessons: {roadmap.milestones.reduce((sum, m) => sum + (m.learning_steps?.length || 0), 0)}</div>
+                        {roadmap.milestones.every(m => !m.learning_steps || m.learning_steps.length === 0) && (
+                          <div className="text-red-600 font-bold mt-2">
+                            ⚠️ WARNING: No learning steps found! Check console logs.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
                   {roadmap.milestones.map((milestone, index) => (
                     <div
                       key={milestone.milestone_id}
@@ -646,6 +769,285 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
                                     {concept}
                                   </span>
                                 ))}
+                              </div>
+                            )}
+                            
+                            {/* Generate Assignment Button */}
+                            <div className="mt-4 mb-4">
+                              <button
+                                onClick={() => generateMilestoneAssignment(milestone)}
+                                disabled={actionLoading}
+                                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium"
+                              >
+                                <span>🎯</span>
+                                <span>{actionLoading ? 'Generating...' : 'Generate Assignment'}</span>
+                              </button>
+                              <p className="text-xs text-gray-500 mt-2">
+                                Create a hands-on project to test your understanding of this module
+                              </p>
+                            </div>
+                            
+                            {/* Web Resources Section */}
+                            {milestone.web_resources && milestone.web_resources.length > 0 && (
+                              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                                  🌐 Learning Resources
+                                </h4>
+                                <div className="space-y-3">
+                                  {milestone.web_resources.map((resource: any, resIdx: number) => (
+                                    <a
+                                      key={resIdx}
+                                      href={resource.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="block p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-md transition-all group"
+                                    >
+                                      <div className="flex items-start gap-3">
+                                        <div className="text-2xl">
+                                          {resource.resource_type === 'video' && '🎥'}
+                                          {resource.resource_type === 'article' && '📄'}
+                                          {resource.resource_type === 'tutorial' && '📚'}
+                                          {resource.resource_type === 'documentation' && '📖'}
+                                          {resource.resource_type === 'course' && '🎓'}
+                                          {resource.resource_type === 'interactive' && '💻'}
+                                          {!['video', 'article', 'tutorial', 'documentation', 'course', 'interactive'].includes(resource.resource_type) && '🔗'}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                                            {resource.title}
+                                          </div>
+                                          {resource.description && (
+                                            <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                                              {resource.description}
+                                            </p>
+                                          )}
+                                          <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
+                                            {resource.platform && (
+                                              <span className="flex items-center gap-1">
+                                                <span className="font-medium">{resource.platform}</span>
+                                              </span>
+                                            )}
+                                            {resource.estimated_time_minutes && (
+                                              <span>⏱️ {resource.estimated_time_minutes} min</span>
+                                            )}
+                                            {resource.difficulty && (
+                                              <span className={`px-2 py-0.5 rounded-full ${
+                                                resource.difficulty === 'beginner' ? 'bg-green-100 text-green-700' :
+                                                resource.difficulty === 'intermediate' ? 'bg-yellow-100 text-yellow-700' :
+                                                'bg-red-100 text-red-700'
+                                              }`}>
+                                                {resource.difficulty}
+                                              </span>
+                                            )}
+                                            {resource.is_free && (
+                                              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
+                                                Free
+                                              </span>
+                                            )}
+                                          </div>
+                                          {resource.why_recommended && (
+                                            <p className="text-xs text-gray-500 mt-2 italic">
+                                              💡 {resource.why_recommended}
+                                            </p>
+                                          )}
+                                        </div>
+                                        <div className="text-gray-400 group-hover:text-blue-600 transition-colors">
+                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                          </svg>
+                                        </div>
+                                      </div>
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Learning Steps - Detailed Lessons */}
+                            {milestone.learning_steps && milestone.learning_steps.length > 0 ? (
+                              <div className="mt-4 space-y-3">
+                                <h4 className="font-semibold text-gray-900 flex items-center gap-2 bg-blue-50 p-3 rounded-lg border-l-4 border-blue-500">
+                                  📚 Learning Path ({milestone.learning_steps.length} lessons) - Click to expand
+                                </h4>
+                                {milestone.learning_steps
+                                  .sort((a, b) => a.order - b.order)
+                                  .map((step, stepIdx) => (
+                                    <details key={step.step_id || stepIdx} className="group bg-gray-50 rounded-lg border-2 border-gray-200 hover:border-blue-400 transition-all">
+                                      <summary className="cursor-pointer p-4 hover:bg-blue-50 rounded-lg transition-colors list-none select-none">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-3 flex-1">
+                                            <span className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold">
+                                              {step.order}
+                                            </span>
+                                            <div className="flex-1">
+                                              <div className="font-semibold text-gray-900">{step.title}</div>
+                                              <div className="text-sm text-gray-600">{step.description}</div>
+                                              <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                                                <span>⏱️ {step.estimated_minutes} min</span>
+                                                <span>📊 {step.difficulty}</span>
+                                                {step.video_resources && step.video_resources.length > 0 && (
+                                                  <span>🎥 {step.video_resources.length} videos</span>
+                                                )}
+                                                {step.reading_resources && step.reading_resources.length > 0 && (
+                                                  <span>📄 {step.reading_resources.length} articles</span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs text-blue-600 font-medium">Click to open</span>
+                                            <svg className="w-5 h-5 text-blue-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                          </div>
+                                        </div>
+                                      </summary>
+                                      
+                                      <div className="p-4 pt-0 space-y-4 bg-white">
+                                        {/* Learning Objectives */}
+                                        {step.learning_objectives && step.learning_objectives.length > 0 && (
+                                          <div>
+                                            <h5 className="font-semibold text-sm text-gray-900 mb-2">🎯 What You'll Learn:</h5>
+                                            <ul className="space-y-1">
+                                              {step.learning_objectives.map((obj, idx) => (
+                                                <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
+                                                  <span className="text-green-500 mt-0.5">✓</span>
+                                                  <span>{obj}</span>
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        )}
+                                        
+                                        {/* Content */}
+                                        {step.content && (
+                                          <div>
+                                            <h5 className="font-semibold text-sm text-gray-900 mb-2">📖 Lesson Content:</h5>
+                                            <div className="text-sm text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border border-gray-200">
+                                              {step.content}
+                                            </div>
+                                          </div>
+                                        )}
+                                        
+                                        {/* Video Resources */}
+                                        {step.video_resources && step.video_resources.length > 0 && (
+                                          <div>
+                                            <h5 className="font-semibold text-sm text-gray-900 mb-2">🎥 Videos to Watch:</h5>
+                                            <div className="space-y-2">
+                                              {step.video_resources.map((resource, idx) => (
+                                                <a
+                                                  key={idx}
+                                                  href={resource.url}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all group"
+                                                >
+                                                  <span className="text-xl">🎥</span>
+                                                  <div className="flex-1 min-w-0">
+                                                    <div className="font-medium text-sm text-gray-900 group-hover:text-blue-600">{resource.title}</div>
+                                                    {resource.platform && <div className="text-xs text-gray-500">{resource.platform} • {resource.estimated_time_minutes} min</div>}
+                                                  </div>
+                                                  <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                  </svg>
+                                                </a>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        
+                                        {/* Reading Resources */}
+                                        {step.reading_resources && step.reading_resources.length > 0 && (
+                                          <div>
+                                            <h5 className="font-semibold text-sm text-gray-900 mb-2">📄 Articles & Docs:</h5>
+                                            <div className="space-y-2">
+                                              {step.reading_resources.map((resource, idx) => (
+                                                <a
+                                                  key={idx}
+                                                  href={resource.url}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all group"
+                                                >
+                                                  <span className="text-xl">📄</span>
+                                                  <div className="flex-1 min-w-0">
+                                                    <div className="font-medium text-sm text-gray-900 group-hover:text-blue-600">{resource.title}</div>
+                                                    {resource.platform && <div className="text-xs text-gray-500">{resource.platform} • {resource.estimated_time_minutes} min read</div>}
+                                                  </div>
+                                                  <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                  </svg>
+                                                </a>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        
+                                        {/* Interactive Resources */}
+                                        {step.interactive_resources && step.interactive_resources.length > 0 && (
+                                          <div>
+                                            <h5 className="font-semibold text-sm text-gray-900 mb-2">💻 Practice Interactively:</h5>
+                                            <div className="space-y-2">
+                                              {step.interactive_resources.map((resource, idx) => (
+                                                <a
+                                                  key={idx}
+                                                  href={resource.url}
+                                                  target="_blank"
+                                                  rel="noopener noreferrer"
+                                                  className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all group"
+                                                >
+                                                  <span className="text-xl">💻</span>
+                                                  <div className="flex-1 min-w-0">
+                                                    <div className="font-medium text-sm text-gray-900 group-hover:text-blue-600">{resource.title}</div>
+                                                    {resource.platform && <div className="text-xs text-gray-500">{resource.platform} • {resource.estimated_time_minutes} min</div>}
+                                                  </div>
+                                                  <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                                  </svg>
+                                                </a>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        
+                                        {/* Action Items */}
+                                        {step.action_items && step.action_items.length > 0 && (
+                                          <div>
+                                            <h5 className="font-semibold text-sm text-gray-900 mb-2">✅ Action Items:</h5>
+                                            <ul className="space-y-1">
+                                              {step.action_items.map((item, idx) => (
+                                                <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
+                                                  <span className="text-blue-500 mt-0.5">→</span>
+                                                  <span>{item}</span>
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        )}
+                                        
+                                        {/* Practice Exercises */}
+                                        {step.practice_exercises && step.practice_exercises.length > 0 && (
+                                          <div>
+                                            <h5 className="font-semibold text-sm text-gray-900 mb-2">🏋️ Practice Exercises:</h5>
+                                            <ul className="space-y-1">
+                                              {step.practice_exercises.map((exercise, idx) => (
+                                                <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
+                                                  <span className="text-purple-500 mt-0.5">★</span>
+                                                  <span>{exercise}</span>
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </details>
+                                  ))}
+                              </div>
+                            ) : (
+                              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                <p className="text-sm text-yellow-800">
+                                  ⚠️ No learning steps available. This might be a fallback roadmap. Configure AI settings for detailed content.
+                                </p>
                               </div>
                             )}
                             
@@ -688,38 +1090,121 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
           {/* Assignments Tab */}
           {activeTab === 'assignments' && (
             <div className="bg-white rounded-2xl shadow-xl p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">📝 Course Assignments</h2>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">📝 Course Assignments</h2>
+                <button
+                  onClick={() => fetchAssignments()}
+                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                  🔄 Refresh
+                </button>
+              </div>
               
               {assignments.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="text-6xl mb-4">📝</div>
                   <p className="text-gray-600 mb-4">No assignments yet</p>
                   <p className="text-sm text-gray-500">Generate assignments from your roadmap milestones</p>
+                  <button
+                    onClick={() => setActiveTab('roadmap')}
+                    className="mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                  >
+                    Go to Roadmap →
+                  </button>
                 </div>
               ) : (
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-4">
                   {assignments.map((assignment) => (
                     <div
                       key={assignment.assignment_id}
                       className={`border-2 rounded-xl p-6 ${
-                        assignment.completed ? 'bg-green-50 border-green-300' : 'border-gray-200'
+                        assignment.status === 'completed' || assignment.status === 'graded' 
+                          ? 'bg-green-50 border-green-300' 
+                          : assignment.status === 'submitted'
+                          ? 'bg-blue-50 border-blue-300'
+                          : 'border-gray-200 hover:border-purple-300 transition-colors'
                       }`}
                     >
                       <div className="flex items-start justify-between mb-3">
-                        <h3 className="text-lg font-bold text-gray-900 flex-1">{assignment.title}</h3>
-                        {assignment.completed && <span className="text-green-600 text-xl">✓</span>}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-full font-semibold uppercase">
+                              {assignment.assignment_type.replace('_', ' ')}
+                            </span>
+                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                              assignment.status === 'completed' || assignment.status === 'graded'
+                                ? 'bg-green-100 text-green-700'
+                                : assignment.status === 'submitted'
+                                ? 'bg-blue-100 text-blue-700'
+                                : assignment.status === 'in_progress'
+                                ? 'bg-yellow-100 text-yellow-700'
+                                : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {assignment.status.replace('_', ' ')}
+                            </span>
+                          </div>
+                          <h3 className="text-lg font-bold text-gray-900">{assignment.title}</h3>
+                        </div>
+                        {(assignment.status === 'completed' || assignment.status === 'graded') && (
+                          <span className="text-green-600 text-2xl">✓</span>
+                        )}
                       </div>
-                      <p className="text-gray-600 text-sm mb-3">{assignment.description}</p>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">
-                          ⏱️ {assignment.estimated_hours}h • 
-                          Difficulty: {Math.round(assignment.difficulty * 100)}%
-                        </span>
+                      
+                      <p className="text-gray-600 text-sm mb-4">{assignment.description}</p>
+                      
+                      {/* Learning Objectives */}
+                      {assignment.learning_objectives && assignment.learning_objectives.length > 0 && (
+                        <div className="mb-4">
+                          <h4 className="text-xs font-semibold text-gray-700 mb-2">🎯 Learning Objectives:</h4>
+                          <ul className="space-y-1">
+                            {assignment.learning_objectives.slice(0, 3).map((obj, idx) => (
+                              <li key={idx} className="text-xs text-gray-600 flex items-start gap-2">
+                                <span className="text-purple-500">→</span>
+                                <span>{obj}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      {/* Questions Preview (for essays, quizzes) */}
+                      {assignment.questions && assignment.questions.length > 0 && (
+                        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                          <h4 className="text-xs font-semibold text-blue-900 mb-2">❓ Questions to Answer:</h4>
+                          <ul className="space-y-1">
+                            {assignment.questions.slice(0, 2).map((q, idx) => (
+                              <li key={idx} className="text-xs text-blue-800">
+                                {idx + 1}. {q.length > 100 ? q.substring(0, 100) + '...' : q}
+                              </li>
+                            ))}
+                            {assignment.questions.length > 2 && (
+                              <li className="text-xs text-blue-600 italic">
+                                +{assignment.questions.length - 2} more questions...
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+                        <div className="flex items-center gap-4 text-xs text-gray-500">
+                          <span>⏱️ {assignment.estimated_time_hours}h</span>
+                          <span>📊 {assignment.difficulty}</span>
+                          <span>📅 {new Date(assignment.created_at).toLocaleDateString()}</span>
+                          {assignment.score !== undefined && (
+                            <span className="text-green-600 font-semibold">
+                              Score: {assignment.score}%
+                            </span>
+                          )}
+                        </div>
                         <button
-                          onClick={() => router.push(`/ai-assignments#${assignment.assignment_id}`)}
-                          className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                          onClick={() => {
+                            // TODO: Open assignment detail modal or page
+                            alert(`Assignment Details:\n\n${JSON.stringify(assignment, null, 2)}`);
+                          }}
+                          className="text-sm text-purple-600 hover:text-purple-700 font-medium px-4 py-2 rounded-lg hover:bg-purple-50"
                         >
-                          View Details →
+                          View Full Details →
                         </button>
                       </div>
                     </div>

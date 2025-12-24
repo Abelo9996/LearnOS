@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import (
     goals, sessions, progress, onboarding, assignments, resources,
-    ai_config, ai_roadmap, ai_content, ai_habits, courses
+    ai_config, ai_roadmap, ai_content, ai_habits, ai_assignments, courses
 )
 from database import init_db
 
@@ -38,6 +38,7 @@ app.include_router(ai_config.router, prefix="/api", tags=["ai-config"])
 app.include_router(ai_roadmap.router, prefix="/api", tags=["ai-roadmap"])
 app.include_router(ai_content.router, prefix="/api", tags=["ai-content"])
 app.include_router(ai_habits.router, prefix="/api", tags=["ai-habits"])
+app.include_router(ai_assignments.router, tags=["ai-assignments"])
 
 @app.on_event("startup")
 async def startup_event():

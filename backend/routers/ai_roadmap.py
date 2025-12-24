@@ -73,19 +73,27 @@ async def generate_roadmap(request: GenerateRoadmapRequest):
             target_weeks=request.target_weeks
         )
         
-        # Create milestones
+        # Create milestones with all fields including learning steps and resources
         milestones = []
         for milestone_data in roadmap_data.get("milestones", []):
-            milestone = RoadmapMilestone(
-                title=milestone_data["title"],
-                description=milestone_data["description"],
-                concepts=milestone_data.get("concepts", []),
-                estimated_hours=milestone_data.get("estimated_hours", 10),
-                prerequisites=milestone_data.get("prerequisites", []),
-                why_important=milestone_data.get("why_important", ""),
-                real_world_applications=milestone_data.get("real_world_applications", []),
-                recommended_projects=milestone_data.get("recommended_projects", [])
-            )
+            # Parse milestone data - using model_validate to handle nested structures
+            try:
+                milestone = RoadmapMilestone.model_validate(milestone_data)
+            except Exception as e:
+                # Fallback to manual parsing
+                milestone = RoadmapMilestone(
+                    title=milestone_data.get("title", "Untitled Milestone"),
+                    description=milestone_data.get("description", ""),
+                    overview=milestone_data.get("overview", ""),
+                    concepts=milestone_data.get("concepts", []),
+                    estimated_hours=milestone_data.get("estimated_hours", 10),
+                    prerequisites=milestone_data.get("prerequisites", []),
+                    why_important=milestone_data.get("why_important", ""),
+                    real_world_applications=milestone_data.get("real_world_applications", []),
+                    recommended_projects=milestone_data.get("recommended_projects", []),
+                    learning_steps=milestone_data.get("learning_steps", []),
+                    web_resources=milestone_data.get("web_resources", [])
+                )
             milestones.append(milestone)
         
         # Calculate totals

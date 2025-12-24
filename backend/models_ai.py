@@ -88,14 +88,68 @@ class LearningSession(BaseModel):
 
 # ===== AI-Generated Roadmaps =====
 
+class WebResource(BaseModel):
+    """A web resource for learning"""
+    url: str
+    title: str
+    resource_type: str  # "article", "video", "tutorial", "documentation", "course", "book", "interactive"
+    description: str = ""
+    author: Optional[str] = None
+    platform: Optional[str] = None  # e.g., "YouTube", "Medium", "MDN", "freeCodeCamp"
+    estimated_time_minutes: Optional[int] = None
+    difficulty: Optional[str] = None  # "beginner", "intermediate", "advanced"
+    is_free: bool = True
+    rating: Optional[float] = None  # 0-5
+    why_recommended: str = ""  # AI explanation of why this resource is good
+
+class LearningStep(BaseModel):
+    """A detailed learning step within a milestone - like a lesson in a course"""
+    step_id: str = Field(default_factory=lambda: f"step_{datetime.now().timestamp()}")
+    order: int  # Step number within milestone (1, 2, 3, ...)
+    title: str
+    description: str  # Detailed explanation of what to learn
+    
+    # Detailed content for this step
+    learning_objectives: List[str]  # What you'll be able to do after this step
+    key_concepts: List[str]  # Main concepts covered in this step
+    content: str  # Rich text content explaining the topic (like a lesson)
+    
+    # Resources specifically for this step
+    video_resources: List[WebResource] = Field(default_factory=list)  # Videos to watch
+    reading_resources: List[WebResource] = Field(default_factory=list)  # Articles/docs to read
+    interactive_resources: List[WebResource] = Field(default_factory=list)  # Interactive tutorials
+    
+    # Practice and assessment
+    action_items: List[str] = Field(default_factory=list)  # Things to do/try
+    practice_exercises: List[str] = Field(default_factory=list)  # Practice problems
+    quiz_questions: List[Dict[str, Any]] = Field(default_factory=list)  # Self-assessment questions
+    
+    # Metadata
+    estimated_minutes: int = 30  # Time to complete this step
+    difficulty: str = "beginner"  # beginner, intermediate, advanced
+    
+    # Progress
+    completed: bool = False
+    completion_date: Optional[datetime] = None
+    notes: str = ""  # User's personal notes
+
 class RoadmapMilestone(BaseModel):
-    """A milestone in a learning roadmap"""
+    """A milestone in a learning roadmap - like a module in a course"""
     milestone_id: str = Field(default_factory=lambda: f"milestone_{datetime.now().timestamp()}")
     title: str
     description: str
-    concepts: List[str]  # List of concept IDs to master
-    estimated_hours: float
+    overview: str = ""  # Detailed overview of what this milestone covers
+    
+    # Structured learning path within this milestone
+    learning_steps: List[LearningStep] = Field(default_factory=list)  # Ordered steps to complete
+    
+    # Legacy fields (keeping for backward compatibility)
+    concepts: List[str] = Field(default_factory=list)  # List of concept IDs to master
+    estimated_hours: float = 0
     prerequisites: List[str] = Field(default_factory=list)  # Other milestone IDs
+    
+    # General resources for the entire milestone
+    web_resources: List[WebResource] = Field(default_factory=list)
     
     # AI-generated insights
     why_important: str = ""
@@ -386,3 +440,69 @@ class EnrollCourseRequest(BaseModel):
     course_id: str
     onboarding_preferences: Dict[str, Any] = Field(default_factory=dict)
     start_date: Optional[datetime] = None
+
+# ===== AI-Generated Assignments =====
+
+class AssignmentType(str, Enum):
+    """Types of assignments based on subject matter"""
+    CODING_PROJECT = "coding_project"
+    ESSAY = "essay"
+    QUIZ = "quiz"
+    PROBLEM_SET = "problem_set"
+    CREATIVE_PROJECT = "creative_project"
+    READING_ANALYSIS = "reading_analysis"
+    LAB_REPORT = "lab_report"
+    PRESENTATION = "presentation"
+    DISCUSSION = "discussion"
+
+class AssignmentStatus(str, Enum):
+    """Status of assignment completion"""
+    NOT_STARTED = "not_started"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    SUBMITTED = "submitted"
+    GRADED = "graded"
+
+class AIGeneratedAssignment(BaseModel):
+    """AI-generated assignment for a milestone"""
+    assignment_id: str = Field(default_factory=lambda: f"assignment_{datetime.now().timestamp()}")
+    user_id: str
+    course_id: str
+    milestone_id: str
+    roadmap_id: str
+    
+    # Assignment details
+    assignment_type: str = "essay"  # coding_project, essay, quiz, etc.
+    title: str
+    description: str
+    learning_objectives: List[str] = Field(default_factory=list)
+    
+    # Content
+    instructions: List[str] = Field(default_factory=list)
+    requirements: List[str] = Field(default_factory=list)
+    questions: List[str] = Field(default_factory=list)
+    starter_materials: Optional[str] = None
+    
+    # Evaluation
+    test_cases: List[Dict[str, Any]] = Field(default_factory=list)
+    rubric: List[Dict[str, Any]] = Field(default_factory=list)  # [{criterion, points, description}]
+    hints: List[str] = Field(default_factory=list)
+    resources: List[str] = Field(default_factory=list)
+    
+    # Metadata
+    estimated_time_hours: float = 2.0
+    difficulty: str = "intermediate"
+    status: AssignmentStatus = AssignmentStatus.NOT_STARTED
+    
+    # Submission
+    submission: Optional[str] = None
+    submission_date: Optional[datetime] = None
+    score: Optional[float] = None
+    feedback: Optional[str] = None
+    
+    # Timestamps
+    created_at: datetime = Field(default_factory=datetime.now)
+    completed_at: Optional[datetime] = None
+    
+    # AI model used
+    ai_model: str = "gpt-4-turbo-preview"

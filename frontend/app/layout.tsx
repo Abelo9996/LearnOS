@@ -26,11 +26,17 @@ export default function RootLayout({
                 </a>
               </div>
               <div className="flex gap-6">
-                <a href="/" className="text-secondary hover:text-foreground transition-colors">
-                  New Goal
+                <a href="/courses" className="text-secondary hover:text-foreground transition-colors">
+                  My Courses
                 </a>
-                <a href="/progress" className="text-secondary hover:text-foreground transition-colors">
-                  Progress
+                <a href="/courses/create" className="text-secondary hover:text-foreground transition-colors">
+                  Create Course
+                </a>
+                <a href="/habits" className="text-secondary hover:text-foreground transition-colors">
+                  Habits
+                </a>
+                <a href="/ai-settings" className="text-secondary hover:text-foreground transition-colors">
+                  AI Settings
                 </a>
               </div>
             </div>
