@@ -33,7 +33,7 @@ class AssignmentGenerationAgent(Agent):
             "goal_id": str
         }
         Output: {
-            "assignment": Assignment,
+            "assignment": Assignments,
             "estimated_hours": int
         }
         """
