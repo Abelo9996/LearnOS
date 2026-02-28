@@ -1,5 +1,7 @@
 # 🧠 LearnOS — AI-Powered Learning Platform
 
+[![GitHub stars](https://img.shields.io/github/stars/Abelo9996/LearnOS?style=social)](https://github.com/Abelo9996/LearnOS)
+
 LearnOS is an agentic learning operating system that uses GPT-4 to create personalized learning experiences. Tell it what you want to learn, and it generates a custom roadmap, assignments, and tracks your progress.
 
 ![Python](https://img.shields.io/badge/Python-3.11+-blue)

@@ -28,7 +28,7 @@ export default function HomePage() {
         <p className="text-xl text-gray-600 max-w-2xl mx-auto mb-10">
           Tell us what you want to learn. Our AI creates personalized roadmaps, generates assignments, and tracks your progress — so you can focus on actually learning.
         </p>
-        <div className="flex items-center justify-center gap-4">
+        <div className="flex items-center justify-center gap-4 flex-wrap">
           <button
             onClick={() => router.push('/courses/create')}
             className="px-8 py-4 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold text-lg rounded-xl hover:from-purple-700 hover:to-blue-700 shadow-lg transition-all hover:shadow-xl"
@@ -41,6 +41,15 @@ export default function HomePage() {
           >
             My Courses
           </button>
+          <a
+            href="https://github.com/Abelo9996/LearnOS"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 px-6 py-4 bg-gradient-to-r from-green-600 to-green-500 text-white font-bold text-lg rounded-xl hover:from-green-500 hover:to-green-400 shadow-lg transition-all hover:shadow-xl hover:-translate-y-0.5"
+          >
+            <svg height="18" width="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25z"/></svg>
+            Star on GitHub
+          </a>
         </div>
       </section>
 
