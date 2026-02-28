@@ -1,13 +1,306 @@
-from typing import Dict, Any, List
+"""
+Resource Curation Agent - Find, evaluate, and recommend learning resources using LLMs
+"""
+
 from agents.base import Agent
-from models_extended import (
-    ExternalResource, ResourceType, ResourceDifficulty,
-    LearnerProfile, ExpertiseLevel
-)
-import uuid
-from datetime import datetime
+from llm_manager import llm_manager
+from llm_providers import LLMRequest, ModelCapability
+from typing import Dict, Any, List, Optional
+import json
+
 
 class ResourceCurationAgent(Agent):
+    """
+    Curates and recommends high-quality learning resources using LLMs.
+    Features:
+    - Evaluates resource relevance and quality
+    - Difficulty assessment
+    - Personalized recommendations
+    - Resource sequencing
+    - Quality checks
+    """
+    
+    def __init__(self):
+        super().__init__(role="Resource Curator")
+        self.resource_cache: Dict[str, List[Dict]] = {}
+    
+    async def process(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Find and curate resources for a concept
+        
+        Inputs:
+        - user_id: str
+        - concept: str
+        - difficulty: float (0-1)
+        - preferred_types: List[str]
+        - max_results: int
+        - learner_preferences: Dict (language, format preferences)
+        
+        Outputs:
+        - resources: List[Resource]
+        - ranked_resources: List[Resource]
+        - recommended_sequence: List[Resource]
+        - supplementary_resources: List[Resource]
+        """
+        
+        user_id = inputs.get("user_id", "demo_user")
+        concept = inputs.get("concept")
+        difficulty = inputs.get("difficulty", 0.5)
+        preferred_types = inputs.get("preferred_types", ["article", "video", "tutorial"])
+        max_results = inputs.get("max_results", 10)
+        learner_preferences = inputs.get("learner_preferences", {})
+        
+        if not concept:
+            raise ValueError("Concept is required")
+        
+        # Find resources
+        resources = await self._find_resources(
+            user_id, concept, preferred_types, max_results, learner_preferences
+        )
+        
+        # Rank by relevance and quality
+        ranked_resources = await self._rank_resources(user_id, concept, resources, difficulty)
+        
+        # Create learning sequence
+        recommended_sequence = await self._sequence_resources(user_id, ranked_resources[:5])
+        
+        # Find supplementary resources
+        supplementary = await self._find_supplementary_resources(
+            user_id, concept, ranked_resources
+        )
+        
+        return {
+            "concept": concept,
+            "resources_found": len(resources),
+            "resources": resources[:max_results],
+            "ranked_resources": ranked_resources[:10],
+            "recommended_sequence": recommended_sequence,
+            "supplementary_resources": supplementary[:5],
+            "metadata": {
+                "difficulty_level": difficulty,
+                "preferred_types": preferred_types,
+                "curated_by": "llm_manager"
+            }
+        }
+    
+    async def _find_resources(
+        self,
+        user_id: str,
+        concept: str,
+        resource_types: List[str],
+        max_results: int,
+        preferences: Dict
+    ) -> List[Dict]:
+        """Find relevant resources using LLM"""
+        
+        cache_key = f"{concept}:{','.join(resource_types)}"
+        if cache_key in self.resource_cache:
+            return self.resource_cache[cache_key]
+        
+        types_str = ", ".join(resource_types)
+        
+        request = LLMRequest(
+            system_prompt="""You are an expert resource curator. Identify high-quality learning resources.
+For each resource, provide: title, type, url (if known), brief description, difficulty (0-1), estimated duration in minutes.""",
+            user_prompt=f"""Find {max_results} high-quality resources to learn "{concept}".
+
+Preferred resource types: {types_str}
+Language: {preferences.get('language', 'English')}
+
+For each resource, return a JSON object with:
+{{"title": "...", "type": "...", "url": "...", "description": "...", "difficulty": 0.5, "duration_minutes": 30}}
+
+Return as a JSON array of resources.""",
+            task_type="content_generation"
+        )
+        
+        try:
+            response = await llm_manager.generate(user_id, request, ModelCapability.CONTENT_GENERATION)
+            
+            # Extract JSON array
+            json_str = response.content
+            if "[" in json_str:
+                start = json_str.index("[")
+                end = json_str.rindex("]") + 1
+                resources = json.loads(json_str[start:end])
+                self.resource_cache[cache_key] = resources
+                return resources
+            
+            return []
+        except Exception as e:
+            print(f"Error finding resources: {e}")
+            return []
+    
+    async def _rank_resources(
+        self,
+        user_id: str,
+        concept: str,
+        resources: List[Dict],
+        target_difficulty: float
+    ) -> List[Dict]:
+        """Rank resources by relevance and quality"""
+        
+        if not resources:
+            return []
+        
+        # Format resources for LLM
+        resources_text = json.dumps(resources, indent=2)
+        
+        request = LLMRequest(
+            system_prompt="""You are an expert educational content evaluator.
+Rank learning resources by:
+1. Relevance to the learning goal
+2. Quality and accuracy
+3. Clarity and pedagogy
+4. Appropriate difficulty level (target: {})
+5. Estimated effectiveness for learning""".format(target_difficulty),
+            user_prompt=f"""Rank these resources for learning "{concept}":
+
+{resources_text}
+
+Return ONLY a JSON array of the same resources, sorted by ranking (best first).
+Add a "ranking_score" (0-100) and "ranking_reason" to each resource.""",
+            task_type="evaluation"
+        )
+        
+        try:
+            response = await llm_manager.generate(user_id, request, ModelCapability.EVALUATION)
+            
+            json_str = response.content
+            if "[" in json_str:
+                start = json_str.index("[")
+                end = json_str.rindex("]") + 1
+                ranked = json.loads(json_str[start:end])
+                
+                # Sort by ranking_score if available
+                if ranked and "ranking_score" in ranked[0]:
+                    ranked.sort(key=lambda x: x.get("ranking_score", 0), reverse=True)
+                
+                return ranked
+            
+            return resources
+        except:
+            return resources
+    
+    async def _sequence_resources(self, user_id: str, resources: List[Dict]) -> List[Dict]:
+        """Create an optimal learning sequence from resources"""
+        
+        if not resources:
+            return []
+        
+        resources_text = json.dumps(resources, indent=2)
+        
+        request = LLMRequest(
+            system_prompt="You are a curriculum designer expert in sequencing learning resources optimally.",
+            user_prompt=f"""Create an optimal learning sequence from these resources:
+
+{resources_text}
+
+Consider:
+1. Start with foundational concepts
+2. Progress from simple to complex
+3. Mix different resource types for engagement
+4. Allow time for concepts to solidify
+
+Return a JSON array with the same resources, reordered for optimal learning.""",
+            task_type="content_generation"
+        )
+        
+        try:
+            response = await llm_manager.generate(user_id, request, ModelCapability.CONTENT_GENERATION)
+            
+            json_str = response.content
+            if "[" in json_str:
+                start = json_str.index("[")
+                end = json_str.rindex("]") + 1
+                return json.loads(json_str[start:end])
+            
+            return resources
+        except:
+            return resources
+    
+    async def _find_supplementary_resources(
+        self,
+        user_id: str,
+        concept: str,
+        main_resources: List[Dict]
+    ) -> List[Dict]:
+        """Find complementary resources for deeper learning"""
+        
+        main_types = set(r.get("type", "") for r in main_resources)
+        
+        # Find alternative types
+        all_types = [
+            "article", "video", "tutorial", "book", 
+            "research_paper", "interactive", "code_example", "podcast"
+        ]
+        alternative_types = [t for t in all_types if t not in main_types][:3]
+        
+        types_str = ", ".join(alternative_types)
+        
+        request = LLMRequest(
+            system_prompt="You are a resource curator finding complementary learning materials.",
+            user_prompt=f"""Find 3-5 supplementary resources to complement learning "{concept}".
+
+Already recommended resource types: {', '.join(main_types)}
+Preferred alternative types: {types_str}
+
+These should provide different perspectives or deeper dives.
+
+Return as a JSON array of resources with: title, type, url, description, difficulty, duration_minutes""",
+            task_type="content_generation"
+        )
+        
+        try:
+            response = await llm_manager.generate(user_id, request, ModelCapability.CONTENT_GENERATION)
+            
+            json_str = response.content
+            if "[" in json_str:
+                start = json_str.index("[")
+                end = json_str.rindex("]") + 1
+                return json.loads(json_str[start:end])
+            
+            return []
+        except:
+            return []
+    
+    async def evaluate_resource_quality(self, user_id: str, resource: Dict) -> Dict[str, Any]:
+        """Evaluate a specific resource's quality and relevance"""
+        
+        request = LLMRequest(
+            system_prompt="You are an expert educational content evaluator.",
+            user_prompt=f"""Evaluate the quality of this learning resource:
+
+Title: {resource.get('title')}
+Type: {resource.get('type')}
+Description: {resource.get('description')}
+URL: {resource.get('url')}
+
+Provide a JSON evaluation with:
+- quality_score (0-100)
+- accuracy (0-100)
+- clarity (0-100)
+- engagement (0-100)
+- recommended_for (beginner/intermediate/advanced)
+- strengths (list)
+- weaknesses (list)
+- overall_recommendation (strongly_recommend/recommend/neutral/avoid)""",
+            task_type="evaluation"
+        )
+        
+        try:
+            response = await llm_manager.generate(user_id, request, ModelCapability.EVALUATION)
+            
+            json_str = response.content
+            if "{" in json_str:
+                start = json_str.index("{")
+                end = json_str.rindex("}") + 1
+                return json.loads(json_str[start:end])
+            
+            return {}
+        except:
+            return {}
+
     """
     Curates external resources based on:
     - Current concept being learned

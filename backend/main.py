@@ -1,75 +1,85 @@
-import os
-import logging
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
-load_dotenv()
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(name)s %(levelname)s %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-logger = logging.getLogger("learnos")
-
-from routers import (
-    goals, sessions, progress, onboarding, assignments, resources,
-    ai_config, ai_roadmap, ai_content, ai_habits, ai_assignments, courses, ai_tutor
-)
-from db import init_database
-
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+from routers import goals, sessions, progress, onboarding, assignments, resources, llm_config, auth
+from database import init_db
 
 app = FastAPI(
     title="LearnOS API",
-    description="Agentic Learning Operating System — AI-Enhanced Learning Platform",
-    version="4.1.0",
+    description="Agentic Learning Operating System - Multi-LLM Edition",
+    version="3.0.0"
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[FRONTEND_URL, "http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Core course router
-app.include_router(courses.router, prefix="/api", tags=["courses"])
+# Authentication & User Management
+app.include_router(auth.router, prefix="/api", tags=["auth"])
 
-# Original routers
+# Core learning routers
 app.include_router(goals.router, prefix="/api", tags=["goals"])
 app.include_router(sessions.router, prefix="/api", tags=["sessions"])
 app.include_router(progress.router, prefix="/api", tags=["progress"])
 
-# Personalization
+# Personalization routers
 app.include_router(onboarding.router, prefix="/api", tags=["onboarding"])
 app.include_router(assignments.router, prefix="/api", tags=["assignments"])
 app.include_router(resources.router, prefix="/api", tags=["resources"])
 
-# AI-powered
-app.include_router(ai_config.router, prefix="/api", tags=["ai-config"])
-app.include_router(ai_roadmap.router, prefix="/api", tags=["ai-roadmap"])
-app.include_router(ai_content.router, prefix="/api", tags=["ai-content"])
-app.include_router(ai_habits.router, prefix="/api", tags=["ai-habits"])
-app.include_router(ai_assignments.router, tags=["ai-assignments"])
-app.include_router(ai_tutor.router, prefix="/api", tags=["ai-tutor"])
-
+# LLM Management router
+app.include_router(llm_config.router, tags=["llm"])
 
 @app.on_event("startup")
 async def startup_event():
-    await init_database()
-    logger.info("LearnOS API started")
-
+    await init_db()
 
 @app.get("/")
 async def root():
-    return {"message": "LearnOS API is running", "version": "4.1.0"}
+    return {
+        "message": "LearnOS API is running",
+        "version": "3.0.0",
+        "features": [
+            "Multi-LLM support (OpenAI, Anthropic, Groq, Ollama)",
+            "Adaptive content generation",
+            "Personalized assessments",
+            "Real-time feedback adaptation",
+            "Resource curation",
+            "User authentication & management",
+            "Usage analytics & billing"
+        ],
+        "documentation": "http://localhost:8000/docs"
+    }
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+
+# ─── AI Settings (runtime config from UI) ─────────────────────────────
+
+from ai_config import ai_config, AIConfigRequest, AIConfigStatusResponse
+
+@app.get("/api/ai/config/status/{user_id}", response_model=AIConfigStatusResponse)
+async def get_ai_config(user_id: str):
+    """Get current AI configuration (keys masked)."""
+    return ai_config.get_status()
+
+@app.post("/api/ai/config/update/{user_id}", response_model=AIConfigStatusResponse)
+async def update_ai_config(user_id: str, req: AIConfigRequest):
+    """Update AI configuration. Changes take effect immediately."""
+    return ai_config.update(req)
+
+@app.post("/api/ai/config/test/{user_id}")
+async def test_ai_config(user_id: str):
+    """Test current API key and model."""
+    return await ai_config.test_connection()
 
 
 if __name__ == "__main__":
     import uvicorn
-    host = os.getenv("HOST", "0.0.0.0")
-    port = int(os.getenv("PORT", "8000"))
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
