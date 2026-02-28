@@ -89,8 +89,8 @@ async def init_database():
             CREATE TABLE IF NOT EXISTS openai_configs (
                 user_id TEXT PRIMARY KEY,
                 api_key TEXT NOT NULL,
-                model TEXT DEFAULT 'gpt-4',
-                max_tokens INTEGER DEFAULT 2000,
+                model TEXT DEFAULT 'gpt-4o-mini',
+                max_tokens INTEGER DEFAULT 4000,
                 temperature REAL DEFAULT 0.7,
                 enabled INTEGER DEFAULT 1,
                 created_at TEXT,
@@ -405,8 +405,8 @@ async def save_openai_config(config_dict: dict):
             VALUES (?,?,?,?,?,?,?,?)
         """, (
             config_dict["user_id"], config_dict["api_key"],
-            config_dict.get("model", "gpt-4"),
-            config_dict.get("max_tokens", 2000),
+            config_dict.get("model", "gpt-4o-mini"),
+            config_dict.get("max_tokens", 4000),
             config_dict.get("temperature", 0.7),
             1 if config_dict.get("enabled", True) else 0,
             config_dict.get("created_at", _now()),

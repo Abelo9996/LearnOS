@@ -321,8 +321,8 @@ class ConfigureOpenAIRequest(BaseModel):
     """Request to configure OpenAI integration"""
     user_id: str
     api_key: str
-    model: str = "gpt-4"
-    max_tokens: int = 2000
+    model: str = "gpt-4o-mini"
+    max_tokens: int = 4000
     temperature: float = 0.7
 
 class GenerateRoadmapRequest(BaseModel):

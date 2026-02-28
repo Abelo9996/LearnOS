@@ -47,7 +47,7 @@ async def setup_openai(request: ConfigureOpenAIRequest):
     }
     await db.save_openai_config(config_dict)
 
-    service = get_openai_service(request.api_key)
+    service = get_openai_service(request.api_key, model=request.model)
 
     # Ensure default feature toggles
     existing = await db.get_feature_toggles(request.user_id)

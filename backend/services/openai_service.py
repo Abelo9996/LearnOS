@@ -17,15 +17,14 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
     OpenAI = None
-    pass  # debug removed
 
 class OpenAIService:
     """Service for interacting with OpenAI GPT-4"""
-    
+
     def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o-mini"):
         """
         Initialize OpenAI service
-        
+
         Args:
             api_key: OpenAI API key. If None, will try to get from environment
             model: Model to use for completions
@@ -33,7 +32,7 @@ class OpenAIService:
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
         self.model = model
         self.client = None
-        
+
         if OPENAI_AVAILABLE and self.api_key:
             try:
                 self.client = OpenAI(api_key=self.api_key)
@@ -43,13 +42,12 @@ class OpenAIService:
                 self.available = False
         else:
             self.available = False
-    
+
     def is_available(self) -> bool:
         """Check if OpenAI service is available"""
         result = self.available and self.client is not None
-        pass  # debug removed
         return result
-    
+
     async def generate_assignment(
         self,
         concept: str,
@@ -59,23 +57,23 @@ class OpenAIService:
     ) -> Dict[str, Any]:
         """
         Generate a custom coding assignment using GPT-4
-        
+
         Args:
             concept: The concept to create assignment for
             difficulty: Difficulty level 0-1
             learner_profile: User's learning profile
             include_test_cases: Whether to include test cases
-            
+
         Returns:
             Dictionary with assignment details
         """
         if not self.is_available():
             return self._get_fallback_assignment(concept)
-        
+
         prompt = self._build_assignment_prompt(
             concept, difficulty, learner_profile, include_test_cases
         )
-        
+
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -86,15 +84,14 @@ class OpenAIService:
                 temperature=0.7,
                 max_tokens=2000
             )
-            
+
             content = response.choices[0].message.content
             assignment = self._parse_assignment_response(content)
             return assignment
-            
+
         except Exception as e:
-            pass  # debug removed
             return self._get_fallback_assignment(concept)
-    
+
     async def generate_roadmap(
         self,
         goal: str,
@@ -104,26 +101,25 @@ class OpenAIService:
     ) -> Dict[str, Any]:
         """
         Generate a personalized learning roadmap using GPT-4
-        
+
         Args:
             goal: Learning goal
             learner_profile: User's learning profile
             learning_habits: User's learning habits
             target_weeks: Target completion time in weeks
-            
+
         Returns:
             Dictionary with roadmap structure
         """
         if not self.is_available():
             return self._get_fallback_roadmap(goal)
-        
+
         prompt = self._build_roadmap_prompt(
             goal, learner_profile, learning_habits, target_weeks
         )
-        
+
         try:
-            pass  # debug removed
-            
+
             response = self.client.chat.completions.create(
                 model=self.model,  # Has 128k context window!
                 messages=[
@@ -131,41 +127,24 @@ class OpenAIService:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=16000
+                max_tokens=8000  # Works for gpt-4o-mini (16k limit) and gpt-4o
             )
-            
+
             content = response.choices[0].message.content
-            
-            pass  # debug removed
-            
+
+
             roadmap = self._parse_roadmap_response(content)
-            
-            pass  # debug removed
-            
+
+
             if roadmap and "milestones" in roadmap and roadmap["milestones"]:
-                first_ms = roadmap["milestones"][0]
-                steps_count = len(first_ms.get('learning_steps', []))
-                pass  # debug removed
-                if steps_count > 0:
-                    first_step = first_ms['learning_steps'][0]
-                    pass  # debug removed
-                else:
-                    pass  # debug removed
-            else:
-                pass  # debug removed
-            
-            pass  # debug removed
-            
+                logger.info("Roadmap generated with %d milestones", len(roadmap["milestones"]))
+
             return roadmap
-            
+
         except Exception as e:
-            pass  # debug removed
-            import traceback
-            pass  # debug removed
-            traceback.print_exc()
-            pass  # debug removed
+            logger.exception("Roadmap generation failed")
             return self._get_fallback_roadmap(goal)
-    
+
     async def analyze_habits_and_suggest_adaptations(
         self,
         learning_habits: Dict[str, Any],
@@ -174,22 +153,22 @@ class OpenAIService:
     ) -> List[Dict[str, Any]]:
         """
         Analyze learning habits and suggest adaptations
-        
+
         Args:
             learning_habits: User's learning habit patterns
             recent_sessions: Recent learning session data
             current_progress: Current learning progress
-            
+
         Returns:
             List of suggested adaptations
         """
         if not self.is_available():
             return self._get_fallback_adaptations()
-        
+
         prompt = self._build_habit_analysis_prompt(
             learning_habits, recent_sessions, current_progress
         )
-        
+
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -200,15 +179,14 @@ class OpenAIService:
                 temperature=0.7,
                 max_tokens=1500
             )
-            
+
             content = response.choices[0].message.content
             adaptations = self._parse_adaptations_response(content)
             return adaptations
-            
+
         except Exception as e:
-            pass  # debug removed
             return self._get_fallback_adaptations()
-    
+
     async def generate_milestone_assignment(
         self,
         milestone_title: str,
@@ -219,35 +197,35 @@ class OpenAIService:
     ) -> Dict[str, Any]:
         """
         Generate a comprehensive assignment for a milestone/module
-        
+
         Args:
             milestone_title: Title of the milestone
             milestone_description: Description of what the milestone covers
             concepts: Key concepts covered in this milestone
             learning_steps: The learning steps/lessons in this milestone
             difficulty: Difficulty level (beginner, intermediate, advanced)
-            
+
         Returns:
             Dictionary with assignment details
         """
         if not self.is_available():
             return self._get_fallback_milestone_assignment(milestone_title, concepts)
-        
+
         # Detect subject type from title and description
         subject_text = f"{milestone_title} {milestone_description}".lower()
-        
+
         # Keywords for different subject areas
         philosophy_keywords = ["philosophy", "stoicism", "ethics", "metaphysics", "epistemology", "logic", "marcus aurelius", "plato", "aristotle", "kant", "nietzsche", "existentialism"]
         tech_keywords = ["programming", "coding", "javascript", "python", "algorithm", "data structure", "software", "api", "database", "web development"]
         science_keywords = ["physics", "chemistry", "biology", "experiment", "lab", "scientific method", "hypothesis", "molecule"]
         arts_keywords = ["art", "music", "design", "creative", "painting", "composition", "visual", "aesthetic"]
-        
+
         # Determine subject type
         is_philosophy = any(kw in subject_text for kw in philosophy_keywords)
         is_tech = any(kw in subject_text for kw in tech_keywords)
         is_science = any(kw in subject_text for kw in science_keywords)
         is_arts = any(kw in subject_text for kw in arts_keywords)
-        
+
         # Build subject-specific instructions
         if is_philosophy:
             subject_instruction = """
@@ -272,7 +250,7 @@ THIS IS AN ARTS/CREATIVE MODULE. Create creative projects with portfolios or com
         else:
             subject_instruction = """
 THIS IS A GENERAL KNOWLEDGE MODULE. Create quizzes or comprehension tests."""
-        
+
         prompt = f"""Create a comprehensive assessment assignment for this learning module:
 
 **Module**: {milestone_title}
@@ -306,7 +284,7 @@ The assignment should:
 4. Include helpful guidance and examples
 5. Be completable by someone who studied the module materials
 
-**CRITICAL**: For philosophy/humanities modules, you MUST use assignment_type "essay" or "reading_analysis" 
+**CRITICAL**: For philosophy/humanities modules, you MUST use assignment_type "essay" or "reading_analysis"
 and provide thoughtful questions in the "questions" field. DO NOT create coding projects for non-technical subjects.
 
 Format as JSON:
@@ -380,8 +358,7 @@ Make it engaging, authentic to the subject matter, and appropriately challenging
 Make it engaging and practical! Think of real-world applications."""
 
         try:
-            pass  # debug removed
-            
+
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
@@ -391,21 +368,18 @@ Make it engaging and practical! Think of real-world applications."""
                 temperature=0.7,
                 max_tokens=2000
             )
-            
+
             content = response.choices[0].message.content
-            
-            pass  # debug removed
-            
+
+
             assignment = self._parse_assignment_response(content)
-            
-            pass  # debug removed
-            
+
+
             return assignment
-            
+
         except Exception as e:
-            pass  # debug removed
             return self._get_fallback_milestone_assignment(milestone_title, concepts)
-    
+
     async def retrieve_and_analyze_content(
         self,
         concept: str,
@@ -415,23 +389,23 @@ Make it engaging and practical! Think of real-world applications."""
     ) -> List[Dict[str, Any]]:
         """
         Search for and analyze relevant content
-        
+
         Args:
             concept: Concept to find content for
             content_types: Types of content to find
             learner_profile: User's learning profile
             max_results: Maximum number of results
-            
+
         Returns:
             List of retrieved and analyzed content
         """
         if not self.is_available():
             return self._get_fallback_content(concept)
-        
+
         prompt = self._build_content_retrieval_prompt(
             concept, content_types, learner_profile
         )
-        
+
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -442,15 +416,14 @@ Make it engaging and practical! Think of real-world applications."""
                 temperature=0.7,
                 max_tokens=2000
             )
-            
+
             content = response.choices[0].message.content
             resources = self._parse_content_response(content, max_results)
             return resources
-            
+
         except Exception as e:
-            pass  # debug removed
             return self._get_fallback_content(concept)
-    
+
     async def generate_progress_insights(
         self,
         user_progress: Dict[str, Any],
@@ -459,22 +432,22 @@ Make it engaging and practical! Think of real-world applications."""
     ) -> List[Dict[str, Any]]:
         """
         Generate AI insights about learning progress
-        
+
         Args:
             user_progress: Current progress data
             learning_history: Historical learning data
             current_goals: User's current goals
-            
+
         Returns:
             List of insights
         """
         if not self.is_available():
             return self._get_fallback_insights()
-        
+
         prompt = self._build_insights_prompt(
             user_progress, learning_history, current_goals
         )
-        
+
         try:
             response = self.client.chat.completions.create(
                 model=self.model,
@@ -485,17 +458,16 @@ Make it engaging and practical! Think of real-world applications."""
                 temperature=0.7,
                 max_tokens=1500
             )
-            
+
             content = response.choices[0].message.content
             insights = self._parse_insights_response(content)
             return insights
-            
+
         except Exception as e:
-            pass  # debug removed
             return self._get_fallback_insights()
-    
+
     # ===== Prompt Building Methods =====
-    
+
     def _build_assignment_prompt(
         self,
         concept: str,
@@ -505,7 +477,7 @@ Make it engaging and practical! Think of real-world applications."""
     ) -> str:
         """Build prompt for assignment generation"""
         difficulty_text = "beginner" if difficulty < 0.3 else "intermediate" if difficulty < 0.7 else "advanced"
-        
+
         prompt = f"""Create a coding assignment for the concept: {concept}
 
 Learner Profile:
@@ -537,7 +509,7 @@ Please format your response as JSON with the following structure:
     "required_libraries": ["numpy", "matplotlib"]
 }}"""
         return prompt
-    
+
     def _build_roadmap_prompt(
         self,
         goal: str,
@@ -564,7 +536,7 @@ Learner Profile:
 """
         if target_weeks:
             prompt += f"Target completion: {target_weeks} weeks\n\n"
-        
+
         prompt += """Create a COMPREHENSIVE, COURSE-LIKE roadmap similar to Coursera, but using FREE, publicly available resources.
 
 CRITICAL: You MUST generate 6-12 milestones (modules) for a full course. Each milestone = 1-2 weeks of study. A 12-week course needs ~10-12 milestones. DO NOT generate only 1 milestone. Cover the ENTIRE topic breadth.
@@ -581,7 +553,7 @@ CRITICAL REQUIREMENTS FOR EACH MILESTONE:
    - Include learning objectives (what learner will be able to do)
    - Provide detailed content explaining the topic (like a lesson transcript)
    - Add specific action items and practice exercises
-   
+
 2. RESOURCES FOR EACH STEP: Include REAL web resources:
    - 2-3 YouTube videos (actual URLs from real channels)
    - 1-2 articles or documentation (MDN, official docs, quality blogs)
@@ -677,15 +649,15 @@ Format as JSON:
     "mitigation_strategies": ["How to overcome the challenge"]
 }
 
-REMEMBER: 
-- Use REAL URLs from YouTube, MDN, freeCodeCamp, official documentation, reputable blogs
-- Each milestone should have 4-8 learning steps (lessons)
-- Each step should have rich content + 3-6 resources
-- Make content detailed and educational (like Coursera lessons)
-- Focus on FREE, publicly available resources
-- Think of this as creating a complete online course!"""
+REMEMBER:
+- Generate 6-12 milestones covering the FULL topic breadth
+- Each milestone should have 3-5 learning steps (keep steps concise)
+- Each step needs 1-2 resource URLs (YouTube, docs, or articles — use REAL URLs)
+- Content per step: 1-2 paragraphs (not a full textbook)
+- Prioritize breadth of coverage over depth per step
+- Format as valid JSON only — no text before or after the JSON"""
         return prompt
-    
+
     def _build_habit_analysis_prompt(
         self,
         learning_habits: Dict[str, Any],
@@ -718,7 +690,7 @@ Provide 3-5 specific, actionable adaptations. Format as JSON:
     }}
 ]"""
         return prompt
-    
+
     def _build_content_retrieval_prompt(
         self,
         concept: str,
@@ -752,7 +724,7 @@ Provide REAL, EXISTING resources with actual URLs. Format as JSON:
 
 Focus on high-quality, well-known resources (MIT OpenCourseWare, Stanford CS, YouTube channels like 3Blue1Brown, Arxiv papers, etc.)"""
         return prompt
-    
+
     def _build_insights_prompt(
         self,
         user_progress: Dict[str, Any],
@@ -784,9 +756,9 @@ Generate 3-5 actionable insights. Format as JSON:
     }}
 ]"""
         return prompt
-    
+
     # ===== Response Parsing Methods =====
-    
+
     def _parse_assignment_response(self, content: str) -> Dict[str, Any]:
         """Parse AI assignment response"""
         try:
@@ -799,28 +771,33 @@ Generate 3-5 actionable insights. Format as JSON:
         except:
             pass
         return self._get_fallback_assignment("Unknown Concept")
-    
+
     def _parse_roadmap_response(self, content: str) -> Dict[str, Any]:
         """Parse AI roadmap response"""
         try:
+            # Strip markdown code fences if present
+            text = content.strip()
+            if text.startswith("```"):
+                text = text.split("```", 2)[1]
+                if text.startswith("json"):
+                    text = text[4:]
+                text = text.strip()
+            
             # Try to find JSON in the response
-            start = content.find('{')
-            end = content.rfind('}') + 1
+            start = text.find('{')
+            end = text.rfind('}') + 1
             if start != -1 and end > start:
-                json_str = content[start:end]
+                json_str = text[start:end]
                 parsed = json.loads(json_str)
-                pass  # debug removed
+                logger.info("Parsed roadmap: %d milestones", len(parsed.get("milestones", [])))
                 return parsed
-            else:
-                pass  # debug removed
         except json.JSONDecodeError as e:
-            pass  # debug removed
+            logger.error("JSON parse error in roadmap: %s", e)
         except Exception as e:
-            pass  # debug removed
-        
-        pass  # debug removed
+            logger.error("Error parsing roadmap: %s", e)
+
         return self._get_fallback_roadmap("Unknown Goal")
-    
+
     def _parse_adaptations_response(self, content: str) -> List[Dict[str, Any]]:
         """Parse AI adaptations response"""
         try:
@@ -832,7 +809,7 @@ Generate 3-5 actionable insights. Format as JSON:
         except:
             pass
         return self._get_fallback_adaptations()
-    
+
     def _parse_content_response(self, content: str, max_results: int) -> List[Dict[str, Any]]:
         """Parse AI content retrieval response"""
         try:
@@ -845,7 +822,7 @@ Generate 3-5 actionable insights. Format as JSON:
         except:
             pass
         return self._get_fallback_content("Unknown Concept")
-    
+
     def _parse_insights_response(self, content: str) -> List[Dict[str, Any]]:
         """Parse AI insights response"""
         try:
@@ -857,9 +834,9 @@ Generate 3-5 actionable insights. Format as JSON:
         except:
             pass
         return self._get_fallback_insights()
-    
+
     # ===== Fallback Methods (when AI is unavailable) =====
-    
+
     def _get_fallback_assignment(self, concept: str) -> Dict[str, Any]:
         """Fallback assignment when AI unavailable"""
         return {
@@ -885,7 +862,7 @@ Generate 3-5 actionable insights. Format as JSON:
             "estimated_hours": 3.0,
             "required_libraries": []
         }
-    
+
     def _get_fallback_milestone_assignment(self, milestone_title: str, concepts: List[str]) -> Dict[str, Any]:
         """Fallback milestone assignment when AI unavailable"""
         concepts_str = ', '.join(concepts[:3]) if concepts else "key concepts"
@@ -932,7 +909,7 @@ Generate 3-5 actionable insights. Format as JSON:
             "estimated_time_hours": 3,
             "difficulty": "intermediate"
         }
-    
+
     def _get_fallback_roadmap(self, goal: str) -> Dict[str, Any]:
         """Fallback roadmap when AI unavailable - includes full structure"""
         return {
@@ -977,7 +954,7 @@ Generate 3-5 actionable insights. Format as JSON:
             "potential_challenges": ["AI not configured - limited content available"],
             "mitigation_strategies": ["Set up OpenAI API key in settings for full experience"]
         }
-    
+
     def _get_fallback_adaptations(self) -> List[Dict[str, Any]]:
         """Fallback adaptations when AI unavailable"""
         return [
@@ -992,7 +969,7 @@ Generate 3-5 actionable insights. Format as JSON:
                 "confidence": 0.7
             }
         ]
-    
+
     def _get_fallback_content(self, concept: str) -> List[Dict[str, Any]]:
         """Fallback content when AI unavailable"""
         return [
@@ -1008,7 +985,7 @@ Generate 3-5 actionable insights. Format as JSON:
                 "relevance_score": 0.7
             }
         ]
-    
+
     def _get_fallback_insights(self) -> List[Dict[str, Any]]:
         """Fallback insights when AI unavailable"""
         return [
