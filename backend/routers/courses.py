@@ -79,7 +79,7 @@ async def create_course(request: CreateCourseRequest):
             }
 
         try:
-            service = get_openai_service(config["api_key"])
+            service = get_openai_service(config["api_key"], model=config.get("model", "gpt-4o-mini"))
             roadmap_data = await service.generate_roadmap(
                 goal=request.goal,
                 current_knowledge=f"Starting {request.difficulty_level} level course",

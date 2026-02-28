@@ -22,14 +22,16 @@ except ImportError:
 class OpenAIService:
     """Service for interacting with OpenAI GPT-4"""
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4o-mini"):
         """
         Initialize OpenAI service
         
         Args:
             api_key: OpenAI API key. If None, will try to get from environment
+            model: Model to use for completions
         """
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.model = model
         self.client = None
         
         if OPENAI_AVAILABLE and self.api_key:
@@ -37,7 +39,7 @@ class OpenAIService:
                 self.client = OpenAI(api_key=self.api_key)
                 self.available = True
             except Exception as e:
-                pass  # debug removed
+                logger.error("Failed to initialize OpenAI client: %s", e)
                 self.available = False
         else:
             self.available = False
@@ -76,7 +78,7 @@ class OpenAIService:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model=self.model,
                 messages=[
                     {"role": "system", "content": "You are an expert programming instructor creating personalized coding assignments."},
                     {"role": "user", "content": prompt}
@@ -123,13 +125,13 @@ class OpenAIService:
             pass  # debug removed
             
             response = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",  # Has 128k context window!
+                model=self.model,  # Has 128k context window!
                 messages=[
                     {"role": "system", "content": "You are an expert learning architect creating comprehensive educational roadmaps with detailed lessons and resources."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.7,
-                max_tokens=4096  # gpt-4-turbo-preview max completion tokens
+                max_tokens=16000
             )
             
             content = response.choices[0].message.content
@@ -190,7 +192,7 @@ class OpenAIService:
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model=self.model,
                 messages=[
                     {"role": "system", "content": "You are an expert learning psychologist analyzing study habits and suggesting improvements."},
                     {"role": "user", "content": prompt}
@@ -381,7 +383,7 @@ Make it engaging and practical! Think of real-world applications."""
             pass  # debug removed
             
             response = self.client.chat.completions.create(
-                model="gpt-4-turbo-preview",
+                model=self.model,
                 messages=[
                     {"role": "system", "content": "You are an expert educator creating practical, engaging assignments that test real understanding."},
                     {"role": "user", "content": prompt}
@@ -432,7 +434,7 @@ Make it engaging and practical! Think of real-world applications."""
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model=self.model,
                 messages=[
                     {"role": "system", "content": "You are an expert at finding and evaluating educational resources. Provide real, existing URLs."},
                     {"role": "user", "content": prompt}
@@ -475,7 +477,7 @@ Make it engaging and practical! Think of real-world applications."""
         
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4",
+                model=self.model,
                 messages=[
                     {"role": "system", "content": "You are an expert learning analytics specialist providing actionable insights."},
                     {"role": "user", "content": prompt}
@@ -564,6 +566,8 @@ Learner Profile:
             prompt += f"Target completion: {target_weeks} weeks\n\n"
         
         prompt += """Create a COMPREHENSIVE, COURSE-LIKE roadmap similar to Coursera, but using FREE, publicly available resources.
+
+CRITICAL: You MUST generate 6-12 milestones (modules) for a full course. Each milestone = 1-2 weeks of study. A 12-week course needs ~10-12 milestones. DO NOT generate only 1 milestone. Cover the ENTIRE topic breadth.
 
 STRUCTURE: Think of this as a full online course with:
 - Milestones = Course Modules
@@ -1022,9 +1026,9 @@ Generate 3-5 actionable insights. Format as JSON:
 # Global service instance
 _openai_service: Optional[OpenAIService] = None
 
-def get_openai_service(api_key: Optional[str] = None) -> OpenAIService:
+def get_openai_service(api_key: Optional[str] = None, model: str = "gpt-4o-mini") -> OpenAIService:
     """Get or create OpenAI service instance"""
     global _openai_service
-    if _openai_service is None or (api_key and api_key != _openai_service.api_key):
-        _openai_service = OpenAIService(api_key)
+    if _openai_service is None or (api_key and api_key != _openai_service.api_key) or (model and _openai_service.model != model):
+        _openai_service = OpenAIService(api_key, model=model)
     return _openai_service

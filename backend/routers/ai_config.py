@@ -67,7 +67,7 @@ async def get_config_status(user_id: str):
     if not config:
         return {"configured": False, "ai_available": False, "message": "OpenAI not configured."}
 
-    service = get_openai_service(config["api_key"])
+    service = get_openai_service(config["api_key"], model=config.get("model", "gpt-4o-mini"))
     features = await db.get_feature_toggles(user_id) or {
         "ai_assignments": True, "ai_roadmaps": True, "habit_adaptation": True,
         "content_retrieval": True, "socratic_enhancement": True, "progress_insights": True,
@@ -118,7 +118,7 @@ async def test_openai_connection(user_id: str):
     if not config:
         raise HTTPException(status_code=404, detail="OpenAI not configured")
 
-    service = get_openai_service(config["api_key"])
+    service = get_openai_service(config["api_key"], model=config.get("model", "gpt-4o-mini"))
     if not service.is_available():
         return {"success": False, "message": "OpenAI service not available."}
 

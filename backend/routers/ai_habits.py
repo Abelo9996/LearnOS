@@ -146,7 +146,7 @@ async def generate_habit_adaptations(request: GetHabitAdaptationsRequest):
     if features and not features.get("habit_adaptation", True):
         raise HTTPException(status_code=403, detail="Habit adaptation is disabled.")
 
-    service = get_openai_service(config["api_key"])
+    service = get_openai_service(config["api_key"], model=config.get("model", "gpt-4o-mini"))
     if not service.is_available():
         raise HTTPException(status_code=503, detail="AI service not available")
 
@@ -235,7 +235,7 @@ async def generate_ai_insights(request: GetAIInsightsRequest):
     if features and not features.get("progress_insights", True):
         raise HTTPException(status_code=403, detail="Progress insights are disabled.")
 
-    service = get_openai_service(config["api_key"])
+    service = get_openai_service(config["api_key"], model=config.get("model", "gpt-4o-mini"))
     if not service.is_available():
         raise HTTPException(status_code=503, detail="AI service not available")
 

@@ -28,7 +28,7 @@ async def generate_ai_assignment(request: GenerateAIAssignmentRequest):
     if features and not features.get("ai_assignments", True):
         raise HTTPException(status_code=403, detail="AI assignment generation is disabled.")
 
-    service = get_openai_service(config["api_key"])
+    service = get_openai_service(config["api_key"], model=config.get("model", "gpt-4o-mini"))
     if not service.is_available():
         raise HTTPException(status_code=503, detail="AI service not available")
 
@@ -106,7 +106,7 @@ async def retrieve_content(request: RetrieveContentRequest):
     if features and not features.get("content_retrieval", True):
         raise HTTPException(status_code=403, detail="AI content retrieval is disabled.")
 
-    service = get_openai_service(config["api_key"])
+    service = get_openai_service(config["api_key"], model=config.get("model", "gpt-4o-mini"))
     if not service.is_available():
         raise HTTPException(status_code=503, detail="AI service not available")
 
