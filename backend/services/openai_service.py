@@ -4,6 +4,9 @@ Provides methods for assignment generation, roadmap planning, content analysis, 
 """
 
 import os
+import logging
+
+logger = logging.getLogger('learnos.openai')
 from typing import List, Dict, Any, Optional
 import json
 from datetime import datetime
@@ -14,7 +17,7 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
     OpenAI = None
-    print("Warning: openai package not installed. AI features will be disabled.")
+    pass  # debug removed
 
 class OpenAIService:
     """Service for interacting with OpenAI GPT-4"""
@@ -34,7 +37,7 @@ class OpenAIService:
                 self.client = OpenAI(api_key=self.api_key)
                 self.available = True
             except Exception as e:
-                print(f"❌ Failed to initialize OpenAI client: {e}")
+                pass  # debug removed
                 self.available = False
         else:
             self.available = False
@@ -42,7 +45,7 @@ class OpenAIService:
     def is_available(self) -> bool:
         """Check if OpenAI service is available"""
         result = self.available and self.client is not None
-        print(f"🤔 is_available() called - returning: {result}")
+        pass  # debug removed
         return result
     
     async def generate_assignment(
@@ -87,7 +90,7 @@ class OpenAIService:
             return assignment
             
         except Exception as e:
-            print(f"Error generating assignment with AI: {e}")
+            pass  # debug removed
             return self._get_fallback_assignment(concept)
     
     async def generate_roadmap(
@@ -117,14 +120,7 @@ class OpenAIService:
         )
         
         try:
-            print(f"\n{'='*80}")
-            print(f"🤖 AI ROADMAP GENERATION - START")
-            print(f"{'='*80}")
-            print(f"Goal: {goal}")
-            print(f"Prompt length: {len(prompt)} characters")
-            print(f"\n--- PROMPT SENT TO GPT-4 TURBO ---")
-            print(prompt)
-            print(f"{'='*80}\n")
+            pass  # debug removed
             
             response = self.client.chat.completions.create(
                 model="gpt-4-turbo-preview",  # Has 128k context window!
@@ -138,49 +134,34 @@ class OpenAIService:
             
             content = response.choices[0].message.content
             
-            print(f"\n--- RAW AI RESPONSE ---")
-            print(content)
-            print(f"{'='*80}")
-            print(f"Response length: {len(content)} characters")
-            print(f"{'='*80}\n")
+            pass  # debug removed
             
             roadmap = self._parse_roadmap_response(content)
             
-            print(f"--- PARSED ROADMAP STRUCTURE ---")
-            print(json.dumps(roadmap, indent=2, default=str))
+            pass  # debug removed
             
             if roadmap and "milestones" in roadmap and roadmap["milestones"]:
                 first_ms = roadmap["milestones"][0]
                 steps_count = len(first_ms.get('learning_steps', []))
-                print(f"\n✅ SUCCESS: Generated {len(roadmap['milestones'])} milestones")
-                print(f"✅ First milestone has {steps_count} learning steps")
+                pass  # debug removed
                 if steps_count > 0:
                     first_step = first_ms['learning_steps'][0]
-                    print(f"✅ First step: '{first_step.get('title', 'No title')}'")
-                    print(f"   - Videos: {len(first_step.get('video_resources', []))}")
-                    print(f"   - Articles: {len(first_step.get('reading_resources', []))}")
-                    print(f"   - Interactive: {len(first_step.get('interactive_resources', []))}")
+                    pass  # debug removed
                 else:
-                    print(f"❌ WARNING: No learning steps in first milestone!")
+                    pass  # debug removed
             else:
-                print(f"❌ ERROR: Roadmap is empty or has no milestones!")
+                pass  # debug removed
             
-            print(f"{'='*80}")
-            print(f"🤖 AI ROADMAP GENERATION - END")
-            print(f"{'='*80}\n")
+            pass  # debug removed
             
             return roadmap
             
         except Exception as e:
-            print(f"\n{'='*80}")
-            print(f"❌ ERROR GENERATING ROADMAP")
-            print(f"{'='*80}")
-            print(f"Error: {e}")
-            print(f"Type: {type(e)}")
+            pass  # debug removed
             import traceback
-            print(f"\nFull traceback:")
+            pass  # debug removed
             traceback.print_exc()
-            print(f"{'='*80}\n")
+            pass  # debug removed
             return self._get_fallback_roadmap(goal)
     
     async def analyze_habits_and_suggest_adaptations(
@@ -223,7 +204,7 @@ class OpenAIService:
             return adaptations
             
         except Exception as e:
-            print(f"Error analyzing habits with AI: {e}")
+            pass  # debug removed
             return self._get_fallback_adaptations()
     
     async def generate_milestone_assignment(
@@ -397,9 +378,7 @@ Make it engaging, authentic to the subject matter, and appropriately challenging
 Make it engaging and practical! Think of real-world applications."""
 
         try:
-            print(f"\n{'='*80}")
-            print(f"🎯 GENERATING ASSIGNMENT FOR: {milestone_title}")
-            print(f"{'='*80}\n")
+            pass  # debug removed
             
             response = self.client.chat.completions.create(
                 model="gpt-4-turbo-preview",
@@ -413,22 +392,16 @@ Make it engaging and practical! Think of real-world applications."""
             
             content = response.choices[0].message.content
             
-            print(f"--- RAW ASSIGNMENT RESPONSE ---")
-            print(content)
-            print(f"{'='*80}\n")
+            pass  # debug removed
             
             assignment = self._parse_assignment_response(content)
             
-            print(f"✅ Assignment generated: {assignment.get('title', 'Untitled')}")
-            print(f"   - Objectives: {len(assignment.get('learning_objectives', []))}")
-            print(f"   - Test cases: {len(assignment.get('test_cases', []))}")
-            print(f"   - Estimated time: {assignment.get('estimated_time_hours', 0)} hours")
-            print(f"{'='*80}\n")
+            pass  # debug removed
             
             return assignment
             
         except Exception as e:
-            print(f"❌ Error generating milestone assignment: {e}")
+            pass  # debug removed
             return self._get_fallback_milestone_assignment(milestone_title, concepts)
     
     async def retrieve_and_analyze_content(
@@ -473,7 +446,7 @@ Make it engaging and practical! Think of real-world applications."""
             return resources
             
         except Exception as e:
-            print(f"Error retrieving content with AI: {e}")
+            pass  # debug removed
             return self._get_fallback_content(concept)
     
     async def generate_progress_insights(
@@ -516,7 +489,7 @@ Make it engaging and practical! Think of real-world applications."""
             return insights
             
         except Exception as e:
-            print(f"Error generating insights with AI: {e}")
+            pass  # debug removed
             return self._get_fallback_insights()
     
     # ===== Prompt Building Methods =====
@@ -832,17 +805,16 @@ Generate 3-5 actionable insights. Format as JSON:
             if start != -1 and end > start:
                 json_str = content[start:end]
                 parsed = json.loads(json_str)
-                print(f"✅ Successfully parsed JSON response")
+                pass  # debug removed
                 return parsed
             else:
-                print(f"⚠️ No JSON found in response")
+                pass  # debug removed
         except json.JSONDecodeError as e:
-            print(f"❌ JSON parsing error: {e}")
-            print(f"📄 Content that failed: {content[:500]}...")
+            pass  # debug removed
         except Exception as e:
-            print(f"❌ Unexpected error parsing response: {e}")
+            pass  # debug removed
         
-        print(f"⚠️ Using fallback roadmap")
+        pass  # debug removed
         return self._get_fallback_roadmap("Unknown Goal")
     
     def _parse_adaptations_response(self, content: str) -> List[Dict[str, Any]]:
