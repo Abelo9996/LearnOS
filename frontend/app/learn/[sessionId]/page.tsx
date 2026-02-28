@@ -1,10 +1,11 @@
-'use client'
+'use client';
+import API_URL from '@/lib/api';
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import axios from 'axios'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+const API_URL = process.env.NEXT_PUBLIC_API_URL || `${API_URL}/api`
 
 interface LearningContent {
   concept: string

@@ -1,206 +1,163 @@
 """
-AI Roadmap Router
-Generate personalized learning roadmaps using GPT-4
+AI Roadmap Router — Generate personalized learning roadmaps using GPT-4.
 """
 
-from fastapi import APIRouter, HTTPException
-from typing import Dict, List
-from models_ai import (
-    LearningRoadmap, RoadmapMilestone, GenerateRoadmapRequest
-)
-from services.openai_service import get_openai_service
-from routers.ai_config import openai_configs, feature_toggles
-from routers.onboarding import learner_profiles
-from datetime import datetime
+import logging
 import uuid
+from datetime import datetime
 
+from fastapi import APIRouter, HTTPException
+
+import db
+from models_ai import LearningRoadmap, RoadmapMilestone, GenerateRoadmapRequest
+from services.openai_service import get_openai_service
+
+logger = logging.getLogger("learnos.ai_roadmap")
 router = APIRouter(prefix="/ai/roadmap", tags=["ai-roadmap"])
 
-# In-memory storage
-roadmaps: Dict[str, LearningRoadmap] = {}
 
 @router.post("/generate")
 async def generate_roadmap(request: GenerateRoadmapRequest):
-    """
-    Generate an AI-powered personalized learning roadmap
-    """
-    # Check if AI is configured
-    if request.user_id not in openai_configs:
-        raise HTTPException(
-            status_code=404,
-            detail="OpenAI not configured. Please set up your API key first."
-        )
-    
-    # Check if feature is enabled
-    features = feature_toggles.get(request.user_id)
-    if features and not features.ai_roadmaps:
-        raise HTTPException(
-            status_code=403,
-            detail="AI roadmap generation is disabled. Enable it in settings."
-        )
-    
-    config = openai_configs[request.user_id]
-    service = get_openai_service(config.api_key)
-    
+    config = await db.get_openai_config(request.user_id)
+    if not config:
+        raise HTTPException(status_code=404, detail="OpenAI not configured. Please set up your API key first.")
+
+    features = await db.get_feature_toggles(request.user_id)
+    if features and not features.get("ai_roadmaps", True):
+        raise HTTPException(status_code=403, detail="AI roadmap generation is disabled.")
+
+    service = get_openai_service(config["api_key"])
     if not service.is_available():
-        raise HTTPException(
-            status_code=503,
-            detail="AI service not available"
-        )
-    
-    # Get learner profile if requested
+        raise HTTPException(status_code=503, detail="AI service not available")
+
+    # Get learner profile
     profile_dict = {}
-    if request.use_profile and request.user_id in learner_profiles:
-        profile = learner_profiles[request.user_id]
-        profile_dict = profile.dict()
-    
-    # Get learning habits if requested
+    if request.use_profile:
+        profile_dict = await db.get_learner_profile(request.user_id) or {}
+
     habits_dict = None
     if request.use_habits:
-        # TODO: Get from habits tracker when implemented
-        habits_dict = {
-            "sessions_per_week": 5,
-            "average_session_duration": 30,
-            "preferred_time_of_day": "morning"
-        }
-    
+        habit = await db.get_learning_habit(request.user_id)
+        if habit:
+            habits_dict = habit
+        else:
+            habits_dict = {"sessions_per_week": 5, "average_session_duration": 30, "preferred_time_of_day": "morning"}
+
     try:
-        # Generate roadmap with AI
         roadmap_data = await service.generate_roadmap(
             goal=request.goal,
             learner_profile=profile_dict,
             learning_habits=habits_dict,
-            target_weeks=request.target_weeks
+            target_weeks=request.target_weeks,
         )
-        
-        # Create milestones with all fields including learning steps and resources
+
         milestones = []
-        for milestone_data in roadmap_data.get("milestones", []):
-            # Parse milestone data - using model_validate to handle nested structures
+        for md in roadmap_data.get("milestones", []):
             try:
-                milestone = RoadmapMilestone.model_validate(milestone_data)
-            except Exception as e:
-                # Fallback to manual parsing
+                milestone = RoadmapMilestone.model_validate(md)
+            except Exception:
                 milestone = RoadmapMilestone(
-                    title=milestone_data.get("title", "Untitled Milestone"),
-                    description=milestone_data.get("description", ""),
-                    overview=milestone_data.get("overview", ""),
-                    concepts=milestone_data.get("concepts", []),
-                    estimated_hours=milestone_data.get("estimated_hours", 10),
-                    prerequisites=milestone_data.get("prerequisites", []),
-                    why_important=milestone_data.get("why_important", ""),
-                    real_world_applications=milestone_data.get("real_world_applications", []),
-                    recommended_projects=milestone_data.get("recommended_projects", []),
-                    learning_steps=milestone_data.get("learning_steps", []),
-                    web_resources=milestone_data.get("web_resources", [])
+                    title=md.get("title", "Untitled"),
+                    description=md.get("description", ""),
+                    overview=md.get("overview", ""),
+                    concepts=md.get("concepts", []),
+                    estimated_hours=md.get("estimated_hours", 10),
+                    prerequisites=md.get("prerequisites", []),
+                    why_important=md.get("why_important", ""),
+                    real_world_applications=md.get("real_world_applications", []),
+                    recommended_projects=md.get("recommended_projects", []),
+                    learning_steps=md.get("learning_steps", []),
+                    web_resources=md.get("web_resources", []),
                 )
             milestones.append(milestone)
-        
-        # Calculate totals
+
         total_hours = sum(m.estimated_hours for m in milestones)
-        estimated_weeks = int(total_hours / (habits_dict.get("sessions_per_week", 5) * habits_dict.get("average_session_duration", 30) / 60)) if habits_dict else int(total_hours / 10)
-        
-        # Create roadmap
-        roadmap = LearningRoadmap(
-            roadmap_id=str(uuid.uuid4()),
-            user_id=request.user_id,
-            goal=request.goal,
-            milestones=milestones,
-            total_estimated_hours=total_hours,
-            estimated_completion_weeks=estimated_weeks,
-            adapted_to_profile=request.use_profile,
-            adapted_to_habits=request.use_habits,
-            difficulty_level=profile_dict.get("expertise_level", "intermediate") if profile_dict else "intermediate",
-            learning_strategy=roadmap_data.get("learning_strategy", ""),
-            success_tips=roadmap_data.get("success_tips", []),
-            potential_challenges=roadmap_data.get("potential_challenges", []),
-            mitigation_strategies=roadmap_data.get("mitigation_strategies", []),
-            generated_at=datetime.now(),
-            last_updated=datetime.now(),
-            ai_model=config.model
-        )
-        
-        # Store roadmap
-        print(f"💾 Storing roadmap with ID: {roadmap.roadmap_id}")
-        print(f"📋 Roadmap goal: {roadmap.goal}")
-        print(f"📊 Total milestones: {len(roadmap.milestones)}")
-        roadmaps[roadmap.roadmap_id] = roadmap
-        print(f"✅ Roadmap stored. Total roadmaps in storage: {len(roadmaps)}")
-        print(f"🔑 Roadmap IDs in storage: {list(roadmaps.keys())}")
-        
+        spw = (habits_dict or {}).get("sessions_per_week", 5)
+        asd = (habits_dict or {}).get("average_session_duration", 30)
+        estimated_weeks = int(total_hours / (spw * asd / 60)) if spw and asd else int(total_hours / 10)
+
+        roadmap_id = str(uuid.uuid4())
+        now = datetime.now().isoformat()
+        model = config.get("model", "gpt-4")
+
+        roadmap_dict = {
+            "roadmap_id": roadmap_id,
+            "user_id": request.user_id,
+            "goal": request.goal,
+            "milestones": [m.model_dump() if hasattr(m, "model_dump") else m.dict() for m in milestones],
+            "total_estimated_hours": total_hours,
+            "estimated_completion_weeks": estimated_weeks,
+            "adapted_to_profile": request.use_profile,
+            "adapted_to_habits": request.use_habits,
+            "difficulty_level": profile_dict.get("expertise_level", "intermediate") if profile_dict else "intermediate",
+            "learning_strategy": roadmap_data.get("learning_strategy", ""),
+            "success_tips": roadmap_data.get("success_tips", []),
+            "potential_challenges": roadmap_data.get("potential_challenges", []),
+            "mitigation_strategies": roadmap_data.get("mitigation_strategies", []),
+            "generated_at": now,
+            "last_updated": now,
+            "ai_model": model,
+        }
+        await db.save_roadmap(roadmap_dict)
+
         return {
             "message": "Roadmap generated successfully!",
-            "roadmap": roadmap,
-            "estimated_time": f"{total_hours} hours over {estimated_weeks} weeks"
+            "roadmap": roadmap_dict,
+            "estimated_time": f"{total_hours} hours over {estimated_weeks} weeks",
         }
-    
+
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to generate roadmap: {str(e)}"
-        )
+        logger.exception("Failed to generate roadmap")
+        raise HTTPException(status_code=500, detail=f"Failed to generate roadmap: {e}")
+
 
 @router.get("/{roadmap_id}")
 async def get_roadmap(roadmap_id: str):
-    """
-    Get a specific roadmap
-    """
-    if roadmap_id not in roadmaps:
+    roadmap = await db.get_roadmap(roadmap_id)
+    if not roadmap:
         raise HTTPException(status_code=404, detail="Roadmap not found")
-    
-    return roadmaps[roadmap_id]
+    return roadmap
+
 
 @router.get("/user/{user_id}/roadmaps")
 async def get_user_roadmaps(user_id: str):
-    """
-    Get all roadmaps for a user
-    """
-    user_roadmaps = [
-        roadmap for roadmap in roadmaps.values()
-        if roadmap.user_id == user_id
-    ]
-    
-    return {
-        "user_id": user_id,
-        "roadmaps": user_roadmaps,
-        "count": len(user_roadmaps)
-    }
+    roadmaps = await db.list_roadmaps(user_id)
+    return {"user_id": user_id, "roadmaps": roadmaps, "count": len(roadmaps)}
+
 
 @router.put("/{roadmap_id}/milestone/{milestone_id}/complete")
 async def complete_milestone(roadmap_id: str, milestone_id: str):
-    """
-    Mark a milestone as completed
-    """
-    if roadmap_id not in roadmaps:
+    roadmap = await db.get_roadmap(roadmap_id)
+    if not roadmap:
         raise HTTPException(status_code=404, detail="Roadmap not found")
-    
-    roadmap = roadmaps[roadmap_id]
-    
-    for milestone in roadmap.milestones:
-        if milestone.milestone_id == milestone_id:
-            milestone.completed = True
-            milestone.completion_date = datetime.now()
-            roadmap.last_updated = datetime.now()
-            
-            # Calculate actual completion percentage
-            completed = sum(1 for m in roadmap.milestones if m.completed)
-            total = len(roadmap.milestones)
-            
-            return {
-                "message": "Milestone marked as complete!",
-                "roadmap": roadmap,
-                "progress": f"{completed}/{total} milestones completed ({int(completed/total*100)}%)"
-            }
-    
-    raise HTTPException(status_code=404, detail="Milestone not found")
+
+    milestones = roadmap.get("milestones", [])
+    found = False
+    for m in milestones:
+        if m.get("milestone_id") == milestone_id:
+            m["completed"] = True
+            m["completion_date"] = datetime.now().isoformat()
+            found = True
+            break
+
+    if not found:
+        raise HTTPException(status_code=404, detail="Milestone not found")
+
+    roadmap["milestones"] = milestones
+    roadmap["last_updated"] = datetime.now().isoformat()
+    await db.save_roadmap(roadmap)
+
+    completed = sum(1 for m in milestones if m.get("completed"))
+    total = len(milestones)
+
+    return {
+        "message": "Milestone marked as complete!",
+        "roadmap": roadmap,
+        "progress": f"{completed}/{total} milestones completed ({int(completed / total * 100)}%)",
+    }
+
 
 @router.delete("/{roadmap_id}")
 async def delete_roadmap(roadmap_id: str):
-    """
-    Delete a roadmap
-    """
-    if roadmap_id in roadmaps:
-        del roadmaps[roadmap_id]
-        return {"message": "Roadmap deleted successfully"}
-    
-    raise HTTPException(status_code=404, detail="Roadmap not found")
+    await db.delete_roadmap(roadmap_id)
+    return {"message": "Roadmap deleted successfully"}

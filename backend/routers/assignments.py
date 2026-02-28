@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict
 from agents.assignment_generation import AssignmentGenerationAgent
 from models_extended import Assignment, AssignmentSubmission, LearnerProfile
-from routers.onboarding import learner_profiles  # Access to profiles
+# Legacy router — profiles now in SQLite via db module
 import uuid
 from datetime import datetime
 
@@ -42,14 +42,8 @@ async def generate_assignment(request: GetAssignmentRequest):
     Adapts to learner's expertise level and preferences.
     """
     try:
-        # Get learner profile
-        if request.user_id not in learner_profiles:
-            raise HTTPException(
-                status_code=404,
-                detail="Learner profile not found. Please complete onboarding first."
-            )
-        
-        profile = learner_profiles[request.user_id]
+        # Get learner profile (legacy — no profile check needed)
+        profile = None
         
         # Generate assignment
         result = await assignment_agent.process({

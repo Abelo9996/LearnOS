@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getUserId } from '@/lib/userId';
+import { useToast } from '@/components/Toast';
+import API_URL from '@/lib/api';
 
 interface Course {
   course_id: string;
@@ -120,6 +122,7 @@ interface Session {
 
 export default function CourseDetailPage({ params }: { params: { courseId: string } }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [userId, setUserId] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'roadmap' | 'assignments' | 'sessions' | 'settings'>('overview');
   
@@ -147,7 +150,7 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`http://localhost:8000/api/courses/${params.courseId}`);
+      const response = await fetch(`${API_URL}/api/courses/${params.courseId}`);
       
       if (response.ok) {
         const data = await response.json();
@@ -171,18 +174,18 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
     
     try {
       const response = await fetch(
-        `http://localhost:8000/api/ai/assignments/list/${userId}?course_id=${course.course_id}`
+        `${API_URL}/api/ai/assignments/list/${userId}?course_id=${course.course_id}`
       );
       
       if (response.ok) {
         const data = await response.json();
         setAssignments(data.assignments || []);
-        alert(`✅ Loaded ${data.assignments?.length || 0} assignments`);
+        toast(`Loaded ${data.assignments?.length || 0} assignments`);
       } else {
-        alert('Failed to fetch assignments');
+        toast('Failed to fetch assignments', 'error');
       }
     } catch (err) {
-      alert('Error fetching assignments');
+      toast('Error fetching assignments', 'error');
     }
   };
 
@@ -191,7 +194,7 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
     setActionLoading(true);
     try {
       const response = await fetch(
-        `http://localhost:8000/api/ai/roadmap/${roadmap.roadmap_id}/milestone/${milestoneId}/complete`,
+        `${API_URL}/api/ai/roadmap/${roadmap.roadmap_id}/milestone/${milestoneId}/complete`,
         { method: 'PUT' }
       );
       if (response.ok) {
@@ -206,12 +209,12 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
 
   const generateMilestoneAssignment = async (milestone: Milestone) => {
     if (!userId || !course) {
-      alert('User ID or course not found');
+      toast('User ID or course not found', 'error');
       return;
     }
     
     if (!roadmap) {
-      alert('No roadmap found. Generate a roadmap first.');
+      toast('No roadmap found. Generate a roadmap first.', 'error');
       return;
     }
     
@@ -219,7 +222,7 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
     setError('');
     
     try {
-      const response = await fetch('http://localhost:8000/api/ai/assignments/generate-milestone', {
+      const response = await fetch(`${API_URL}/api/ai/assignments/generate-milestone`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -275,18 +278,18 @@ ${assignment.rubric.map((r: any) => `• ${r.criterion} (${r.points} pts): ${r.d
 View it in the Assignments tab to start working on it.
         `.trim();
         
-        alert(assignmentText);
+        toast('Assignment generated! Check the Assignments tab.', 'success');
         
         // Reload assignments list
         await fetchAssignments();
         
       } else {
         const errorData = await response.json();
-        alert(`Failed to generate assignment: ${errorData.detail || 'Unknown error'}`);
+        toast(errorData.detail || 'Failed to generate assignment', 'error');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate assignment';
-      alert(`Error: ${errorMessage}`);
+      toast(errorMessage, 'error');
     } finally {
       setActionLoading(false);
     }
@@ -296,7 +299,7 @@ View it in the Assignments tab to start working on it.
     setActionLoading(true);
     setError('');
     try {
-      const response = await fetch('http://localhost:8000/api/ai/assignments/generate', {
+      const response = await fetch(`${API_URL}/api/ai/assignments/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -313,7 +316,7 @@ View it in the Assignments tab to start working on it.
         
         // Link assignment to course
         if (course) {
-          await fetch(`http://localhost:8000/api/courses/${course.course_id}`, {
+          await fetch(`${API_URL}/api/courses/${course.course_id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -338,7 +341,7 @@ View it in the Assignments tab to start working on it.
 
   const generateRoadmapForCourse = async () => {
     if (!course) {
-      alert('No course data available');
+      toast('No course data available', 'error');
       return;
     }
     
@@ -346,7 +349,7 @@ View it in the Assignments tab to start working on it.
     setError('');
     
     try {
-      const response = await fetch('http://localhost:8000/api/ai/roadmap/generate', {
+      const response = await fetch(`${API_URL}/api/ai/roadmap/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -373,7 +376,7 @@ View it in the Assignments tab to start working on it.
         }
         
         // Link roadmap to course
-        const updateResponse = await fetch(`http://localhost:8000/api/courses/${course.course_id}`, {
+        const updateResponse = await fetch(`${API_URL}/api/courses/${course.course_id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -395,7 +398,7 @@ View it in the Assignments tab to start working on it.
           setActiveTab('roadmap');
         }
         
-        alert('✅ Roadmap generated successfully! Check the Roadmap tab.');
+        toast('Roadmap generated! Check the Roadmap tab.', 'success');
       } else {
         const errorData = JSON.parse(responseText);
         
@@ -425,7 +428,7 @@ View it in the Assignments tab to start working on it.
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to generate roadmap';
       setError(errorMessage);
-      alert('❌ Error: ' + errorMessage);
+      toast(errorMessage, 'error');
     } finally {
       setActionLoading(false);
     }
@@ -435,7 +438,7 @@ View it in the Assignments tab to start working on it.
     if (!course) return;
     setActionLoading(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/courses/${course.course_id}`, {
+      const response = await fetch(`${API_URL}/api/courses/${course.course_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
@@ -1200,7 +1203,7 @@ View it in the Assignments tab to start working on it.
                         <button
                           onClick={() => {
                             // TODO: Open assignment detail modal or page
-                            alert(`Assignment Details:\n\n${JSON.stringify(assignment, null, 2)}`);
+                            router.push('/assignments/' + assignment.assignment_id);
                           }}
                           className="text-sm text-purple-600 hover:text-purple-700 font-medium px-4 py-2 rounded-lg hover:bg-purple-50"
                         >

@@ -1,394 +1,345 @@
 """
-Courses Router - Central hub for course management
-All roadmaps, assignments, and habits are tied to courses
+Courses Router — Central hub for course management.
+All roadmaps, assignments, and habits are tied to courses.
 """
 
+import logging
+import uuid
+from datetime import datetime, timedelta
+from typing import List, Optional
+
 from fastapi import APIRouter, HTTPException
-from typing import Dict, List, Optional
+
+import db
 from models_ai import (
     Course, CreateCourseRequest, UpdateCourseRequest, EnrollCourseRequest,
-    CourseStatus, LearningRoadmap as Roadmap
+    CourseStatus,
 )
 from services.openai_service import get_openai_service
-from routers.ai_config import openai_configs
-from routers.ai_roadmap import roadmaps
-from routers.ai_content import ai_assignments
-from routers.ai_habits import learning_sessions, learning_habits
-from datetime import datetime, timedelta
-import uuid
 
+logger = logging.getLogger("learnos.courses")
 router = APIRouter(prefix="/courses", tags=["courses"])
 
-# In-memory storage
-courses: Dict[str, Course] = {}
 
-# ===== Course CRUD =====
+# ═══════════════ helpers ═══════════════
+
+def _course_to_dict(course: Course) -> dict:
+    """Convert a Pydantic Course to a flat dict for db.save_course."""
+    d = course.model_dump() if hasattr(course, "model_dump") else course.dict()
+    # Ensure datetimes are ISO strings
+    for k in ("created_at", "updated_at", "last_accessed", "start_date",
+              "target_completion_date", "actual_completion_date"):
+        v = d.get(k)
+        if v and not isinstance(v, str):
+            d[k] = v.isoformat() if hasattr(v, "isoformat") else str(v)
+    return d
+
+
+# ═══════════════ CRUD ═══════════════
 
 @router.post("/create")
 async def create_course(request: CreateCourseRequest):
-    """
-    Create a new course (and optionally generate roadmap)
-    """
-    course = Course(
-        course_id=str(uuid.uuid4()),
-        user_id=request.user_id,
-        title=request.title,
-        description=request.description,
-        goal=request.goal,
-        difficulty_level=request.difficulty_level,
-        target_weeks=request.target_weeks,
-        status=CourseStatus.PLANNING,
-        created_at=datetime.now()
-    )
-    
-    # Store course
-    courses[course.course_id] = course
-    
+    now = datetime.now()
+    course_id = str(uuid.uuid4())
+
+    course_dict = {
+        "course_id": course_id,
+        "user_id": request.user_id,
+        "title": request.title,
+        "description": request.description,
+        "goal": request.goal,
+        "difficulty_level": request.difficulty_level,
+        "target_weeks": request.target_weeks,
+        "status": "planning",
+        "progress_percentage": 0.0,
+        "roadmap_id": None,
+        "assignment_ids": [],
+        "onboarding_completed": False,
+        "custom_preferences": {},
+        "total_time_spent_minutes": 0,
+        "sessions_count": 0,
+        "concepts_mastered": [],
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat(),
+        "last_accessed": now.isoformat(),
+        "generated_by_ai": False,
+        "ai_model_used": None,
+    }
+
     # Generate roadmap if requested
-    roadmap = None
+    roadmap_dict = None
     if request.generate_roadmap:
-        # Check if AI is configured
-        if request.user_id not in openai_configs:
+        config = await db.get_openai_config(request.user_id)
+        if not config:
+            await db.save_course(course_dict)
             return {
-                "message": "Course created successfully (without roadmap - AI not configured)",
-                "course": course,
-                "roadmap": None
+                "message": "Course created (without roadmap — AI not configured)",
+                "course": course_dict,
+                "roadmap": None,
             }
-        
+
         try:
-            config = openai_configs[request.user_id]
-            service = get_openai_service(config.api_key)
-            
-            # Generate roadmap using AI
+            service = get_openai_service(config["api_key"])
             roadmap_data = await service.generate_roadmap(
                 goal=request.goal,
                 current_knowledge=f"Starting {request.difficulty_level} level course",
                 target_weeks=request.target_weeks,
-                learning_style=f"Course-based learning: {request.title}"
+                learning_style=f"Course-based learning: {request.title}",
             )
-            
-            # Create roadmap object
-            roadmap = Roadmap(
-                roadmap_id=str(uuid.uuid4()),
-                user_id=request.user_id,
-                course_id=course.course_id,  # Link to course
-                goal=request.goal,
-                title=roadmap_data.get("title", f"Roadmap for {request.title}"),
-                description=roadmap_data.get("description", ""),
-                estimated_weeks=roadmap_data.get("estimated_weeks", request.target_weeks),
-                milestones=roadmap_data.get("milestones", []),
-                prerequisites=roadmap_data.get("prerequisites", []),
-                recommended_resources=roadmap_data.get("resources", []),
-                created_at=datetime.now(),
-                generated_by_ai=True,
-                ai_model=config.model
-            )
-            
-            # Store roadmap
-            roadmaps[roadmap.roadmap_id] = roadmap
-            
-            # Link roadmap to course
-            course.roadmap_id = roadmap.roadmap_id
-            course.generated_by_ai = True
-            course.ai_model_used = config.model
-            
+
+            roadmap_id = str(uuid.uuid4())
+            milestones = roadmap_data.get("milestones", [])
+
+            roadmap_dict = {
+                "roadmap_id": roadmap_id,
+                "user_id": request.user_id,
+                "course_id": course_id,
+                "goal": request.goal,
+                "milestones": milestones,
+                "total_estimated_hours": sum(m.get("estimated_hours", 10) for m in milestones),
+                "estimated_completion_weeks": request.target_weeks,
+                "adapted_to_profile": True,
+                "adapted_to_habits": True,
+                "difficulty_level": request.difficulty_level,
+                "learning_strategy": roadmap_data.get("learning_strategy", ""),
+                "success_tips": roadmap_data.get("success_tips", []),
+                "potential_challenges": roadmap_data.get("potential_challenges", []),
+                "mitigation_strategies": roadmap_data.get("mitigation_strategies", []),
+                "generated_at": now.isoformat(),
+                "last_updated": now.isoformat(),
+                "ai_model": config.get("model", "gpt-4"),
+            }
+            await db.save_roadmap(roadmap_dict)
+
+            course_dict["roadmap_id"] = roadmap_id
+            course_dict["generated_by_ai"] = True
+            course_dict["ai_model_used"] = config.get("model", "gpt-4")
         except Exception as e:
-            print(f"Error generating roadmap: {e}")
-            # Continue without roadmap
-    
+            logger.exception("Failed to generate roadmap during course creation")
+
+    await db.save_course(course_dict)
+
     return {
         "message": "Course created successfully!",
-        "course": course,
-        "roadmap": roadmap
+        "course": course_dict,
+        "roadmap": roadmap_dict,
     }
+
 
 @router.get("/list/{user_id}")
-async def list_user_courses(
-    user_id: str,
-    status: Optional[str] = None,
-    sort_by: str = "last_accessed"
-):
-    """
-    Get all courses for a user, optionally filtered by status
-    """
-    user_courses = [
-        course for course in courses.values()
-        if course.user_id == user_id
-    ]
-    
-    # Filter by status if provided
-    if status:
-        user_courses = [c for c in user_courses if c.status == status]
-    
-    # Sort
-    if sort_by == "last_accessed":
-        user_courses.sort(key=lambda x: x.last_accessed, reverse=True)
-    elif sort_by == "created_at":
-        user_courses.sort(key=lambda x: x.created_at, reverse=True)
-    elif sort_by == "progress":
-        user_courses.sort(key=lambda x: x.progress_percentage, reverse=True)
-    
-    return {
-        "user_id": user_id,
-        "courses": user_courses,
-        "count": len(user_courses)
-    }
+async def list_user_courses(user_id: str, status: Optional[str] = None):
+    courses = await db.list_courses(user_id, status=status)
+    return {"user_id": user_id, "courses": courses, "count": len(courses)}
+
 
 @router.get("/{course_id}")
-async def get_course(course_id: str):
-    """
-    Get detailed course information
-    """
-    print(f"📖 GET COURSE called for: {course_id}")
-    
-    if course_id not in courses:
+async def get_course_detail(course_id: str):
+    course = await db.get_course(course_id)
+    if not course:
         raise HTTPException(status_code=404, detail="Course not found")
-    
-    course = courses[course_id]
-    print(f"📚 Course found: {course.title}")
-    print(f"🗺️ Course roadmap_id: {course.roadmap_id}")
-    
+
     # Update last accessed
-    course.last_accessed = datetime.now()
-    
-    # Get associated roadmap
+    course["last_accessed"] = datetime.now().isoformat()
+    await db.save_course(course)
+
+    # Associated roadmap
     roadmap = None
-    if course.roadmap_id:
-        print(f"🔍 Looking for roadmap: {course.roadmap_id}")
-        print(f"📦 Roadmaps in storage: {list(roadmaps.keys())}")
-        if course.roadmap_id in roadmaps:
-            roadmap = roadmaps[course.roadmap_id]
-            print(f"✅ Roadmap FOUND: {roadmap.goal}")
-        else:
-            print(f"❌ Roadmap NOT FOUND in storage!")
-    else:
-        print(f"ℹ️ No roadmap_id set on course")
-    
-    # Get associated assignments
-    course_assignments = [
-        ai_assignments[aid] for aid in course.assignment_ids
-        if aid in ai_assignments
-    ]
-    
-    # Get learning sessions for this course
-    course_sessions = []
-    if course.user_id in learning_sessions:
-        # Filter sessions that have course concepts
-        all_sessions = learning_sessions[course.user_id]
-        # For now, include all sessions - in future, filter by course-specific tags
-        course_sessions = all_sessions[-10:]  # Last 10 sessions
-    
+    if course.get("roadmap_id"):
+        roadmap = await db.get_roadmap(course["roadmap_id"])
+
+    # Assignments for this course
+    course_assignments = await db.list_assignments(course["user_id"], course_id=course_id)
+
+    # Recent sessions
+    all_sessions = await db.list_learning_sessions(course["user_id"], limit=10)
+
+    completed_milestones = 0
+    total_milestones = 0
+    if roadmap:
+        ms = roadmap.get("milestones", [])
+        total_milestones = len(ms)
+        completed_milestones = sum(1 for m in ms if m.get("completed"))
+
+    completed_assignments = sum(1 for a in course_assignments if a.get("status") in ("completed", "graded"))
+
     return {
         "course": course,
         "roadmap": roadmap,
         "assignments": course_assignments,
-        "recent_sessions": course_sessions,
+        "recent_sessions": all_sessions[:10],
         "stats": {
-            "total_milestones": len(roadmap.milestones) if roadmap else 0,
-            "completed_milestones": len([m for m in roadmap.milestones if getattr(m, "completed", False)]) if roadmap else 0,
+            "total_milestones": total_milestones,
+            "completed_milestones": completed_milestones,
             "total_assignments": len(course_assignments),
-            "completed_assignments": len([a for a in course_assignments if a.completed]),
-            "total_time_hours": round(course.total_time_spent_minutes / 60, 1),
-            "sessions_count": course.sessions_count
-        }
+            "completed_assignments": completed_assignments,
+            "total_time_hours": round(course.get("total_time_spent_minutes", 0) / 60, 1),
+            "sessions_count": course.get("sessions_count", 0),
+        },
     }
+
 
 @router.put("/{course_id}")
 async def update_course(course_id: str, request: UpdateCourseRequest):
-    """
-    Update course details
-    """
-    print(f"🔧 UPDATE COURSE called for: {course_id}")
-    print(f"📝 Request data: {request}")
-    
-    if course_id not in courses:
+    course = await db.get_course(course_id)
+    if not course:
         raise HTTPException(status_code=404, detail="Course not found")
-    
-    course = courses[course_id]
-    
-    print(f"📋 Current course roadmap_id: {course.roadmap_id}")
-    print(f"📝 Request roadmap_id: {request.roadmap_id}")
-    print(f"📝 Request dict: {request.dict()}")
-    
-    # Update fields
+
     if request.title:
-        course.title = request.title
+        course["title"] = request.title
     if request.description:
-        course.description = request.description
+        course["description"] = request.description
     if request.status:
-        course.status = request.status
+        course["status"] = request.status
     if request.progress_percentage is not None:
-        course.progress_percentage = request.progress_percentage
+        course["progress_percentage"] = request.progress_percentage
     if request.roadmap_id is not None:
-        print(f"🗺️ Linking roadmap_id: {request.roadmap_id} to course")
-        print(f"📦 Roadmap exists in storage: {request.roadmap_id in roadmaps}")
-        if request.roadmap_id in roadmaps:
-            print(f"✅ Roadmap found: {roadmaps[request.roadmap_id].goal}")
-        else:
-            print(f"⚠️ Roadmap NOT found in storage!")
-        course.roadmap_id = request.roadmap_id
-        print(f"✅ Course roadmap_id set to: {course.roadmap_id}")
-    else:
-        print(f"⚠️ request.roadmap_id is None - not updating")
+        course["roadmap_id"] = request.roadmap_id
     if request.custom_preferences:
-        course.custom_preferences.update(request.custom_preferences)
-    
-    course.updated_at = datetime.now()
-    
-    print(f"✅ Course updated - roadmap_id is now: {course.roadmap_id}")
-    
-    # Get the roadmap if one is linked
+        prefs = course.get("custom_preferences") or {}
+        prefs.update(request.custom_preferences)
+        course["custom_preferences"] = prefs
+
+    course["updated_at"] = datetime.now().isoformat()
+    await db.save_course(course)
+
     roadmap = None
-    if course.roadmap_id and course.roadmap_id in roadmaps:
-        roadmap = roadmaps[course.roadmap_id]
-        print(f"📋 Including roadmap in response: {roadmap.goal}")
-    
-    return {
-        "message": "Course updated successfully",
-        "course": course,
-        "roadmap": roadmap
-    }
+    if course.get("roadmap_id"):
+        roadmap = await db.get_roadmap(course["roadmap_id"])
+
+    return {"message": "Course updated successfully", "course": course, "roadmap": roadmap}
+
 
 @router.post("/{course_id}/enroll")
 async def enroll_course(course_id: str, request: EnrollCourseRequest):
-    """
-    Officially enroll/start a course (moves from PLANNING to ACTIVE)
-    """
-    if course_id not in courses:
+    course = await db.get_course(course_id)
+    if not course:
         raise HTTPException(status_code=404, detail="Course not found")
-    
-    course = courses[course_id]
-    
-    # Update course status
-    course.status = CourseStatus.ACTIVE
-    course.start_date = request.start_date or datetime.now()
-    course.onboarding_completed = True
-    course.custom_preferences.update(request.onboarding_preferences)
-    
-    # Calculate target completion date
-    if course.target_weeks:
-        course.target_completion_date = course.start_date + timedelta(weeks=course.target_weeks)
-    
-    course.updated_at = datetime.now()
-    
+
+    start = request.start_date or datetime.now()
+    course["status"] = "active"
+    course["start_date"] = start.isoformat() if hasattr(start, "isoformat") else str(start)
+    course["onboarding_completed"] = True
+    prefs = course.get("custom_preferences") or {}
+    prefs.update(request.onboarding_preferences)
+    course["custom_preferences"] = prefs
+
+    if course.get("target_weeks"):
+        target = start + timedelta(weeks=course["target_weeks"])
+        course["target_completion_date"] = target.isoformat()
+
+    course["updated_at"] = datetime.now().isoformat()
+    await db.save_course(course)
+
     return {
         "message": "Successfully enrolled in course!",
         "course": course,
         "next_steps": [
             "Start with the first milestone in your roadmap",
             "Generate your first assignment",
-            "Track your learning sessions"
-        ]
+            "Track your learning sessions",
+        ],
     }
+
 
 @router.delete("/{course_id}")
-async def delete_course(course_id: str):
-    """
-    Delete a course (archives it)
-    """
-    if course_id not in courses:
+async def archive_course(course_id: str):
+    course = await db.get_course(course_id)
+    if not course:
         raise HTTPException(status_code=404, detail="Course not found")
-    
-    course = courses[course_id]
-    course.status = CourseStatus.ARCHIVED
-    course.updated_at = datetime.now()
-    
-    return {
-        "message": "Course archived successfully",
-        "course_id": course_id
-    }
 
-# ===== Course Progress Tracking =====
+    course["status"] = "archived"
+    course["updated_at"] = datetime.now().isoformat()
+    await db.save_course(course)
+
+    return {"message": "Course archived successfully", "course_id": course_id}
+
+
+# ═══════════════ Session & Analytics ═══════════════
 
 @router.post("/{course_id}/session")
 async def record_course_session(
     course_id: str,
     duration_minutes: int,
     concepts_studied: List[str],
-    notes: Optional[str] = None
+    notes: Optional[str] = None,
 ):
-    """
-    Record a learning session for this course
-    """
-    if course_id not in courses:
+    course = await db.get_course(course_id)
+    if not course:
         raise HTTPException(status_code=404, detail="Course not found")
-    
-    course = courses[course_id]
-    
-    # Update course stats
-    course.total_time_spent_minutes += duration_minutes
-    course.sessions_count += 1
-    course.last_accessed = datetime.now()
-    
-    # Add new concepts to mastered list
-    for concept in concepts_studied:
-        if concept not in course.concepts_mastered:
-            course.concepts_mastered.append(concept)
-    
-    # Recalculate progress based on roadmap
-    if course.roadmap_id and course.roadmap_id in roadmaps:
-        roadmap = roadmaps[course.roadmap_id]
-        completed = len([m for m in roadmap.milestones if m.get("completed", False)])
-        total = len(roadmap.milestones)
-        course.progress_percentage = (completed / total * 100) if total > 0 else 0
-    
+
+    course["total_time_spent_minutes"] = course.get("total_time_spent_minutes", 0) + duration_minutes
+    course["sessions_count"] = course.get("sessions_count", 0) + 1
+    course["last_accessed"] = datetime.now().isoformat()
+
+    mastered = course.get("concepts_mastered") or []
+    for c in concepts_studied:
+        if c not in mastered:
+            mastered.append(c)
+    course["concepts_mastered"] = mastered
+
+    # Recalculate progress from roadmap
+    if course.get("roadmap_id"):
+        roadmap = await db.get_roadmap(course["roadmap_id"])
+        if roadmap:
+            ms = roadmap.get("milestones", [])
+            completed = sum(1 for m in ms if m.get("completed"))
+            total = len(ms)
+            course["progress_percentage"] = (completed / total * 100) if total > 0 else 0
+
+    await db.save_course(course)
+
     return {
         "message": "Session recorded successfully",
         "course": course,
         "session_summary": {
             "duration": f"{duration_minutes} minutes",
             "concepts_count": len(concepts_studied),
-            "total_time": f"{course.total_time_spent_minutes // 60}h {course.total_time_spent_minutes % 60}m",
-            "progress": f"{course.progress_percentage:.1f}%"
-        }
+            "total_time": f"{course['total_time_spent_minutes'] // 60}h {course['total_time_spent_minutes'] % 60}m",
+            "progress": f"{course['progress_percentage']:.1f}%",
+        },
     }
+
 
 @router.get("/{course_id}/analytics")
 async def get_course_analytics(course_id: str):
-    """
-    Get detailed analytics for a course
-    """
-    if course_id not in courses:
+    course = await db.get_course(course_id)
+    if not course:
         raise HTTPException(status_code=404, detail="Course not found")
-    
-    course = courses[course_id]
-    
-    # Get roadmap progress
+
     roadmap_progress = {}
-    if course.roadmap_id and course.roadmap_id in roadmaps:
-        roadmap = roadmaps[course.roadmap_id]
-        total_milestones = len(roadmap.milestones)
-        completed_milestones = len([m for m in roadmap.milestones if m.get("completed", False)])
-        roadmap_progress = {
-            "total_milestones": total_milestones,
-            "completed_milestones": completed_milestones,
-            "percentage": (completed_milestones / total_milestones * 100) if total_milestones > 0 else 0
-        }
-    
-    # Get assignment progress
-    course_assignments = [ai_assignments[aid] for aid in course.assignment_ids if aid in ai_assignments]
-    assignment_progress = {
-        "total_assignments": len(course_assignments),
-        "completed_assignments": len([a for a in course_assignments if a.completed]),
-        "average_difficulty": sum(a.difficulty for a in course_assignments) / len(course_assignments) if course_assignments else 0
-    }
-    
-    # Time analytics
-    time_analytics = {
-        "total_hours": round(course.total_time_spent_minutes / 60, 1),
-        "sessions_count": course.sessions_count,
-        "average_session_minutes": round(course.total_time_spent_minutes / course.sessions_count) if course.sessions_count > 0 else 0,
-        "days_since_start": (datetime.now() - course.start_date).days if course.start_date else 0
-    }
-    
+    if course.get("roadmap_id"):
+        roadmap = await db.get_roadmap(course["roadmap_id"])
+        if roadmap:
+            ms = roadmap.get("milestones", [])
+            total = len(ms)
+            completed = sum(1 for m in ms if m.get("completed"))
+            roadmap_progress = {
+                "total_milestones": total,
+                "completed_milestones": completed,
+                "percentage": (completed / total * 100) if total > 0 else 0,
+            }
+
+    assignments = await db.list_assignments(course["user_id"], course_id=course_id)
+    completed_a = sum(1 for a in assignments if a.get("status") in ("completed", "graded"))
+
+    ttm = course.get("total_time_spent_minutes", 0)
+    sc = course.get("sessions_count", 0)
+
     return {
         "course_id": course_id,
-        "course_title": course.title,
-        "overall_progress": course.progress_percentage,
-        "status": course.status,
+        "course_title": course.get("title"),
+        "overall_progress": course.get("progress_percentage", 0),
+        "status": course.get("status"),
         "roadmap_progress": roadmap_progress,
-        "assignment_progress": assignment_progress,
-        "time_analytics": time_analytics,
-        "concepts_mastered": len(course.concepts_mastered),
-        "concepts_list": course.concepts_mastered
+        "assignment_progress": {
+            "total_assignments": len(assignments),
+            "completed_assignments": completed_a,
+        },
+        "time_analytics": {
+            "total_hours": round(ttm / 60, 1),
+            "sessions_count": sc,
+            "average_session_minutes": round(ttm / sc) if sc > 0 else 0,
+        },
+        "concepts_mastered": len(course.get("concepts_mastered", [])),
+        "concepts_list": course.get("concepts_mastered", []),
     }

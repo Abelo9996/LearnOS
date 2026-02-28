@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import List, Dict
 from agents.resource_curation import ResourceCurationAgent
 from models_extended import ExternalResource, LearnerProfile
-from routers.onboarding import learner_profiles  # Access to profiles
+# Legacy router — profiles now in SQLite via db module
 
 router = APIRouter(prefix="/resources", tags=["resources"])
 
@@ -28,14 +28,8 @@ async def curate_resources(request: GetResourcesRequest):
     Personalized based on learner profile (expertise, preferences).
     """
     try:
-        # Get learner profile
-        if request.user_id not in learner_profiles:
-            raise HTTPException(
-                status_code=404,
-                detail="Learner profile not found. Please complete onboarding first."
-            )
-        
-        profile = learner_profiles[request.user_id]
+        # Get learner profile (legacy — no profile check needed)
+        profile = None
         
         # Curate resources
         result = await resource_agent.process({

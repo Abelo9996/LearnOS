@@ -1,4 +1,5 @@
 'use client';
+import API_URL from '@/lib/api';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -46,7 +47,7 @@ export default function OnboardingPage() {
     setError('');
     
     try {
-      const response = await fetch('http://localhost:8000/api/onboarding/start', {
+      const response = await fetch(`${API_URL}/api/onboarding/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: `user_${Date.now()}` })
@@ -93,7 +94,7 @@ export default function OnboardingPage() {
         answer: responses[q.id] || ''
       }));
 
-      const response = await fetch('http://localhost:8000/api/onboarding/submit', {
+      const response = await fetch(`${API_URL}/api/onboarding/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
