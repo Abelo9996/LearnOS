@@ -18,7 +18,7 @@ export default function AISettingsPage() {
   const router = useRouter();
   const [userId, setUserId] = useState('');
   const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState('gpt-4');
+  const [model, setModel] = useState('gpt-4o-mini');
   const [configured, setConfigured] = useState(false);
   const [aiAvailable, setAiAvailable] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -246,9 +246,11 @@ export default function AISettingsPage() {
                   onChange={(e) => setModel(e.target.value)}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
                 >
-                  <option value="gpt-4">GPT-4 (Recommended)</option>
+                  <option value="gpt-4o-mini">GPT-4o Mini (Recommended — fast & affordable)</option>
+                  <option value="gpt-4o">GPT-4o (Best quality)</option>
                   <option value="gpt-4-turbo">GPT-4 Turbo</option>
-                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Faster, cheaper)</option>
+                  <option value="gpt-4">GPT-4</option>
+                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Fastest, cheapest)</option>
                 </select>
               </div>
 

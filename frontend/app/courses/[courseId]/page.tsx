@@ -526,7 +526,13 @@ View it in the Assignments tab to start working on it.
               </div>
             </div>
             
-            <div className="ml-6">
+            <div className="ml-6 flex flex-col gap-2">
+              <button
+                onClick={() => router.push(`/tutor/${params.courseId}`)}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold px-6 py-3 rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
+              >
+                🤖 AI Tutor
+              </button>
               <button
                 onClick={() => router.push('/ai-settings')}
                 className="text-purple-600 hover:text-purple-700 font-medium px-4 py-2 rounded-lg hover:bg-purple-50"
@@ -776,7 +782,14 @@ View it in the Assignments tab to start working on it.
                             )}
                             
                             {/* Generate Assignment Button */}
-                            <div className="mt-4 mb-4">
+                            <div className="mt-4 mb-4 flex gap-2 flex-wrap">
+                              <button
+                                onClick={() => router.push(`/tutor/${params.courseId}?milestone=${milestone.milestone_id}`)}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 font-medium"
+                              >
+                                <span>🤖</span>
+                                <span>Study with AI Tutor</span>
+                              </button>
                               <button
                                 onClick={() => generateMilestoneAssignment(milestone)}
                                 disabled={actionLoading}

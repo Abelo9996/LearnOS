@@ -8,6 +8,10 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'LearnOS — AI-Powered Learning Platform',
   description: 'Your personalized AI learning companion. Create courses, generate roadmaps, and master any subject.',
+  icons: {
+    icon: '/favicon.svg',
+    apple: '/apple-touch-icon.svg',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -33,6 +37,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   </a>
                   <a href="/habits" className="text-gray-600 hover:text-gray-900 transition-colors font-medium">
                     Habits
+                  </a>
+                  <a href="/onboarding" className="text-gray-600 hover:text-gray-900 transition-colors font-medium">
+                    Onboarding
                   </a>
                   <a href="/ai-settings" className="text-gray-600 hover:text-gray-900 transition-colors font-medium">
                     ⚙️ Settings

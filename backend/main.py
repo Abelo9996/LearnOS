@@ -15,7 +15,7 @@ logger = logging.getLogger("learnos")
 
 from routers import (
     goals, sessions, progress, onboarding, assignments, resources,
-    ai_config, ai_roadmap, ai_content, ai_habits, ai_assignments, courses
+    ai_config, ai_roadmap, ai_content, ai_habits, ai_assignments, courses, ai_tutor
 )
 from db import init_database
 
@@ -54,6 +54,7 @@ app.include_router(ai_roadmap.router, prefix="/api", tags=["ai-roadmap"])
 app.include_router(ai_content.router, prefix="/api", tags=["ai-content"])
 app.include_router(ai_habits.router, prefix="/api", tags=["ai-habits"])
 app.include_router(ai_assignments.router, tags=["ai-assignments"])
+app.include_router(ai_tutor.router, prefix="/api", tags=["ai-tutor"])
 
 
 @app.on_event("startup")
