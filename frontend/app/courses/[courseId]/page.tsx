@@ -19,44 +19,24 @@ interface Course {
   concepts_mastered: string[];
   roadmap_id?: string;
   created_at: string;
-  custom_preferences?: {
-    assignment_ids?: string[];
-    [key: string]: any;
-  };
-}
-
-interface WebResource {
-  url: string;
-  title: string;
-  resource_type: string;
-  description?: string;
-  author?: string;
-  platform?: string;
-  estimated_time_minutes?: number;
-  difficulty?: string;
-  is_free?: boolean;
-  rating?: number;
-  why_recommended?: string;
 }
 
 interface LearningStep {
-  step_id: string;
+  step_id?: string;
   order: number;
   title: string;
   description: string;
-  learning_objectives: string[];
-  key_concepts: string[];
+  learning_objectives?: string[];
+  key_concepts?: string[];
   content: string;
-  video_resources: WebResource[];
-  reading_resources: WebResource[];
-  interactive_resources: WebResource[];
-  action_items: string[];
-  practice_exercises: string[];
-  quiz_questions?: any[];
-  estimated_minutes: number;
-  difficulty: string;
-  completed: boolean;
-  notes?: string;
+  video_resources?: any[];
+  reading_resources?: any[];
+  interactive_resources?: any[];
+  action_items?: string[];
+  practice_exercises?: string[];
+  estimated_minutes?: number;
+  difficulty?: string;
+  completed?: boolean;
 }
 
 interface Milestone {
@@ -67,431 +47,266 @@ interface Milestone {
   concepts: string[];
   estimated_hours: number;
   completed: boolean;
-  completion_date?: string;
-  web_resources?: WebResource[];
-  learning_steps?: LearningStep[];
   why_important?: string;
   real_world_applications?: string[];
-  recommended_projects?: string[];
-}
-
-interface Roadmap {
-  roadmap_id: string;
-  title: string;
-  description: string;
-  milestones: Milestone[];
-  estimated_weeks: number;
+  learning_steps?: LearningStep[];
+  web_resources?: any[];
 }
 
 interface Assignment {
   assignment_id: string;
-  user_id: string;
-  course_id: string;
-  milestone_id: string;
-  roadmap_id: string;
-  assignment_type: string;
   title: string;
   description: string;
-  learning_objectives: string[];
-  instructions: string[];
-  requirements: string[];
-  questions: string[];
-  starter_materials?: string;
-  test_cases: any[];
-  rubric: any[];
-  hints: string[];
-  resources: string[];
+  assignment_type: string;
+  status: string;
   estimated_time_hours: number;
   difficulty: string;
-  status: string;
-  submission?: string;
-  submission_date?: string;
+  learning_objectives?: string[];
+  instructions?: string[];
+  questions?: string[];
+  rubric?: any[];
+  hints?: string[];
   score?: number;
-  feedback?: string;
   created_at: string;
-  completed_at?: string;
-  ai_model: string;
-}
-
-interface Session {
-  session_id: string;
-  start_time: string;
-  duration_minutes: number;
-  concepts_covered: string[];
 }
 
 export default function CourseDetailPage({ params }: { params: { courseId: string } }) {
   const router = useRouter();
   const { toast } = useToast();
+
   const [userId, setUserId] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'roadmap' | 'assignments' | 'sessions' | 'settings'>('overview');
-  
   const [course, setCourse] = useState<Course | null>(null);
-  const [roadmap, setRoadmap] = useState<Roadmap | null>(null);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [roadmapId, setRoadmapId] = useState('');
   const [stats, setStats] = useState<any>(null);
-  
+
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | React.ReactNode>('');
   const [actionLoading, setActionLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    setUserId(getUserId());
-  }, []);
+  // UI state
+  const [selectedModule, setSelectedModule] = useState<number>(0);
+  const [selectedLesson, setSelectedLesson] = useState<number>(0);
+  const [view, setView] = useState<'overview' | 'learn' | 'assignment'>('overview');
 
-  useEffect(() => {
-    if (userId) {
-      loadCourseData();
-    }
-  }, [userId, params.courseId]);
+  // AI lesson generation
+  const [generatingLesson, setGeneratingLesson] = useState(false);
+  const [generatedContent, setGeneratedContent] = useState<string>('');
+
+  useEffect(() => { setUserId(getUserId()); }, []);
+  useEffect(() => { if (userId) loadCourseData(); }, [userId]);
 
   const loadCourseData = async () => {
     setLoading(true);
-    setError('');
     try {
-      const response = await fetch(`${API_URL}/api/courses/${params.courseId}`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setCourse(data.course);
-        setRoadmap(data.roadmap);
-        setAssignments(data.assignments || []);
-        setSessions(data.recent_sessions || []);
-        setStats(data.stats);
-      } else {
-        setError('Failed to load course');
+      const res = await fetch(`${API_URL}/api/courses/${params.courseId}`);
+      if (!res.ok) throw new Error('Failed to load course');
+      const data = await res.json();
+      setCourse(data.course);
+      setStats(data.stats);
+
+      if (data.roadmap?.milestones) {
+        setMilestones(data.roadmap.milestones);
+        setRoadmapId(data.roadmap.roadmap_id);
       }
-    } catch (err) {
+
+      // Load assignments
+      if (data.course?.course_id) {
+        const aRes = await fetch(`${API_URL}/api/ai/assignments/list/${getUserId()}?course_id=${data.course.course_id}`);
+        if (aRes.ok) {
+          const aData = await aRes.json();
+          setAssignments(aData.assignments || []);
+        }
+      }
+    } catch {
       setError('Failed to load course');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchAssignments = async () => {
-    if (!userId || !course) return;
-    
-    try {
-      const response = await fetch(
-        `${API_URL}/api/ai/assignments/list/${userId}?course_id=${course.course_id}`
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        setAssignments(data.assignments || []);
-        toast(`Loaded ${data.assignments?.length || 0} assignments`);
-      } else {
-        toast('Failed to fetch assignments', 'error');
-      }
-    } catch (err) {
-      toast('Error fetching assignments', 'error');
-    }
-  };
-
-  const toggleMilestone = async (milestoneId: string) => {
-    if (!roadmap) return;
+  const generateRoadmap = async () => {
+    if (!course) return;
     setActionLoading(true);
+    setError('');
     try {
-      const response = await fetch(
-        `${API_URL}/api/ai/roadmap/${roadmap.roadmap_id}/milestone/${milestoneId}/complete`,
-        { method: 'PUT' }
-      );
-      if (response.ok) {
-        await loadCourseData();
+      const res = await fetch(`${API_URL}/api/ai/roadmap/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_id: userId,
+          goal: course.goal,
+          target_weeks: course.target_weeks,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || 'Failed');
       }
-    } catch (err) {
-      // Silent error
+      const data = await res.json();
+      // Link roadmap to course
+      await fetch(`${API_URL}/api/courses/${course.course_id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roadmap_id: data.roadmap.roadmap_id }),
+      });
+      toast('Roadmap generated!', 'success');
+      await loadCourseData();
+    } catch (err: any) {
+      setError(err.message);
+      toast(err.message, 'error');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const generateMilestoneAssignment = async (milestone: Milestone) => {
-    if (!userId || !course) {
-      toast('User ID or course not found', 'error');
-      return;
-    }
-    
-    if (!roadmap) {
-      toast('No roadmap found. Generate a roadmap first.', 'error');
-      return;
-    }
-    
+  const generateAssignment = async (milestone: Milestone) => {
+    if (!course || !roadmapId) return;
     setActionLoading(true);
-    setError('');
-    
     try {
-      const response = await fetch(`${API_URL}/api/ai/assignments/generate-milestone`, {
+      const res = await fetch(`${API_URL}/api/ai/assignments/generate-milestone`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: userId,
           course_id: course.course_id,
           milestone_id: milestone.milestone_id,
-          roadmap_id: roadmap.roadmap_id,
+          roadmap_id: roadmapId,
           milestone_title: milestone.title,
           milestone_description: milestone.description || milestone.overview || '',
           concepts: milestone.concepts || [],
           learning_steps: milestone.learning_steps || [],
-          difficulty: 'intermediate'
-        })
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const assignment = data.assignment;
-        
-        // Format assignment display based on type
-        let assignmentText = `
-🎯 ${assignment.assignment_type.toUpperCase().replace('_', ' ')}
-📚 ${assignment.title}
-
-📝 ${assignment.description}
-
-� Learning Objectives:
-${assignment.learning_objectives.map((obj: string, i: number) => `${i + 1}. ${obj}`).join('\n')}
-
-📋 Instructions:
-${assignment.instructions.map((inst: string, i: number) => `${i + 1}. ${inst}`).join('\n')}
-
-✅ Requirements:
-${assignment.requirements.map((req: string) => `• ${req}`).join('\n')}
-`;
-
-        // Add questions if present (for essays, quizzes, reading analysis)
-        if (assignment.questions && assignment.questions.length > 0) {
-          assignmentText += `\n❓ Questions to Answer:\n${assignment.questions.map((q: string, i: number) => `${i + 1}. ${q}`).join('\n')}\n`;
-        }
-
-        assignmentText += `
-💡 Hints:
-${assignment.hints.map((hint: string) => `• ${hint}`).join('\n')}
-
-⏱️ Estimated Time: ${assignment.estimated_time_hours} hours
-📊 Difficulty: ${assignment.difficulty}
-
-📌 Grading Rubric:
-${assignment.rubric.map((r: any) => `• ${r.criterion} (${r.points} pts): ${r.description}`).join('\n')}
-
-✅ Assignment saved! ID: ${data.assignment_id}
-View it in the Assignments tab to start working on it.
-        `.trim();
-        
-        toast('Assignment generated! Check the Assignments tab.', 'success');
-        
-        // Reload assignments list
-        await fetchAssignments();
-        
-      } else {
-        const errorData = await response.json();
-        toast(errorData.detail || 'Failed to generate assignment', 'error');
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate assignment';
-      toast(errorMessage, 'error');
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const generateAssignment = async (concept: string) => {
-    setActionLoading(true);
-    setError('');
-    try {
-      const response = await fetch(`${API_URL}/api/ai/assignments/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userId,
-          concept,
           difficulty: 'intermediate',
-          include_test_cases: true
-        })
+        }),
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        const assignment = data.assignment;
-        
-        // Link assignment to course
-        if (course) {
-          await fetch(`${API_URL}/api/courses/${course.course_id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              custom_preferences: {
-                assignment_ids: [...(course.custom_preferences?.assignment_ids || []), assignment.assignment_id]
-              }
-            })
-          });
-        }
-        
+      if (res.ok) {
+        toast('Assignment created!', 'success');
         await loadCourseData();
       } else {
-        const errorData = await response.json();
-        setError(errorData.detail || 'Failed to generate assignment');
+        const err = await res.json();
+        toast(err.detail || 'Failed', 'error');
       }
-    } catch (err) {
-      setError('Failed to generate assignment');
+    } catch {
+      toast('Failed to generate assignment', 'error');
     } finally {
       setActionLoading(false);
     }
   };
 
-  const generateRoadmapForCourse = async () => {
-    if (!course) {
-      toast('No course data available', 'error');
-      return;
-    }
-    
+  const toggleMilestone = async (milestoneId: string) => {
+    if (!roadmapId) return;
     setActionLoading(true);
-    setError('');
-    
     try {
-      const response = await fetch(`${API_URL}/api/ai/roadmap/generate`, {
+      await fetch(`${API_URL}/api/ai/roadmap/${roadmapId}/milestone/${milestoneId}/complete`, { method: 'PUT' });
+      await loadCourseData();
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const generateLessonContent = async (milestone: Milestone, step: LearningStep) => {
+    setGeneratingLesson(true);
+    setGeneratedContent('');
+    try {
+      const res = await fetch(`${API_URL}/api/ai/tutor/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_id: userId,
-          goal: course.goal,
-          target_weeks: course.target_weeks
-        })
+          course_id: params.courseId,
+          milestone_id: milestone.milestone_id,
+          topic: step.title,
+        }),
       });
-      
-      const responseText = await response.text();
-      
-      if (response.ok) {
-        let data;
-        try {
-          data = JSON.parse(responseText);
-        } catch (parseError) {
-          throw new Error('Invalid JSON response from server');
-        }
-        
-        const newRoadmap = data.roadmap;
-        
-        if (!newRoadmap || !newRoadmap.roadmap_id) {
-          throw new Error('Invalid roadmap data received');
-        }
-        
-        // Link roadmap to course
-        const updateResponse = await fetch(`${API_URL}/api/courses/${course.course_id}`, {
-          method: 'PUT',
+      if (res.ok) {
+        const data = await res.json();
+        setGeneratedContent(data.greeting);
+        // Now ask for a full lesson
+        const lessonRes = await fetch(`${API_URL}/api/ai/tutor/message`, {
+          method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            roadmap_id: newRoadmap.roadmap_id
-          })
+            user_id: userId,
+            chat_id: data.chat_id,
+            message: `Please give me a complete, detailed lesson on "${step.title}". Include: key concepts with explanations, real-world examples, and 3 practice questions at the end. Format with headers and bullet points.`,
+          }),
         });
-        
-        if (!updateResponse.ok) {
-          throw new Error('Failed to link roadmap to course');
-        }
-        
-        // Small delay to ensure backend is ready
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        await loadCourseData();
-        
-        // Switch to roadmap tab
-        if (roadmap) {
-          setActiveTab('roadmap');
-        }
-        
-        toast('Roadmap generated! Check the Roadmap tab.', 'success');
-      } else {
-        const errorData = JSON.parse(responseText);
-        
-        const errorMsg = errorData.detail || 'Failed to generate roadmap';
-        
-        if (errorMsg.includes('not configured') || errorMsg.includes('API key')) {
-          setError(
-            <span>
-              AI not configured. Please{' '}
-              <a 
-                href="/ai-settings" 
-                className="underline font-semibold hover:text-red-800"
-                onClick={(e) => {
-                  e.preventDefault();
-                  router.push('/ai-settings');
-                }}
-              >
-                set up your OpenAI API key
-              </a>
-              {' '}first.
-            </span>
-          );
-        } else {
-          setError(errorMsg);
+        if (lessonRes.ok) {
+          const lessonData = await lessonRes.json();
+          setGeneratedContent(lessonData.reply);
         }
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to generate roadmap';
-      setError(errorMessage);
-      toast(errorMessage, 'error');
+    } catch {
+      setGeneratedContent('Failed to generate lesson. Check your AI settings.');
     } finally {
-      setActionLoading(false);
+      setGeneratingLesson(false);
     }
   };
 
-  const updateCourseStatus = async (status: string) => {
-    if (!course) return;
-    setActionLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/api/courses/${course.course_id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
-      if (response.ok) {
-        await loadCourseData();
-      }
-    } catch (err) {
-      // Silent error
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'planning': return 'bg-blue-100 text-blue-800';
-      case 'paused': return 'bg-yellow-100 text-yellow-800';
-      case 'completed': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const formatTime = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-  };
+  const mod = milestones[selectedModule];
+  const completedCount = milestones.filter((m) => m.completed).length;
+  const progressPct = milestones.length > 0 ? Math.round((completedCount / milestones.length) * 100) : 0;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-green-50 p-4 py-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
-            <div className="text-gray-500 text-lg">Loading course...</div>
-          </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-500 text-lg animate-pulse">Loading course...</div>
+      </div>
+    );
+  }
+
+  if (!course) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-md">
+          <div className="text-5xl mb-4">😕</div>
+          <p className="text-gray-700 text-lg mb-4">{error || 'Course not found'}</p>
+          <button onClick={() => router.push('/courses')} className="text-purple-600 font-medium hover:underline">
+            ← Back to Courses
+          </button>
         </div>
       </div>
     );
   }
 
-  if (error || !course) {
+  // No roadmap yet — show generation prompt
+  if (milestones.length === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-green-50 p-4 py-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-red-50 border border-red-200 rounded-2xl p-8">
-            <div className="text-red-800 text-lg mb-4">{error || 'Course not found'}</div>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-3xl mx-auto px-4 py-12">
+          <button onClick={() => router.push('/courses')} className="text-gray-600 hover:text-gray-800 font-medium mb-6 block">
+            ← Back to Courses
+          </button>
+          <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+            <div className="text-6xl mb-4">🚀</div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{course.title}</h1>
+            <p className="text-gray-600 text-lg mb-2">{course.goal}</p>
+            <p className="text-gray-500 mb-8">Target: {course.target_weeks} weeks</p>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">{error}</div>
+            )}
+
+            <p className="text-gray-600 mb-6">
+              Let AI create a personalized curriculum with modules, lessons, and resources tailored to your learning goal.
+            </p>
             <button
-              onClick={() => router.push('/courses')}
-              className="text-red-600 hover:text-red-700 font-medium"
+              onClick={generateRoadmap}
+              disabled={actionLoading}
+              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold px-8 py-4 rounded-xl text-lg hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 transition-all shadow-lg"
             >
-              ← Back to Courses
+              {actionLoading ? (
+                <span className="flex items-center gap-3 justify-center">
+                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Generating curriculum...
+                </span>
+              ) : (
+                '✨ Generate My Curriculum'
+              )}
             </button>
           </div>
         </div>
@@ -500,847 +315,468 @@ View it in the Assignments tab to start working on it.
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-green-50 p-4 py-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-          <button
-            onClick={() => router.push('/courses')}
-            className="text-gray-600 hover:text-gray-800 font-medium mb-4"
-          >
-            ← Back to Courses
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* ═══ SIDEBAR ═══ */}
+      <aside className="w-80 bg-white border-r border-gray-200 flex flex-col h-screen sticky top-0 overflow-y-auto">
+        {/* Course header */}
+        <div className="p-4 border-b border-gray-200">
+          <button onClick={() => router.push('/courses')} className="text-xs text-gray-500 hover:text-gray-700 mb-2 block">
+            ← All Courses
           </button>
-          
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-3">
-                <h1 className="text-4xl font-bold text-gray-900">{course.title}</h1>
-                <span className={`px-3 py-1 rounded-full text-sm font-bold ${getStatusColor(course.status)}`}>
-                  {course.status.toUpperCase()}
-                </span>
-              </div>
-              <p className="text-gray-600 text-lg mb-4">{course.description}</p>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="text-sm font-semibold text-blue-700 mb-1">LEARNING GOAL</div>
-                <div className="text-blue-900">{course.goal}</div>
-              </div>
+          <h1 className="font-bold text-gray-900 text-lg leading-tight">{course.title}</h1>
+          <div className="mt-3">
+            <div className="flex justify-between text-xs text-gray-600 mb-1">
+              <span>{completedCount}/{milestones.length} modules</span>
+              <span className="font-bold">{progressPct}%</span>
             </div>
-            
-            <div className="ml-6 flex flex-col gap-2">
-              <button
-                onClick={() => router.push(`/tutor/${params.courseId}`)}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold px-6 py-3 rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl"
-              >
-                🤖 AI Tutor
-              </button>
-              <button
-                onClick={() => router.push('/ai-settings')}
-                className="text-purple-600 hover:text-purple-700 font-medium px-4 py-2 rounded-lg hover:bg-purple-50"
-              >
-                ⚙️ Settings
-              </button>
-            </div>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="mt-6">
-            <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-              <span className="font-semibold">Overall Progress</span>
-              <span className="font-bold text-lg">{Math.round(course.progress_percentage)}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-4">
+            <div className="w-full bg-gray-200 rounded-full h-2">
               <div
-                className="bg-gradient-to-r from-purple-500 to-blue-500 h-4 rounded-full transition-all"
-                style={{ width: `${course.progress_percentage}%` }}
+                className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${progressPct}%` }}
               />
             </div>
           </div>
-
-          {/* Stats Row */}
-          <div className="grid md:grid-cols-4 gap-4 mt-6">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4">
-              <div className="text-sm text-blue-700 mb-1">Study Time</div>
-              <div className="text-2xl font-bold text-blue-900">{formatTime(course.total_time_spent_minutes)}</div>
-            </div>
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4">
-              <div className="text-sm text-green-700 mb-1">Sessions</div>
-              <div className="text-2xl font-bold text-green-900">{course.sessions_count}</div>
-            </div>
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4">
-              <div className="text-sm text-purple-700 mb-1">Concepts Mastered</div>
-              <div className="text-2xl font-bold text-purple-900">{course.concepts_mastered.length}</div>
-            </div>
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4">
-              <div className="text-sm text-orange-700 mb-1">
-                {stats?.total_milestones ? 'Milestones' : 'Target'}
-              </div>
-              <div className="text-2xl font-bold text-orange-900">
-                {stats?.total_milestones ? `${stats.completed_milestones}/${stats.total_milestones}` : `${course.target_weeks}w`}
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* Tabs */}
-        <div className="bg-white rounded-2xl shadow-xl mb-6">
-          <div className="flex border-b overflow-x-auto">
-            {[
-              { id: 'overview', label: '📊 Overview', icon: '📊' },
-              { id: 'roadmap', label: '🗺️ Roadmap', icon: '🗺️' },
-              { id: 'assignments', label: '📝 Assignments', icon: '📝' },
-              { id: 'sessions', label: '⏱️ Sessions', icon: '⏱️' },
-              { id: 'settings', label: '⚙️ Settings', icon: '⚙️' }
-            ].map((tab) => (
+        {/* Module list */}
+        <nav className="flex-1 p-2 space-y-1">
+          {milestones.map((m, idx) => {
+            const isActive = selectedModule === idx;
+            const stepCount = m.learning_steps?.length || 0;
+            return (
               <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex-1 px-6 py-4 font-semibold transition-colors whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                key={m.milestone_id}
+                onClick={() => { setSelectedModule(idx); setSelectedLesson(0); setView('overview'); setGeneratedContent(''); }}
+                className={`w-full text-left p-3 rounded-xl transition-all ${
+                  isActive
+                    ? 'bg-purple-50 border-2 border-purple-300'
+                    : 'hover:bg-gray-50 border-2 border-transparent'
                 }`}
               >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-6">
-            {error}
-          </div>
-        )}
-
-        {/* Tab Content */}
-        <div className="space-y-6">
-          {/* Overview Tab */}
-          {activeTab === 'overview' && (
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="bg-white rounded-2xl shadow-xl p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">📈 Quick Stats</h2>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-gray-700">Total Time Invested</span>
-                    <span className="font-bold text-gray-900">{formatTime(course.total_time_spent_minutes)}</span>
+                <div className="flex items-start gap-3">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5 ${
+                    m.completed
+                      ? 'bg-green-500 text-white'
+                      : isActive
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-200 text-gray-600'
+                  }`}>
+                    {m.completed ? '✓' : idx + 1}
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-gray-700">Learning Sessions</span>
-                    <span className="font-bold text-gray-900">{course.sessions_count}</span>
+                  <div className="min-w-0">
+                    <div className={`text-sm font-semibold leading-tight ${isActive ? 'text-purple-900' : 'text-gray-800'}`}>
+                      {m.title}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {stepCount > 0 ? `${stepCount} lessons` : ''} · {m.estimated_hours}h
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-gray-700">Concepts Mastered</span>
-                    <span className="font-bold text-gray-900">{course.concepts_mastered.length}</span>
-                  </div>
-                  {stats && (
-                    <>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <span className="text-gray-700">Milestones Completed</span>
-                        <span className="font-bold text-gray-900">
-                          {stats.completed_milestones}/{stats.total_milestones}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <span className="text-gray-700">Assignments Done</span>
-                        <span className="font-bold text-gray-900">
-                          {stats.completed_assignments}/{stats.total_assignments}
-                        </span>
-                      </div>
-                    </>
-                  )}
                 </div>
-              </div>
 
-              <div className="bg-white rounded-2xl shadow-xl p-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">🎯 Next Steps</h2>
-                <div className="space-y-3">
-                  {roadmap && roadmap.milestones.filter(m => !m.completed).slice(0, 3).map((milestone) => (
-                    <div key={milestone.milestone_id} className="p-4 border border-gray-200 rounded-lg hover:border-blue-300 transition-colors">
-                      <div className="font-semibold text-gray-900 mb-1">{milestone.title}</div>
-                      <div className="text-sm text-gray-600 mb-2">{milestone.description}</div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-gray-500">⏱️ {milestone.estimated_hours}h</span>
-                        <button
-                          onClick={() => setActiveTab('roadmap')}
-                          className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                        >
-                          View in Roadmap →
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                  {roadmap && roadmap.milestones.filter(m => !m.completed).length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      <p>🎉 All milestones completed!</p>
-                    </div>
-                  )}
-                  {!roadmap && (
-                    <div className="text-center py-8">
-                      <div className="text-4xl mb-3">🗺️</div>
-                      <p className="text-gray-600 mb-4">No roadmap yet</p>
-                      <button
-                        onClick={() => setActiveTab('roadmap')}
-                        className="text-blue-600 hover:text-blue-700 font-medium"
+                {/* Sub-lessons (expanded when active) */}
+                {isActive && stepCount > 0 && (
+                  <div className="mt-2 ml-10 space-y-1">
+                    {m.learning_steps!.sort((a, b) => a.order - b.order).map((step, sIdx) => (
+                      <div
+                        key={sIdx}
+                        onClick={(e) => { e.stopPropagation(); setSelectedLesson(sIdx); setView('learn'); setGeneratedContent(''); }}
+                        className={`text-xs p-2 rounded-lg cursor-pointer transition-colors ${
+                          selectedLesson === sIdx && view === 'learn'
+                            ? 'bg-purple-100 text-purple-800 font-semibold'
+                            : 'text-gray-600 hover:bg-gray-100'
+                        }`}
                       >
-                        Generate Roadmap →
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+                        {step.order}. {step.title}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </nav>
 
-          {/* Roadmap Tab */}
-          {activeTab === 'roadmap' && (
-            <div className="bg-white rounded-2xl shadow-xl p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">🗺️ Learning Roadmap</h2>
-                {roadmap && (
-                  <span className="text-sm text-gray-600">
-                    {roadmap.milestones.filter(m => m.completed).length} of {roadmap.milestones.length} completed
-                  </span>
+        {/* Sidebar footer */}
+        <div className="p-3 border-t border-gray-200 space-y-2">
+          <button
+            onClick={() => router.push(`/tutor/${params.courseId}`)}
+            className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-xl font-semibold text-sm hover:from-purple-700 hover:to-blue-700 transition-all"
+          >
+            🤖 Open AI Tutor Chat
+          </button>
+          <button
+            onClick={() => router.push('/ai-settings')}
+            className="w-full py-2 text-gray-600 hover:text-gray-800 text-xs font-medium hover:bg-gray-50 rounded-lg"
+          >
+            ⚙️ Settings
+          </button>
+        </div>
+      </aside>
+
+      {/* ═══ MAIN CONTENT ═══ */}
+      <main className="flex-1 min-h-screen">
+        {mod ? (
+          <div className="max-w-4xl mx-auto px-8 py-8">
+            {/* Module header */}
+            <div className="mb-8">
+              <div className="flex items-center gap-3 mb-1">
+                <span className="text-xs font-semibold text-purple-600 uppercase tracking-wide">
+                  Module {selectedModule + 1} of {milestones.length}
+                </span>
+                {mod.completed && (
+                  <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full font-semibold">Completed</span>
                 )}
               </div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">{mod.title}</h2>
+              <p className="text-gray-600 text-lg">{mod.description}</p>
 
-              {!roadmap && (
-                <div className="text-center py-12">
-                  <div className="text-6xl mb-4">🗺️</div>
-                  <p className="text-gray-600 mb-4">No roadmap generated yet</p>
-                  <p className="text-sm text-gray-500 mb-6">
-                    Generate an AI-powered learning roadmap for this course
-                  </p>
-                  <button
-                    onClick={generateRoadmapForCourse}
-                    disabled={actionLoading}
-                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-                  >
-                    {actionLoading ? (
-                      <span className="flex items-center gap-2">
-                        <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        Generating with AI...
-                      </span>
-                    ) : (
-                      '✨ Generate Roadmap with AI'
-                    )}
-                  </button>
-                </div>
-              )}
-
-              {roadmap && (
-                <div className="space-y-4">
-                  {/* Debug Info */}
-                  {roadmap.milestones && roadmap.milestones.length > 0 && (
-                    <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-4">
-                      <h3 className="font-bold text-blue-900 mb-2">📊 Roadmap Status:</h3>
-                      <div className="text-sm text-blue-800 space-y-1">
-                        <div>✅ Total Modules: {roadmap.milestones.length}</div>
-                        <div>📚 Total Lessons: {roadmap.milestones.reduce((sum, m) => sum + (m.learning_steps?.length || 0), 0)}</div>
-                        {roadmap.milestones.every(m => !m.learning_steps || m.learning_steps.length === 0) && (
-                          <div className="text-red-600 font-bold mt-2">
-                            ⚠️ WARNING: No learning steps found! Check console logs.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {roadmap.milestones.map((milestone, index) => (
-                    <div
-                      key={milestone.milestone_id}
-                      className={`border-2 rounded-xl p-6 transition-all ${
-                        milestone.completed
-                          ? 'bg-green-50 border-green-300'
-                          : 'bg-white border-gray-200 hover:border-blue-300'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-start gap-4 flex-1">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                            milestone.completed ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'
-                          }`}>
-                            {milestone.completed ? '✓' : index + 1}
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="text-xl font-bold text-gray-900 mb-2">{milestone.title}</h3>
-                            <p className="text-gray-600 mb-3">{milestone.description}</p>
-                            
-                            {milestone.concepts && milestone.concepts.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mb-3">
-                                {milestone.concepts.map((concept, idx) => (
-                                  <span
-                                    key={idx}
-                                    className="px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded-full"
-                                  >
-                                    {concept}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                            
-                            {/* Generate Assignment Button */}
-                            <div className="mt-4 mb-4 flex gap-2 flex-wrap">
-                              <button
-                                onClick={() => router.push(`/tutor/${params.courseId}?milestone=${milestone.milestone_id}`)}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 font-medium"
-                              >
-                                <span>🤖</span>
-                                <span>Study with AI Tutor</span>
-                              </button>
-                              <button
-                                onClick={() => generateMilestoneAssignment(milestone)}
-                                disabled={actionLoading}
-                                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2 font-medium"
-                              >
-                                <span>🎯</span>
-                                <span>{actionLoading ? 'Generating...' : 'Generate Assignment'}</span>
-                              </button>
-                              <p className="text-xs text-gray-500 mt-2">
-                                Create a hands-on project to test your understanding of this module
-                              </p>
-                            </div>
-                            
-                            {/* Web Resources Section */}
-                            {milestone.web_resources && milestone.web_resources.length > 0 && (
-                              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                                <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                  🌐 Learning Resources
-                                </h4>
-                                <div className="space-y-3">
-                                  {milestone.web_resources.map((resource: any, resIdx: number) => (
-                                    <a
-                                      key={resIdx}
-                                      href={resource.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="block p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-md transition-all group"
-                                    >
-                                      <div className="flex items-start gap-3">
-                                        <div className="text-2xl">
-                                          {resource.resource_type === 'video' && '🎥'}
-                                          {resource.resource_type === 'article' && '📄'}
-                                          {resource.resource_type === 'tutorial' && '📚'}
-                                          {resource.resource_type === 'documentation' && '📖'}
-                                          {resource.resource_type === 'course' && '🎓'}
-                                          {resource.resource_type === 'interactive' && '💻'}
-                                          {!['video', 'article', 'tutorial', 'documentation', 'course', 'interactive'].includes(resource.resource_type) && '🔗'}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                          <div className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
-                                            {resource.title}
-                                          </div>
-                                          {resource.description && (
-                                            <p className="text-sm text-gray-600 mt-1 line-clamp-2">
-                                              {resource.description}
-                                            </p>
-                                          )}
-                                          <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-gray-500">
-                                            {resource.platform && (
-                                              <span className="flex items-center gap-1">
-                                                <span className="font-medium">{resource.platform}</span>
-                                              </span>
-                                            )}
-                                            {resource.estimated_time_minutes && (
-                                              <span>⏱️ {resource.estimated_time_minutes} min</span>
-                                            )}
-                                            {resource.difficulty && (
-                                              <span className={`px-2 py-0.5 rounded-full ${
-                                                resource.difficulty === 'beginner' ? 'bg-green-100 text-green-700' :
-                                                resource.difficulty === 'intermediate' ? 'bg-yellow-100 text-yellow-700' :
-                                                'bg-red-100 text-red-700'
-                                              }`}>
-                                                {resource.difficulty}
-                                              </span>
-                                            )}
-                                            {resource.is_free && (
-                                              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">
-                                                Free
-                                              </span>
-                                            )}
-                                          </div>
-                                          {resource.why_recommended && (
-                                            <p className="text-xs text-gray-500 mt-2 italic">
-                                              💡 {resource.why_recommended}
-                                            </p>
-                                          )}
-                                        </div>
-                                        <div className="text-gray-400 group-hover:text-blue-600 transition-colors">
-                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                          </svg>
-                                        </div>
-                                      </div>
-                                    </a>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                            
-                            {/* Learning Steps - Detailed Lessons */}
-                            {milestone.learning_steps && milestone.learning_steps.length > 0 ? (
-                              <div className="mt-4 space-y-3">
-                                <h4 className="font-semibold text-gray-900 flex items-center gap-2 bg-blue-50 p-3 rounded-lg border-l-4 border-blue-500">
-                                  📚 Learning Path ({milestone.learning_steps.length} lessons) - Click to expand
-                                </h4>
-                                {milestone.learning_steps
-                                  .sort((a, b) => a.order - b.order)
-                                  .map((step, stepIdx) => (
-                                    <details key={step.step_id || stepIdx} className="group bg-gray-50 rounded-lg border-2 border-gray-200 hover:border-blue-400 transition-all">
-                                      <summary className="cursor-pointer p-4 hover:bg-blue-50 rounded-lg transition-colors list-none select-none">
-                                        <div className="flex items-center justify-between">
-                                          <div className="flex items-center gap-3 flex-1">
-                                            <span className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold">
-                                              {step.order}
-                                            </span>
-                                            <div className="flex-1">
-                                              <div className="font-semibold text-gray-900">{step.title}</div>
-                                              <div className="text-sm text-gray-600">{step.description}</div>
-                                              <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
-                                                <span>⏱️ {step.estimated_minutes} min</span>
-                                                <span>📊 {step.difficulty}</span>
-                                                {step.video_resources && step.video_resources.length > 0 && (
-                                                  <span>🎥 {step.video_resources.length} videos</span>
-                                                )}
-                                                {step.reading_resources && step.reading_resources.length > 0 && (
-                                                  <span>📄 {step.reading_resources.length} articles</span>
-                                                )}
-                                              </div>
-                                            </div>
-                                          </div>
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-xs text-blue-600 font-medium">Click to open</span>
-                                            <svg className="w-5 h-5 text-blue-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                            </svg>
-                                          </div>
-                                        </div>
-                                      </summary>
-                                      
-                                      <div className="p-4 pt-0 space-y-4 bg-white">
-                                        {/* Learning Objectives */}
-                                        {step.learning_objectives && step.learning_objectives.length > 0 && (
-                                          <div>
-                                            <h5 className="font-semibold text-sm text-gray-900 mb-2">🎯 What You'll Learn:</h5>
-                                            <ul className="space-y-1">
-                                              {step.learning_objectives.map((obj, idx) => (
-                                                <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
-                                                  <span className="text-green-500 mt-0.5">✓</span>
-                                                  <span>{obj}</span>
-                                                </li>
-                                              ))}
-                                            </ul>
-                                          </div>
-                                        )}
-                                        
-                                        {/* Content */}
-                                        {step.content && (
-                                          <div>
-                                            <h5 className="font-semibold text-sm text-gray-900 mb-2">📖 Lesson Content:</h5>
-                                            <div className="text-sm text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border border-gray-200">
-                                              {step.content}
-                                            </div>
-                                          </div>
-                                        )}
-                                        
-                                        {/* Video Resources */}
-                                        {step.video_resources && step.video_resources.length > 0 && (
-                                          <div>
-                                            <h5 className="font-semibold text-sm text-gray-900 mb-2">🎥 Videos to Watch:</h5>
-                                            <div className="space-y-2">
-                                              {step.video_resources.map((resource, idx) => (
-                                                <a
-                                                  key={idx}
-                                                  href={resource.url}
-                                                  target="_blank"
-                                                  rel="noopener noreferrer"
-                                                  className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all group"
-                                                >
-                                                  <span className="text-xl">🎥</span>
-                                                  <div className="flex-1 min-w-0">
-                                                    <div className="font-medium text-sm text-gray-900 group-hover:text-blue-600">{resource.title}</div>
-                                                    {resource.platform && <div className="text-xs text-gray-500">{resource.platform} • {resource.estimated_time_minutes} min</div>}
-                                                  </div>
-                                                  <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                                  </svg>
-                                                </a>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        )}
-                                        
-                                        {/* Reading Resources */}
-                                        {step.reading_resources && step.reading_resources.length > 0 && (
-                                          <div>
-                                            <h5 className="font-semibold text-sm text-gray-900 mb-2">📄 Articles & Docs:</h5>
-                                            <div className="space-y-2">
-                                              {step.reading_resources.map((resource, idx) => (
-                                                <a
-                                                  key={idx}
-                                                  href={resource.url}
-                                                  target="_blank"
-                                                  rel="noopener noreferrer"
-                                                  className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all group"
-                                                >
-                                                  <span className="text-xl">📄</span>
-                                                  <div className="flex-1 min-w-0">
-                                                    <div className="font-medium text-sm text-gray-900 group-hover:text-blue-600">{resource.title}</div>
-                                                    {resource.platform && <div className="text-xs text-gray-500">{resource.platform} • {resource.estimated_time_minutes} min read</div>}
-                                                  </div>
-                                                  <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                                  </svg>
-                                                </a>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        )}
-                                        
-                                        {/* Interactive Resources */}
-                                        {step.interactive_resources && step.interactive_resources.length > 0 && (
-                                          <div>
-                                            <h5 className="font-semibold text-sm text-gray-900 mb-2">💻 Practice Interactively:</h5>
-                                            <div className="space-y-2">
-                                              {step.interactive_resources.map((resource, idx) => (
-                                                <a
-                                                  key={idx}
-                                                  href={resource.url}
-                                                  target="_blank"
-                                                  rel="noopener noreferrer"
-                                                  className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg hover:border-blue-400 hover:shadow-sm transition-all group"
-                                                >
-                                                  <span className="text-xl">💻</span>
-                                                  <div className="flex-1 min-w-0">
-                                                    <div className="font-medium text-sm text-gray-900 group-hover:text-blue-600">{resource.title}</div>
-                                                    {resource.platform && <div className="text-xs text-gray-500">{resource.platform} • {resource.estimated_time_minutes} min</div>}
-                                                  </div>
-                                                  <svg className="w-4 h-4 text-gray-400 group-hover:text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                                  </svg>
-                                                </a>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        )}
-                                        
-                                        {/* Action Items */}
-                                        {step.action_items && step.action_items.length > 0 && (
-                                          <div>
-                                            <h5 className="font-semibold text-sm text-gray-900 mb-2">✅ Action Items:</h5>
-                                            <ul className="space-y-1">
-                                              {step.action_items.map((item, idx) => (
-                                                <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
-                                                  <span className="text-blue-500 mt-0.5">→</span>
-                                                  <span>{item}</span>
-                                                </li>
-                                              ))}
-                                            </ul>
-                                          </div>
-                                        )}
-                                        
-                                        {/* Practice Exercises */}
-                                        {step.practice_exercises && step.practice_exercises.length > 0 && (
-                                          <div>
-                                            <h5 className="font-semibold text-sm text-gray-900 mb-2">🏋️ Practice Exercises:</h5>
-                                            <ul className="space-y-1">
-                                              {step.practice_exercises.map((exercise, idx) => (
-                                                <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
-                                                  <span className="text-purple-500 mt-0.5">★</span>
-                                                  <span>{exercise}</span>
-                                                </li>
-                                              ))}
-                                            </ul>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </details>
-                                  ))}
-                              </div>
-                            ) : (
-                              <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                                <p className="text-sm text-yellow-800">
-                                  ⚠️ No learning steps available. This might be a fallback roadmap. Configure AI settings for detailed content.
-                                </p>
-                              </div>
-                            )}
-                            
-                            <div className="text-sm text-gray-500">
-                              ⏱️ Estimated: {milestone.estimated_hours} hours
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => toggleMilestone(milestone.milestone_id)}
-                          disabled={actionLoading}
-                          className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all ${
-                            milestone.completed
-                              ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                              : 'bg-blue-600 text-white hover:bg-blue-700'
-                          } disabled:opacity-50`}
-                        >
-                          {milestone.completed ? '↩️ Mark Incomplete' : '✓ Mark Complete'}
-                        </button>
-                        {!milestone.completed && milestone.concepts && milestone.concepts.length > 0 && (
-                          <button
-                            onClick={() => generateAssignment(milestone.concepts[0])}
-                            disabled={actionLoading}
-                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium disabled:opacity-50"
-                          >
-                            📝 Generate Assignment
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Assignments Tab */}
-          {activeTab === 'assignments' && (
-            <div className="bg-white rounded-2xl shadow-xl p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">📝 Course Assignments</h2>
+              {/* Module actions */}
+              <div className="flex gap-3 mt-4 flex-wrap">
                 <button
-                  onClick={() => fetchAssignments()}
-                  className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  onClick={() => setView('overview')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${view === 'overview' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
                 >
-                  🔄 Refresh
+                  📋 Overview
+                </button>
+                {mod.learning_steps && mod.learning_steps.length > 0 && (
+                  <button
+                    onClick={() => { setView('learn'); setSelectedLesson(0); }}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${view === 'learn' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  >
+                    📖 Lessons ({mod.learning_steps.length})
+                  </button>
+                )}
+                <button
+                  onClick={() => setView('assignment')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${view === 'assignment' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                >
+                  📝 Assignments ({assignments.filter(a => a.title?.toLowerCase().includes(mod.title.split(':').pop()?.trim().toLowerCase().slice(0, 10) || '')).length || 0})
+                </button>
+                <button
+                  onClick={() => router.push(`/tutor/${params.courseId}?milestone=${mod.milestone_id}`)}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-gradient-to-r from-purple-600 to-blue-600 text-white hover:from-purple-700 hover:to-blue-700"
+                >
+                  🤖 Ask AI Tutor
                 </button>
               </div>
-              
-              {assignments.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="text-6xl mb-4">📝</div>
-                  <p className="text-gray-600 mb-4">No assignments yet</p>
-                  <p className="text-sm text-gray-500">Generate assignments from your roadmap milestones</p>
-                  <button
-                    onClick={() => setActiveTab('roadmap')}
-                    className="mt-4 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                  >
-                    Go to Roadmap →
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {assignments.map((assignment) => (
-                    <div
-                      key={assignment.assignment_id}
-                      className={`border-2 rounded-xl p-6 ${
-                        assignment.status === 'completed' || assignment.status === 'graded' 
-                          ? 'bg-green-50 border-green-300' 
-                          : assignment.status === 'submitted'
-                          ? 'bg-blue-50 border-blue-300'
-                          : 'border-gray-200 hover:border-purple-300 transition-colors'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-full font-semibold uppercase">
-                              {assignment.assignment_type.replace('_', ' ')}
-                            </span>
-                            <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
-                              assignment.status === 'completed' || assignment.status === 'graded'
-                                ? 'bg-green-100 text-green-700'
-                                : assignment.status === 'submitted'
-                                ? 'bg-blue-100 text-blue-700'
-                                : assignment.status === 'in_progress'
-                                ? 'bg-yellow-100 text-yellow-700'
-                                : 'bg-gray-100 text-gray-700'
-                            }`}>
-                              {assignment.status.replace('_', ' ')}
-                            </span>
-                          </div>
-                          <h3 className="text-lg font-bold text-gray-900">{assignment.title}</h3>
-                        </div>
-                        {(assignment.status === 'completed' || assignment.status === 'graded') && (
-                          <span className="text-green-600 text-2xl">✓</span>
-                        )}
-                      </div>
-                      
-                      <p className="text-gray-600 text-sm mb-4">{assignment.description}</p>
-                      
-                      {/* Learning Objectives */}
-                      {assignment.learning_objectives && assignment.learning_objectives.length > 0 && (
-                        <div className="mb-4">
-                          <h4 className="text-xs font-semibold text-gray-700 mb-2">🎯 Learning Objectives:</h4>
-                          <ul className="space-y-1">
-                            {assignment.learning_objectives.slice(0, 3).map((obj, idx) => (
-                              <li key={idx} className="text-xs text-gray-600 flex items-start gap-2">
-                                <span className="text-purple-500">→</span>
-                                <span>{obj}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      
-                      {/* Questions Preview (for essays, quizzes) */}
-                      {assignment.questions && assignment.questions.length > 0 && (
-                        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                          <h4 className="text-xs font-semibold text-blue-900 mb-2">❓ Questions to Answer:</h4>
-                          <ul className="space-y-1">
-                            {assignment.questions.slice(0, 2).map((q, idx) => (
-                              <li key={idx} className="text-xs text-blue-800">
-                                {idx + 1}. {q.length > 100 ? q.substring(0, 100) + '...' : q}
-                              </li>
-                            ))}
-                            {assignment.questions.length > 2 && (
-                              <li className="text-xs text-blue-600 italic">
-                                +{assignment.questions.length - 2} more questions...
-                              </li>
-                            )}
-                          </ul>
-                        </div>
-                      )}
-                      
-                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-                        <div className="flex items-center gap-4 text-xs text-gray-500">
-                          <span>⏱️ {assignment.estimated_time_hours}h</span>
-                          <span>📊 {assignment.difficulty}</span>
-                          <span>📅 {new Date(assignment.created_at).toLocaleDateString()}</span>
-                          {assignment.score !== undefined && (
-                            <span className="text-green-600 font-semibold">
-                              Score: {assignment.score}%
-                            </span>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => {
-                            // TODO: Open assignment detail modal or page
-                            router.push('/assignments/' + assignment.assignment_id);
-                          }}
-                          className="text-sm text-purple-600 hover:text-purple-700 font-medium px-4 py-2 rounded-lg hover:bg-purple-50"
-                        >
-                          View Full Details →
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-          )}
 
-          {/* Sessions Tab */}
-          {activeTab === 'sessions' && (
-            <div className="bg-white rounded-2xl shadow-xl p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">⏱️ Learning Sessions</h2>
-                <button
-                  onClick={() => router.push('/habits')}
-                  className="text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  View All Sessions →
-                </button>
-              </div>
-              
-              {sessions.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="text-6xl mb-4">⏱️</div>
-                  <p className="text-gray-600 mb-4">No sessions recorded yet</p>
-                  <button
-                    onClick={() => router.push('/habits')}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
-                  >
-                    Start Your First Session
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {sessions.map((session) => (
-                    <div key={session.session_id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold text-gray-900">
-                          {new Date(session.start_time).toLocaleString()}
-                        </span>
-                        <span className="text-sm font-bold text-blue-600">
-                          {formatTime(session.duration_minutes)}
-                        </span>
-                      </div>
-                      {session.concepts_covered && session.concepts_covered.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {session.concepts_covered.map((concept, idx) => (
-                            <span key={idx} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                              {concept}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Settings Tab */}
-          {activeTab === 'settings' && (
-            <div className="bg-white rounded-2xl shadow-xl p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">⚙️ Course Settings</h2>
-              
+            {/* ─── OVERVIEW VIEW ─── */}
+            {view === 'overview' && (
               <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-2">Course Status</label>
-                  <select
-                    value={course.status}
-                    onChange={(e) => updateCourseStatus(e.target.value)}
-                    disabled={actionLoading}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="planning">📋 Planning</option>
-                    <option value="active">🟢 Active</option>
-                    <option value="paused">⏸️ Paused</option>
-                    <option value="completed">✅ Completed</option>
-                    <option value="archived">📦 Archived</option>
-                  </select>
-                </div>
+                {mod.overview && (
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <h3 className="font-bold text-gray-900 mb-3">About This Module</h3>
+                    <p className="text-gray-700 whitespace-pre-wrap">{mod.overview}</p>
+                  </div>
+                )}
 
-                <div className="border-t border-gray-200 pt-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-4">Course Information</h3>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Created:</span>
-                      <span className="font-medium">{new Date(course.created_at).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Target Duration:</span>
-                      <span className="font-medium">{course.target_weeks} weeks</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Course ID:</span>
-                      <span className="font-mono text-xs">{course.course_id}</span>
+                {mod.why_important && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+                    <h3 className="font-bold text-blue-900 mb-2">💡 Why This Matters</h3>
+                    <p className="text-blue-800">{mod.why_important}</p>
+                  </div>
+                )}
+
+                {mod.concepts && mod.concepts.length > 0 && (
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <h3 className="font-bold text-gray-900 mb-3">Key Concepts</h3>
+                    <div className="flex flex-wrap gap-2">
+                      {mod.concepts.map((c, i) => (
+                        <span key={i} className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium">
+                          {c}
+                        </span>
+                      ))}
                     </div>
                   </div>
-                </div>
+                )}
 
-                <div className="border-t border-gray-200 pt-6">
-                  <h3 className="text-lg font-bold text-red-900 mb-4">Danger Zone</h3>
+                {mod.real_world_applications && mod.real_world_applications.length > 0 && (
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <h3 className="font-bold text-gray-900 mb-3">🌍 Real-World Applications</h3>
+                    <ul className="space-y-2">
+                      {mod.real_world_applications.map((app, i) => (
+                        <li key={i} className="flex items-start gap-2 text-gray-700">
+                          <span className="text-green-500 mt-1">→</span>
+                          <span>{app}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Lessons preview */}
+                {mod.learning_steps && mod.learning_steps.length > 0 && (
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <h3 className="font-bold text-gray-900 mb-4">📚 Lessons in This Module</h3>
+                    <div className="space-y-2">
+                      {mod.learning_steps.sort((a, b) => a.order - b.order).map((step, i) => (
+                        <button
+                          key={i}
+                          onClick={() => { setSelectedLesson(i); setView('learn'); setGeneratedContent(''); }}
+                          className="w-full flex items-center gap-4 p-4 rounded-lg border border-gray-200 hover:border-purple-300 hover:bg-purple-50 transition-all text-left"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center text-sm font-bold flex-shrink-0">
+                            {step.order}
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold text-gray-900">{step.title}</div>
+                            <div className="text-sm text-gray-500 mt-0.5">{step.description}</div>
+                          </div>
+                          <span className="text-purple-600 text-sm font-medium">Start →</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Module completion */}
+                <div className="flex gap-3">
                   <button
-                    onClick={() => {
-                      if (confirm('Are you sure you want to archive this course?')) {
-                        updateCourseStatus('archived');
-                        router.push('/courses');
-                      }
-                    }}
-                    className="w-full bg-red-600 text-white py-3 px-4 rounded-lg hover:bg-red-700 font-medium"
+                    onClick={() => toggleMilestone(mod.milestone_id)}
+                    disabled={actionLoading}
+                    className={`flex-1 py-3 rounded-xl font-semibold transition-all ${
+                      mod.completed
+                        ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        : 'bg-green-600 text-white hover:bg-green-700'
+                    } disabled:opacity-50`}
                   >
-                    🗑️ Archive Course
+                    {mod.completed ? '↩️ Mark Incomplete' : '✅ Mark Module Complete'}
+                  </button>
+                  <button
+                    onClick={() => generateAssignment(mod)}
+                    disabled={actionLoading}
+                    className="px-6 py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700 disabled:opacity-50 transition-all"
+                  >
+                    📝 Generate Assignment
                   </button>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      </div>
+            )}
+
+            {/* ─── LESSON VIEW ─── */}
+            {view === 'learn' && mod.learning_steps && mod.learning_steps.length > 0 && (() => {
+              const step = mod.learning_steps!.sort((a, b) => a.order - b.order)[selectedLesson];
+              if (!step) return null;
+              return (
+                <div className="space-y-6">
+                  {/* Lesson header */}
+                  <div className="flex items-center gap-3 text-sm text-gray-500">
+                    <span>Lesson {selectedLesson + 1} of {mod.learning_steps!.length}</span>
+                    {step.estimated_minutes && <span>· ⏱️ {step.estimated_minutes} min</span>}
+                    {step.difficulty && <span>· 📊 {step.difficulty}</span>}
+                  </div>
+
+                  <h3 className="text-2xl font-bold text-gray-900">{step.title}</h3>
+
+                  {/* Learning objectives */}
+                  {step.learning_objectives && step.learning_objectives.length > 0 && (
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-5">
+                      <h4 className="font-bold text-green-900 mb-2">🎯 After this lesson, you will:</h4>
+                      <ul className="space-y-1">
+                        {step.learning_objectives.map((obj, i) => (
+                          <li key={i} className="text-green-800 text-sm flex items-start gap-2">
+                            <span className="text-green-500 mt-0.5">✓</span>
+                            <span>{obj}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Lesson content */}
+                  <div className="bg-white rounded-xl border border-gray-200 p-6">
+                    <div className="prose prose-gray max-w-none text-gray-800 whitespace-pre-wrap leading-relaxed">
+                      {step.content || 'No pre-generated content. Click "Generate AI Lesson" below for a detailed lesson.'}
+                    </div>
+                  </div>
+
+                  {/* AI-generated deep lesson */}
+                  {!generatedContent && !generatingLesson && (
+                    <button
+                      onClick={() => generateLessonContent(mod, step)}
+                      className="w-full py-4 bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-dashed border-purple-300 rounded-xl text-purple-700 font-semibold hover:from-purple-100 hover:to-blue-100 transition-all"
+                    >
+                      ✨ Generate Detailed AI Lesson
+                    </button>
+                  )}
+
+                  {generatingLesson && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-6 text-center">
+                      <div className="animate-pulse text-4xl mb-3">🤖</div>
+                      <p className="text-purple-700 font-medium">Generating your personalized lesson...</p>
+                    </div>
+                  )}
+
+                  {generatedContent && (
+                    <div className="bg-white rounded-xl border-2 border-purple-200 p-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="text-lg">🤖</span>
+                        <h4 className="font-bold text-purple-900">AI-Generated Lesson</h4>
+                      </div>
+                      <div
+                        className="prose prose-gray max-w-none text-gray-800 leading-relaxed"
+                        dangerouslySetInnerHTML={{ __html: formatMarkdown(generatedContent) }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Action items */}
+                  {step.action_items && step.action_items.length > 0 && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
+                      <h4 className="font-bold text-yellow-900 mb-2">✅ Try This</h4>
+                      <ul className="space-y-1">
+                        {step.action_items.map((item, i) => (
+                          <li key={i} className="text-yellow-800 text-sm flex items-start gap-2">
+                            <span className="text-yellow-500 mt-0.5">→</span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Practice */}
+                  {step.practice_exercises && step.practice_exercises.length > 0 && (
+                    <div className="bg-purple-50 border border-purple-200 rounded-xl p-5">
+                      <h4 className="font-bold text-purple-900 mb-2">🏋️ Practice</h4>
+                      <ul className="space-y-2">
+                        {step.practice_exercises.map((ex, i) => (
+                          <li key={i} className="text-purple-800 text-sm">{i + 1}. {ex}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Navigation */}
+                  <div className="flex justify-between pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => { if (selectedLesson > 0) { setSelectedLesson(selectedLesson - 1); setGeneratedContent(''); } }}
+                      disabled={selectedLesson === 0}
+                      className="px-6 py-3 rounded-xl font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      ← Previous Lesson
+                    </button>
+                    {selectedLesson < (mod.learning_steps?.length || 0) - 1 ? (
+                      <button
+                        onClick={() => { setSelectedLesson(selectedLesson + 1); setGeneratedContent(''); }}
+                        className="px-6 py-3 bg-purple-600 text-white rounded-xl font-semibold hover:bg-purple-700"
+                      >
+                        Next Lesson →
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          if (selectedModule < milestones.length - 1) {
+                            setSelectedModule(selectedModule + 1);
+                            setSelectedLesson(0);
+                            setView('overview');
+                            setGeneratedContent('');
+                          }
+                        }}
+                        disabled={selectedModule >= milestones.length - 1}
+                        className="px-6 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 disabled:opacity-50"
+                      >
+                        Next Module →
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ─── ASSIGNMENTS VIEW ─── */}
+            {view === 'assignment' && (
+              <div className="space-y-6">
+                {assignments.length === 0 ? (
+                  <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
+                    <div className="text-5xl mb-4">📝</div>
+                    <p className="text-gray-600 mb-4">No assignments yet for this course.</p>
+                    <button
+                      onClick={() => generateAssignment(mod)}
+                      disabled={actionLoading}
+                      className="bg-purple-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-purple-700 disabled:opacity-50"
+                    >
+                      {actionLoading ? 'Generating...' : '✨ Generate Assignment for This Module'}
+                    </button>
+                  </div>
+                ) : (
+                  assignments.map((a) => (
+                    <div key={a.assignment_id} className={`bg-white rounded-xl border-2 p-6 ${
+                      a.status === 'completed' || a.status === 'graded' ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-full font-semibold uppercase">
+                          {a.assignment_type.replace('_', ' ')}
+                        </span>
+                        <span className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                          a.status === 'completed' || a.status === 'graded' ? 'bg-green-100 text-green-700'
+                          : a.status === 'submitted' ? 'bg-blue-100 text-blue-700'
+                          : 'bg-gray-100 text-gray-600'
+                        }`}>
+                          {a.status.replace('_', ' ')}
+                        </span>
+                        {a.score != null && <span className="text-sm font-bold text-green-600">Score: {a.score}%</span>}
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">{a.title}</h3>
+                      <p className="text-gray-600 text-sm mb-3">{a.description}</p>
+
+                      {a.learning_objectives && a.learning_objectives.length > 0 && (
+                        <div className="mb-3">
+                          <h4 className="text-xs font-bold text-gray-700 mb-1">Learning Objectives:</h4>
+                          <ul className="text-xs text-gray-600 space-y-0.5">
+                            {a.learning_objectives.slice(0, 3).map((o, i) => (
+                              <li key={i}>• {o}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-4 text-xs text-gray-500 mt-3 pt-3 border-t border-gray-200">
+                        <span>⏱️ {a.estimated_time_hours}h</span>
+                        <span>📊 {a.difficulty}</span>
+                        <button
+                          onClick={() => router.push(`/assignments/${a.assignment_id}`)}
+                          className="ml-auto text-purple-600 font-semibold hover:underline"
+                        >
+                          View Details →
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+
+                {assignments.length > 0 && (
+                  <button
+                    onClick={() => generateAssignment(mod)}
+                    disabled={actionLoading}
+                    className="w-full py-3 border-2 border-dashed border-purple-300 rounded-xl text-purple-600 font-semibold hover:bg-purple-50 disabled:opacity-50"
+                  >
+                    {actionLoading ? 'Generating...' : '+ Generate Another Assignment'}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full text-gray-500">
+            Select a module from the sidebar
+          </div>
+        )}
+      </main>
     </div>
   );
+}
+
+function formatMarkdown(text: string): string {
+  let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  html = html.replace(/```([\s\S]*?)```/g, '<pre class="bg-gray-100 p-3 rounded-lg my-2 text-sm overflow-x-auto"><code>$1</code></pre>');
+  html = html.replace(/`(.*?)`/g, '<code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm">$1</code>');
+  html = html.replace(/^### (.*)/gm, '<h3 class="font-bold text-lg mt-4 mb-2">$1</h3>');
+  html = html.replace(/^## (.*)/gm, '<h2 class="font-bold text-xl mt-4 mb-2">$1</h2>');
+  html = html.replace(/^- (.*)/gm, '<li class="ml-4 mb-1">• $1</li>');
+  html = html.replace(/^\d+\. (.*)/gm, '<li class="ml-4 mb-1">$&</li>');
+  return html;
 }
