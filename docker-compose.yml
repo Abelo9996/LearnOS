@@ -2,31 +2,40 @@ version: "3.8"
 
 services:
   backend:
-    build:
-      context: .
-      target: backend
+    build: ./backend
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_PATH=learnos.db
+      - DATABASE_PATH=/app/data/learnos.db
+      - DATABASE_URL=${DATABASE_URL:-}
       - HOST=0.0.0.0
       - PORT=8000
       - FRONTEND_URL=http://localhost:3000
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - LEARNOS_MODE=${LEARNOS_MODE:-offline}
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-me}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
     volumes:
-      - backend-data:/app/backend/data
+      - backend-data:/app/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
 
   frontend:
-    build:
-      context: .
-      target: frontend
+    build: ./frontend
     ports:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

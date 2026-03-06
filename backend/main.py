@@ -9,6 +9,16 @@ from routers import (
 from database import init_db
 from db import init_database
 from models_db import init_models
+import os
+
+# CORS: allow localhost + production frontend URL
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+]
+if FRONTEND_URL not in ALLOWED_ORIGINS:
+    ALLOWED_ORIGINS.append(FRONTEND_URL)
 
 app = FastAPI(
     title="LearnOS API",
@@ -19,7 +29,7 @@ app = FastAPI(
 # Middleware (order matters: CORS first, then auth)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -61,7 +71,7 @@ async def startup_event():
 async def root():
     return {
         "message": "LearnOS API is running",
-        "version": "3.0.0",
+        "version": "4.2.0",
         "features": [
             "Multi-LLM support (OpenAI, Anthropic, Groq, Ollama)",
             "Adaptive content generation",

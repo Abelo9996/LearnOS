@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+*.pyo
+.env
+*.db
+.git
+.gitignore
+node_modules
+.next
+*.md
+!requirements.txt
