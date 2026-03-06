@@ -32,7 +32,7 @@ function LoginContent() {
     try {
       const response = await axios.post(`${API_URL}/api/auth/login`, { email, password })
       localStorage.setItem('access_token', response.data.access_token)
-      router.push('/')
+      window.location.href = '/dashboard'
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Login failed')
     } finally {

@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import axios from 'axios'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_URL = `${BASE_URL}/api`
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('')
@@ -41,7 +42,7 @@ export default function RegisterPage() {
       })
 
       localStorage.setItem('access_token', response.data.access_token)
-      router.push('/')
+      window.location.href = '/dashboard'
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Registration failed')
     } finally {
