@@ -1696,3 +1696,102 @@ async def get_course_leaderboard(course_id: str, limit: int = 20) -> List[dict]:
             LIMIT ?
         """, (course_id, limit))
         return [dict(r) for r in await cursor.fetchall()]
+
+
+# ──────────────────── CERTIFICATES TABLE ────────────────────
+
+async def init_certificate_tables():
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS certificates (
+                certificate_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                course_id TEXT NOT NULL,
+                course_title TEXT NOT NULL,
+                user_display_name TEXT NOT NULL,
+                completion_date TEXT NOT NULL,
+                mastery_score REAL DEFAULT 0,
+                milestones_completed INTEGER DEFAULT 0,
+                total_milestones INTEGER DEFAULT 0,
+                total_hours REAL DEFAULT 0,
+                verification_hash TEXT UNIQUE NOT NULL,
+                issued_at TEXT NOT NULL,
+                metadata TEXT DEFAULT '{}'
+            )
+        """)
+        await conn.execute("CREATE INDEX IF NOT EXISTS idx_cert_user ON certificates(user_id)")
+        await conn.execute("CREATE INDEX IF NOT EXISTS idx_cert_course ON certificates(course_id)")
+        await conn.execute("CREATE INDEX IF NOT EXISTS idx_cert_hash ON certificates(verification_hash)")
+
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS mastery_requirements (
+                course_id TEXT PRIMARY KEY,
+                min_milestones_pct REAL DEFAULT 100,
+                min_mastery_score REAL DEFAULT 70,
+                min_hours REAL DEFAULT 0,
+                require_final_assessment INTEGER DEFAULT 0
+            )
+        """)
+        await conn.commit()
+
+
+async def save_certificate(c: dict):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("""
+            INSERT OR REPLACE INTO certificates
+            (certificate_id, user_id, course_id, course_title, user_display_name,
+             completion_date, mastery_score, milestones_completed, total_milestones,
+             total_hours, verification_hash, issued_at, metadata)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            c["certificate_id"], c["user_id"], c["course_id"],
+            c["course_title"], c["user_display_name"],
+            c["completion_date"], c.get("mastery_score", 0),
+            c.get("milestones_completed", 0), c.get("total_milestones", 0),
+            c.get("total_hours", 0), c["verification_hash"],
+            c.get("issued_at", _now()), _json(c.get("metadata", {})),
+        ))
+        await conn.commit()
+
+async def get_certificate(certificate_id: str) -> Optional[dict]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM certificates WHERE certificate_id = ?", (certificate_id,))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+async def get_certificate_by_hash(verification_hash: str) -> Optional[dict]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM certificates WHERE verification_hash = ?", (verification_hash,))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+async def list_user_certificates(user_id: str) -> List[dict]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM certificates WHERE user_id = ? ORDER BY issued_at DESC", (user_id,))
+        return [dict(r) for r in await cursor.fetchall()]
+
+async def get_mastery_requirements(course_id: str) -> dict:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM mastery_requirements WHERE course_id = ?", (course_id,))
+        row = await cursor.fetchone()
+        if row:
+            return dict(row)
+        return {"min_milestones_pct": 100, "min_mastery_score": 70, "min_hours": 0, "require_final_assessment": 0}
+
+async def save_mastery_requirements(course_id: str, reqs: dict):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("""
+            INSERT OR REPLACE INTO mastery_requirements
+            (course_id, min_milestones_pct, min_mastery_score, min_hours, require_final_assessment)
+            VALUES (?,?,?,?,?)
+        """, (
+            course_id, reqs.get("min_milestones_pct", 100),
+            reqs.get("min_mastery_score", 70), reqs.get("min_hours", 0),
+            1 if reqs.get("require_final_assessment") else 0,
+        ))
+        await conn.commit()

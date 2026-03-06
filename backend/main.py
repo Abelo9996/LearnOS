@@ -6,6 +6,7 @@ from routers import (
     llm_config, auth, courses, ai_roadmap, ai_content, ai_habits,
     ai_assignments, ai_tutor, ai_config, marketplace, social
 )
+from routers import certificates
 from database import init_db
 from db import init_database
 from models_db import init_models
@@ -67,6 +68,9 @@ app.include_router(marketplace.router, prefix="/api", tags=["marketplace"])
 # Social
 app.include_router(social.router, prefix="/api", tags=["social"])
 
+# Certificates
+app.include_router(certificates.router, prefix="/api", tags=["certificates"])
+
 @app.on_event("startup")
 async def startup_event():
     await init_models()      # SQLAlchemy: create new tables (users, llm_configs, etc.)
@@ -74,6 +78,8 @@ async def startup_event():
     await init_database()    # Legacy: aiosqlite tables (courses, roadmaps, etc.)
     from db import init_social_tables
     await init_social_tables()  # Social: discussions, cohorts, activity feed
+    from db import init_certificate_tables
+    await init_certificate_tables()  # Certificates
 
 @app.get("/")
 async def root():

@@ -44,6 +44,9 @@ PUBLIC_PREFIXES = (
     "/api/social/discussions/",
     "/api/social/leaderboard/",
     "/api/social/activity",
+    "/api/certificates/verify/",
+    "/api/certificates/download-by-hash/",
+    "/api/certificates/mastery-requirements/",
 )
 
 # Environment flag: set LEARNOS_MODE=offline to disable auth enforcement

@@ -22,6 +22,7 @@ function NavBar() {
     { href: '/explore', label: 'Explore', icon: '🔍' },
     { href: '/courses', label: 'My Courses', icon: '📚' },
     { href: '/tutor', label: 'AI Tutor', icon: '🤖' },
+    { href: '/certificates', label: 'Certificates', icon: '🏅' },
   ] : []
 
   return (
