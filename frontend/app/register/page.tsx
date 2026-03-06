@@ -35,7 +35,9 @@ export default function RegisterPage() {
       const response = await axios.post(`${API_URL}/auth/register`, {
         email,
         username,
-        password
+        password,
+        display_name: username,
+        accept_terms: true
       })
 
       localStorage.setItem('access_token', response.data.access_token)

@@ -2,12 +2,13 @@
 Authentication Router - User registration, login, and account management
 """
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Header
 from auth import (
     UserService, UserProfile, UserCredentials, UserRegistration,
     PasswordResetRequest, PasswordReset, UserSettings, auth_service
 )
 from database import db
+from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -104,7 +105,7 @@ async def reset_password(reset: PasswordReset):
 # ============================================================================
 
 @router.get("/auth/users/me")
-async def get_current_user(authorization: str = None):
+async def get_current_user(authorization: Optional[str] = Header(None)):
     """Get current user profile"""
     try:
         # Extract user_id from token (this is a simplified version)

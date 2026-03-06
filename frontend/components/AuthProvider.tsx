@@ -70,7 +70,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await axios.post(`${API_URL}/auth/register`, {
       email,
       username,
-      password
+      password,
+      display_name: username,
+      accept_terms: true
     })
     const { access_token, user: userData } = response.data
     localStorage.setItem('access_token', access_token)

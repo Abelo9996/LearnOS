@@ -5,6 +5,7 @@ Resource Curation Agent - Find, evaluate, and recommend learning resources using
 from agents.base import Agent
 from llm_manager import llm_manager
 from llm_providers import LLMRequest, ModelCapability
+from models_extended import ExpertiseLevel, ResourceDifficulty, LearnerProfile, ExternalResource, ResourceType
 from typing import Dict, Any, List, Optional
 import json
 

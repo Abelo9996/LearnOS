@@ -1,7 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import goals, sessions, progress, onboarding, assignments, resources, llm_config, auth
+from routers import (
+    goals, sessions, progress, onboarding, assignments, resources,
+    llm_config, auth, courses, ai_roadmap, ai_content, ai_habits,
+    ai_assignments, ai_tutor, ai_config
+)
 from database import init_db
+from db import init_database
 
 app = FastAPI(
     title="LearnOS API",
@@ -33,9 +38,19 @@ app.include_router(resources.router, prefix="/api", tags=["resources"])
 # LLM Management router
 app.include_router(llm_config.router, tags=["llm"])
 
+# Course & AI routers (prefixes are baked into each router)
+app.include_router(courses.router, prefix="/api", tags=["courses"])
+app.include_router(ai_roadmap.router, prefix="/api", tags=["ai-roadmap"])
+app.include_router(ai_content.router, prefix="/api", tags=["ai-content"])
+app.include_router(ai_habits.router, prefix="/api", tags=["ai-habits"])
+app.include_router(ai_assignments.router, tags=["ai-assignments"])  # already has /api prefix
+app.include_router(ai_tutor.router, prefix="/api", tags=["ai-tutor"])
+app.include_router(ai_config.router, prefix="/api", tags=["ai-config"])
+
 @app.on_event("startup")
 async def startup_event():
     await init_db()
+    await init_database()
 
 @app.get("/")
 async def root():
@@ -57,26 +72,6 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
-
-
-# ─── AI Settings (runtime config from UI) ─────────────────────────────
-
-from ai_config import ai_config, AIConfigRequest, AIConfigStatusResponse
-
-@app.get("/api/ai/config/status/{user_id}", response_model=AIConfigStatusResponse)
-async def get_ai_config(user_id: str):
-    """Get current AI configuration (keys masked)."""
-    return ai_config.get_status()
-
-@app.post("/api/ai/config/update/{user_id}", response_model=AIConfigStatusResponse)
-async def update_ai_config(user_id: str, req: AIConfigRequest):
-    """Update AI configuration. Changes take effect immediately."""
-    return ai_config.update(req)
-
-@app.post("/api/ai/config/test/{user_id}")
-async def test_ai_config(user_id: str):
-    """Test current API key and model."""
-    return await ai_config.test_connection()
 
 
 if __name__ == "__main__":
