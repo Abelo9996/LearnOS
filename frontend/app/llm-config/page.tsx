@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import api, { API_URL } from '@/lib/api'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
 
 interface AIConfig {
   provider: string
@@ -56,9 +55,9 @@ export default function LLMConfigPage() {
   const loadAll = async () => {
     try {
       const [configRes, provRes, usageRes] = await Promise.allSettled([
-        axios.get(`${API_URL}/ai/config/status/${userId}`),
-        axios.get(`${API_URL}/llm/providers`),
-        axios.get(`${API_URL}/llm/usage`),
+        api.get(`${API_URL}/ai/config/status/${userId}`),
+        api.get(`${API_URL}/llm/providers`),
+        api.get(`${API_URL}/llm/usage`),
       ])
 
       if (configRes.status === 'fulfilled') {
@@ -86,7 +85,7 @@ export default function LLMConfigPage() {
     try {
       const payload: any = { provider: selectedProvider, model }
       if (apiKey) payload.api_key = apiKey
-      const r = await axios.post(`${API_URL}/ai/config/update/${userId}`, payload)
+      const r = await api.post(`${API_URL}/ai/config/update/${userId}`, payload)
       setConfig(r.data)
       setApiKey('')
       setModel(r.data.model)
@@ -101,7 +100,7 @@ export default function LLMConfigPage() {
     setTesting(true)
     setTestResult(null)
     try {
-      const r = await axios.post(`${API_URL}/ai/config/test/${userId}`)
+      const r = await api.post(`${API_URL}/ai/config/test/${userId}`)
       setTestResult(r.data)
     } catch {
       setTestResult({ success: false, error: 'Connection failed' })
@@ -113,7 +112,7 @@ export default function LLMConfigPage() {
   const handleClearKey = async () => {
     setSaving(true)
     try {
-      const r = await axios.post(`${API_URL}/ai/config/update/${userId}`, { api_key: '' })
+      const r = await api.post(`${API_URL}/ai/config/update/${userId}`, { api_key: '' })
       setConfig(r.data)
     } catch {} finally { setSaving(false) }
   }
@@ -122,7 +121,7 @@ export default function LLMConfigPage() {
     setSelectedProvider(p)
     // Get models for new provider
     try {
-      const r = await axios.post(`${API_URL}/ai/config/update/${userId}`, { provider: p })
+      const r = await api.post(`${API_URL}/ai/config/update/${userId}`, { provider: p })
       setConfig(r.data)
       setModel(r.data.model)
     } catch {}

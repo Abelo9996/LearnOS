@@ -10,6 +10,8 @@ anthropic>=0.7.0
 groq>=0.4.0
 httpx>=0.24.0
 
-# Additional utilities
-python-jose>=3.3.0
-passlib>=1.7.4
+# Auth
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+PyJWT>=2.8.0
+authlib>=1.3.0

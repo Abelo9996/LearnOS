@@ -1,10 +1,10 @@
-'use client';
+'use client'
+import { authFetch, API_URL } from '@/lib/api';;
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getUserId } from '@/lib/userId';
 import { useToast } from '@/components/Toast';
-import API_URL from '@/lib/api';
 
 interface Course {
   course_id: string;
@@ -100,7 +100,7 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
   const loadCourseData = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/courses/${params.courseId}`);
+      const res = await authFetch(`${API_URL}/api/courses/${params.courseId}`);
       if (!res.ok) throw new Error('Failed to load course');
       const data = await res.json();
       setCourse(data.course);
@@ -113,7 +113,7 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
 
       // Load assignments
       if (data.course?.course_id) {
-        const aRes = await fetch(`${API_URL}/api/ai/assignments/list/${getUserId()}?course_id=${data.course.course_id}`);
+        const aRes = await authFetch(`${API_URL}/api/ai/assignments/list/${getUserId()}?course_id=${data.course.course_id}`);
         if (aRes.ok) {
           const aData = await aRes.json();
           setAssignments(aData.assignments || []);
@@ -131,7 +131,7 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
     setActionLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API_URL}/api/ai/roadmap/generate`, {
+      const res = await authFetch(`${API_URL}/api/ai/roadmap/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -146,7 +146,7 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
       }
       const data = await res.json();
       // Link roadmap to course
-      await fetch(`${API_URL}/api/courses/${course.course_id}`, {
+      await authFetch(`${API_URL}/api/courses/${course.course_id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roadmap_id: data.roadmap.roadmap_id }),
@@ -165,7 +165,7 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
     if (!course || !roadmapId) return;
     setActionLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/ai/assignments/generate-milestone`, {
+      const res = await authFetch(`${API_URL}/api/ai/assignments/generate-milestone`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -198,7 +198,7 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
     if (!roadmapId) return;
     setActionLoading(true);
     try {
-      await fetch(`${API_URL}/api/ai/roadmap/${roadmapId}/milestone/${milestoneId}/complete`, { method: 'PUT' });
+      await authFetch(`${API_URL}/api/ai/roadmap/${roadmapId}/milestone/${milestoneId}/complete`, { method: 'PUT' });
       await loadCourseData();
     } finally {
       setActionLoading(false);
@@ -209,7 +209,7 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
     setGeneratingLesson(true);
     setGeneratedContent('');
     try {
-      const res = await fetch(`${API_URL}/api/ai/tutor/start`, {
+      const res = await authFetch(`${API_URL}/api/ai/tutor/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -223,7 +223,7 @@ export default function CourseDetailPage({ params }: { params: { courseId: strin
         const data = await res.json();
         setGeneratedContent(data.greeting);
         // Now ask for a full lesson
-        const lessonRes = await fetch(`${API_URL}/api/ai/tutor/message`, {
+        const lessonRes = await authFetch(`${API_URL}/api/ai/tutor/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

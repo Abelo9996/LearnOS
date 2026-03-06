@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import axios from 'axios'
+import api, { API_URL } from '@/lib/api'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
 
 export default function ContentGenerationPage() {
   const [concept, setConcept] = useState('')
@@ -20,7 +19,7 @@ export default function ContentGenerationPage() {
     setLoading(true)
 
     try {
-      const response = await axios.post(
+      const response = await api.post(
         `${API_URL}/content/generate`,
         {
           concept: concept.trim(),

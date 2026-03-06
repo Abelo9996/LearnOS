@@ -1,17 +1,22 @@
 """
-Authentication Router - User registration, login, and account management
+Authentication Router - User registration, login, OAuth, and account management
 """
 
+import os
 from fastapi import APIRouter, HTTPException, Depends, status, Header
+from fastapi.responses import RedirectResponse
 from auth import (
     UserService, UserProfile, UserCredentials, UserRegistration,
     PasswordResetRequest, PasswordReset, UserSettings, auth_service
 )
+from oauth import oauth_service
+from auth_deps import get_current_user_id
 from database import db
 from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 router = APIRouter()
 user_service = UserService(db)
@@ -98,6 +103,62 @@ async def reset_password(reset: PasswordReset):
         return result
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ============================================================================
+# OAUTH ENDPOINTS
+# ============================================================================
+
+@router.get("/auth/google")
+async def google_login():
+    """Redirect to Google OAuth"""
+    url = oauth_service.get_google_auth_url()
+    return RedirectResponse(url=url)
+
+
+@router.get("/auth/google/callback")
+async def google_callback(code: str):
+    """Handle Google OAuth callback"""
+    try:
+        result = await oauth_service.handle_google_callback(code)
+        # Redirect to frontend with token
+        token = result["access_token"]
+        return RedirectResponse(
+            url=f"{FRONTEND_URL}/auth/callback?access_token={token}"
+        )
+    except Exception as e:
+        logger.error(f"Google OAuth error: {e}")
+        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=google_auth_failed")
+
+
+@router.get("/auth/github")
+async def github_login():
+    """Redirect to GitHub OAuth"""
+    url = oauth_service.get_github_auth_url()
+    return RedirectResponse(url=url)
+
+
+@router.get("/auth/github/callback")
+async def github_callback(code: str):
+    """Handle GitHub OAuth callback"""
+    try:
+        result = await oauth_service.handle_github_callback(code)
+        token = result["access_token"]
+        return RedirectResponse(
+            url=f"{FRONTEND_URL}/auth/callback?access_token={token}"
+        )
+    except Exception as e:
+        logger.error(f"GitHub OAuth error: {e}")
+        return RedirectResponse(url=f"{FRONTEND_URL}/login?error=github_auth_failed")
+
+
+@router.get("/auth/providers")
+async def get_auth_providers():
+    """Return which OAuth providers are configured"""
+    return {
+        "google": bool(os.getenv("GOOGLE_CLIENT_ID")),
+        "github": bool(os.getenv("GITHUB_CLIENT_ID")),
+    }
 
 
 # ============================================================================

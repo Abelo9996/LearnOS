@@ -1,10 +1,7 @@
 'use client';
-import API_URL from '@/lib/api';
 
 import { useEffect, useState } from 'react'
-import axios from 'axios'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || `${API_URL}/api`
+import api, { API_URL } from '@/lib/api'
 
 interface ConceptDetail {
   concept: string
@@ -37,7 +34,7 @@ export default function ProgressPage() {
 
     setLoading(true)
     try {
-      const response = await axios.get(`${API_URL}/progress`, {
+      const response = await api.get(`${API_URL}/progress`, {
         params: {
           user_id: 'demo_user',
           goal_id: goalId

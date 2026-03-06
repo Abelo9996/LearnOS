@@ -1,5 +1,5 @@
-'use client';
-import API_URL from '@/lib/api';
+'use client'
+import { authFetch, API_URL } from '@/lib/api';;
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -31,7 +31,7 @@ export default function CreateCoursePage() {
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/api/courses/create`, {
+      const response = await authFetch(`${API_URL}/api/courses/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

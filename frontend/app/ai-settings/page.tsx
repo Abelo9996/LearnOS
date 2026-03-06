@@ -1,5 +1,5 @@
-'use client';
-import API_URL from '@/lib/api';
+'use client'
+import { authFetch, API_URL } from '@/lib/api';;
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -48,7 +48,7 @@ export default function AISettingsPage() {
 
   const checkConfigStatus = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/ai/config/status/${userId}`);
+      const response = await authFetch(`${API_URL}/api/ai/config/status/${userId}`);
       const data = await response.json();
       
       setConfigured(data.configured);
@@ -70,7 +70,7 @@ export default function AISettingsPage() {
     setSuccess('');
 
     try {
-      const response = await fetch(`${API_URL}/api/ai/config/setup`, {
+      const response = await authFetch(`${API_URL}/api/ai/config/setup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -104,7 +104,7 @@ export default function AISettingsPage() {
     setSuccess('');
 
     try {
-      const response = await fetch(`${API_URL}/api/ai/config/test/${userId}`);
+      const response = await authFetch(`${API_URL}/api/ai/config/test/${userId}`);
       const data = await response.json();
 
       if (data.success) {
@@ -124,7 +124,7 @@ export default function AISettingsPage() {
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/api/ai/config/toggle-features`, {
+      const response = await authFetch(`${API_URL}/api/ai/config/toggle-features`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -151,7 +151,7 @@ export default function AISettingsPage() {
     }
 
     try {
-      await fetch(`${API_URL}/api/ai/config/remove/${userId}`, {
+      await authFetch(`${API_URL}/api/ai/config/remove/${userId}`, {
         method: 'DELETE'
       });
       

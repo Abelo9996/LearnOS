@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import axios from 'axios'
+import api, { API_URL } from '@/lib/api'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
 
 export default function Home() {
   const [goal, setGoal] = useState('')
@@ -30,7 +29,7 @@ export default function Home() {
     setError('')
 
     try {
-      const response = await axios.post(`${API_URL}/goal`, {
+      const response = await api.post(`${API_URL}/goal`, {
         goal: goal.trim(),
         user_id: 'demo_user'
       })

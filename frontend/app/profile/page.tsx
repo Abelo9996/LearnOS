@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import axios from 'axios'
+import api, { API_URL } from '@/lib/api'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
 
 interface UserProfile {
   id: string
@@ -33,7 +32,7 @@ export default function ProfilePage() {
 
   const fetchProfile = async () => {
     try {
-      const response = await axios.get(`${API_URL}/auth/users/me`, {
+      const response = await api.get(`${API_URL}/auth/users/me`, {
         headers: { Authorization: `Bearer ${token}` }
       })
       setProfile(response.data)
@@ -51,7 +50,7 @@ export default function ProfilePage() {
     setMessage('')
 
     try {
-      await axios.put(
+      await api.put(
         `${API_URL}/auth/users/me`,
         { display_name: displayName },
         { headers: { Authorization: `Bearer ${token}` } }

@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from auth_middleware import AuthMiddleware
 from routers import (
     goals, sessions, progress, onboarding, assignments, resources,
     llm_config, auth, courses, ai_roadmap, ai_content, ai_habits,
@@ -10,10 +11,11 @@ from db import init_database
 
 app = FastAPI(
     title="LearnOS API",
-    description="Agentic Learning Operating System - Multi-LLM Edition",
-    version="3.0.0"
+    description="The Open-Source AI University — Agentic Learning Platform",
+    version="4.2.0"
 )
 
+# Middleware (order matters: CORS first, then auth)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://localhost:3001"],
@@ -21,6 +23,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(AuthMiddleware)
 
 # Authentication & User Management
 app.include_router(auth.router, prefix="/api", tags=["auth"])

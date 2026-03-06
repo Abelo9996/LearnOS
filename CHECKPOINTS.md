@@ -26,15 +26,15 @@
 ## CP-1: Auth & Multi-User 🔐 ⏱️ ~6-8 hours
 **Goal:** Real users, real accounts. Kill `demo_user`.
 
-- [ ] Auth system (JWT + OAuth2 — Google, GitHub)
-- [ ] User model: id, email, name, avatar, created_at, subscription_tier
-- [ ] Registration / login pages (frontend)
-- [ ] Protected API routes (middleware)
-- [ ] User profile page
-- [ ] Migrate all `demo_user` references to authenticated user
-- [ ] Session management (refresh tokens)
+- [x] Auth system (JWT + OAuth2 — Google, GitHub)
+- [x] User model: id, email, name, avatar, created_at, subscription_tier
+- [x] Registration / login pages (frontend)
+- [x] Protected API routes (middleware)
+- [x] User profile page
+- [x] Migrate all `demo_user` references to authenticated user
+- [x] Session management (refresh tokens)
 
-**Done when:** Two different people can sign up, log in, and see their own separate courses.
+**Done when:** Two different people can sign up, log in, and see their own separate courses. ✅
 
 ---
 

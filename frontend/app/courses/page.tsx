@@ -1,5 +1,5 @@
-'use client';
-import API_URL from '@/lib/api';
+'use client'
+import { authFetch, API_URL } from '@/lib/api';;
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -52,7 +52,7 @@ export default function CoursesPage() {
     setLoading(true);
     setError('');
     try {
-      const response = await fetch(`${API_URL}/api/courses/list/${userId}`);
+      const response = await authFetch(`${API_URL}/api/courses/list/${userId}`);
       if (response.ok) {
         const data = await response.json();
         setCourses(data.courses || []);

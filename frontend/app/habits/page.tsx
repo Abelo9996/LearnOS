@@ -1,5 +1,5 @@
-'use client';
-import API_URL from '@/lib/api';
+'use client'
+import { authFetch, API_URL } from '@/lib/api';;
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -100,7 +100,7 @@ export default function HabitsPage() {
 
   const loadSessions = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/ai/habits/sessions/${userId}`);
+      const response = await authFetch(`${API_URL}/api/ai/habits/sessions/${userId}`);
       if (response.ok) {
         const data = await response.json();
         setSessions(data.sessions || []);
@@ -112,7 +112,7 @@ export default function HabitsPage() {
 
   const loadAdaptations = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/ai/habits/adaptations/${userId}`);
+      const response = await authFetch(`${API_URL}/api/ai/habits/adaptations/${userId}`);
       if (response.ok) {
         const data = await response.json();
         setAdaptations(data.adaptations || []);
@@ -124,7 +124,7 @@ export default function HabitsPage() {
 
   const loadInsights = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/ai/habits/insights/${userId}`);
+      const response = await authFetch(`${API_URL}/api/ai/habits/insights/${userId}`);
       if (response.ok) {
         const data = await response.json();
         setInsights(data.insights || []);
@@ -137,7 +137,7 @@ export default function HabitsPage() {
   const startSession = async () => {
     setError('');
     try {
-      const response = await fetch(`${API_URL}/api/ai/habits/session/start`, {
+      const response = await authFetch(`${API_URL}/api/ai/habits/session/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_id: userId })
@@ -162,7 +162,7 @@ export default function HabitsPage() {
     try {
       const concepts = sessionForm.concepts.split(',').map(c => c.trim()).filter(c => c);
       
-      const response = await fetch(
+      const response = await authFetch(
         `${API_URL}/api/ai/habits/session/${currentSession.session_id}/end?` +
         `concepts_covered=${encodeURIComponent(JSON.stringify(concepts))}&` +
         `questions_answered=${sessionForm.questions}&` +
@@ -189,7 +189,7 @@ export default function HabitsPage() {
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/api/ai/habits/adaptations/generate`, {
+      const response = await authFetch(`${API_URL}/api/ai/habits/adaptations/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -218,7 +218,7 @@ export default function HabitsPage() {
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/api/ai/habits/insights/generate`, {
+      const response = await authFetch(`${API_URL}/api/ai/habits/insights/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -244,7 +244,7 @@ export default function HabitsPage() {
 
   const updateAdaptationStatus = async (adaptationId: string, status: string) => {
     try {
-      await fetch(
+      await authFetch(
         `${API_URL}/api/ai/habits/adaptations/${adaptationId}/status`,
         {
           method: 'PUT',

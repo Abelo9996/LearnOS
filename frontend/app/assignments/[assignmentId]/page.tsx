@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import API_URL from '@/lib/api';
 
 interface Assignment {
   assignment_id: string;
