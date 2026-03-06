@@ -80,9 +80,9 @@ export default function DashboardPage() {
   const totalSessions = courses.reduce((acc, c) => acc + (c.sessions_count || 0), 0)
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
+    <div className="max-w-7xl mx-auto px-4 py-8 animate-fade-in">
       {/* Welcome */}
-      <div className="mb-8">
+      <div className="mb-8 animate-fade-in-up">
         <h1 className="text-3xl font-bold text-gray-900">
           Welcome back, {user.display_name || user.username} 👋
         </h1>
@@ -90,20 +90,20 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 stagger-children">
+        <div className="bg-white rounded-xl border border-gray-200 p-5 card-hover">
           <div className="text-sm text-gray-500 mb-1">My Courses</div>
           <div className="text-2xl font-bold text-gray-900">{courses.length}</div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="bg-white rounded-xl border border-gray-200 p-5 card-hover">
           <div className="text-sm text-gray-500 mb-1">Active</div>
           <div className="text-2xl font-bold text-green-600">{activeCourses.length}</div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="bg-white rounded-xl border border-gray-200 p-5 card-hover">
           <div className="text-sm text-gray-500 mb-1">Study Time</div>
           <div className="text-2xl font-bold text-violet-600">{Math.round(totalMinutes / 60)}h</div>
         </div>
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="bg-white rounded-xl border border-gray-200 p-5 card-hover">
           <div className="text-sm text-gray-500 mb-1">Sessions</div>
           <div className="text-2xl font-bold text-indigo-600">{totalSessions}</div>
         </div>
@@ -149,7 +149,7 @@ export default function DashboardPage() {
                 <Link
                   key={course.course_id}
                   href={`/courses/${course.course_id}`}
-                  className="block bg-white rounded-xl border border-gray-200 p-5 hover:border-violet-300 hover:shadow-sm transition-all"
+                  className="block bg-white rounded-xl border border-gray-200 p-5 hover:border-violet-300 hover:shadow-md hover:shadow-violet-50 transition-all duration-300"
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
@@ -188,31 +188,31 @@ export default function DashboardPage() {
           {/* Quick Actions */}
           <div>
             <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 stagger-children">
               <Link
                 href="/courses/create"
-                className="bg-white rounded-xl border border-gray-200 p-4 text-center hover:border-violet-300 hover:shadow-sm transition-all"
+                className="bg-white rounded-xl border border-gray-200 p-4 text-center card-hover btn-press"
               >
                 <div className="text-2xl mb-1">✨</div>
                 <div className="text-sm font-medium text-gray-900">New Course</div>
               </Link>
               <Link
                 href="/explore"
-                className="bg-white rounded-xl border border-gray-200 p-4 text-center hover:border-violet-300 hover:shadow-sm transition-all"
+                className="bg-white rounded-xl border border-gray-200 p-4 text-center card-hover btn-press"
               >
                 <div className="text-2xl mb-1">🔍</div>
                 <div className="text-sm font-medium text-gray-900">Explore</div>
               </Link>
               <Link
                 href="/ai-settings"
-                className="bg-white rounded-xl border border-gray-200 p-4 text-center hover:border-violet-300 hover:shadow-sm transition-all"
+                className="bg-white rounded-xl border border-gray-200 p-4 text-center card-hover btn-press"
               >
                 <div className="text-2xl mb-1">⚙️</div>
                 <div className="text-sm font-medium text-gray-900">AI Settings</div>
               </Link>
               <Link
                 href="/profile"
-                className="bg-white rounded-xl border border-gray-200 p-4 text-center hover:border-violet-300 hover:shadow-sm transition-all"
+                className="bg-white rounded-xl border border-gray-200 p-4 text-center card-hover btn-press"
               >
                 <div className="text-2xl mb-1">👤</div>
                 <div className="text-sm font-medium text-gray-900">Profile</div>
@@ -234,7 +234,7 @@ export default function DashboardPage() {
                   <Link
                     key={course.course_id}
                     href={`/explore/${course.course_id}`}
-                    className="block bg-white rounded-xl border border-gray-200 p-4 hover:border-violet-300 transition-all"
+                    className="block bg-white rounded-xl border border-gray-200 p-4 hover:border-violet-300 hover:shadow-md hover:shadow-violet-50 transition-all duration-300"
                   >
                     <h4 className="font-medium text-gray-900 text-sm mb-1 truncate">{course.title}</h4>
                     <div className="flex items-center gap-3 text-xs text-gray-500">

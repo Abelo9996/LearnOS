@@ -310,7 +310,7 @@ function ExploreContent() {
                 <Link
                   key={course.course_id}
                   href={`/explore/${course.course_id}`}
-                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-violet-300 hover:shadow-md transition-all group"
+                  className="bg-white rounded-xl border border-gray-200 p-6 hover:border-violet-300 hover:shadow-md hover:shadow-violet-50 transition-all duration-300 group"
                 >
                   {/* Header */}
                   <div className="flex items-start justify-between mb-3">

@@ -7,33 +7,129 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Smooth page transitions */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Better focus styles */
+  :focus-visible {
+    @apply outline-none ring-2 ring-violet-500 ring-offset-2;
   }
 }
 
 @layer components {
-  .btn-primary {
-    @apply px-4 py-2 bg-primary text-white rounded-md hover:bg-blue-700 transition-colors font-medium;
+  /* Glass morphism card */
+  .glass {
+    @apply bg-white/70 backdrop-blur-xl border border-white/20 shadow-lg;
   }
-  
-  .btn-secondary {
-    @apply px-4 py-2 bg-muted text-foreground rounded-md hover:bg-gray-200 transition-colors font-medium;
+
+  .glass-dark {
+    @apply bg-gray-900/70 backdrop-blur-xl border border-white/10;
   }
-  
-  .card {
-    @apply bg-white border border-border rounded-lg p-6 shadow-sm;
+
+  /* Animated gradient text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-violet-600 via-indigo-600 to-violet-600 bg-clip-text text-transparent bg-300% animate-gradient-x;
   }
-  
-  .input {
-    @apply w-full px-4 py-2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary;
+
+  /* Shimmer loading placeholder */
+  .shimmer {
+    @apply relative overflow-hidden;
+    background: linear-gradient(90deg, #f4f4f5 25%, #e4e4e7 50%, #f4f4f5 75%);
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+
+  /* Card hover lift effect */
+  .card-hover {
+    @apply transition-all duration-300 ease-out;
+  }
+  .card-hover:hover {
+    @apply -translate-y-1 shadow-lg shadow-violet-100/50;
+  }
+
+  /* Smooth button press */
+  .btn-press {
+    @apply transition-all duration-150 active:scale-[0.97];
+  }
+
+  /* Glow effect */
+  .glow-violet {
+    box-shadow: 0 0 30px -5px rgba(124, 58, 237, 0.3);
+  }
+
+  .glow-indigo {
+    box-shadow: 0 0 30px -5px rgba(99, 102, 241, 0.3);
+  }
+
+  /* Dot grid background */
+  .bg-dot-grid {
+    background-image: radial-gradient(circle, #d4d4d8 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* Gradient mesh background */
+  .bg-mesh {
+    background:
+      radial-gradient(at 27% 37%, rgba(139, 92, 246, 0.08) 0, transparent 50%),
+      radial-gradient(at 97% 21%, rgba(99, 102, 241, 0.06) 0, transparent 50%),
+      radial-gradient(at 52% 99%, rgba(139, 92, 246, 0.05) 0, transparent 50%),
+      radial-gradient(at 10% 29%, rgba(99, 102, 241, 0.04) 0, transparent 50%);
+  }
+
+  /* Stagger animation helpers */
+  .stagger-children > * {
+    @apply opacity-0;
+    animation: fade-in-up 0.5s ease-out forwards;
+  }
+  .stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
+  .stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
+  .stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
+  .stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
+  .stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
+  .stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
+  .stagger-children > *:nth-child(7) { animation-delay: 0.35s; }
+  .stagger-children > *:nth-child(8) { animation-delay: 0.4s; }
+
+  /* Scrollbar */
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Animated underline on hover */
+  .hover-underline {
+    @apply relative;
+  }
+  .hover-underline::after {
+    content: '';
+    @apply absolute bottom-0 left-0 w-0 h-0.5 bg-violet-600 transition-all duration-300;
+  }
+  .hover-underline:hover::after {
+    @apply w-full;
+  }
+
+  @keyframes fade-in-up {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
   }
 }
 
-@keyframes slide-up {
-  from { opacity: 0; transform: translateY(1rem); }
-  to   { opacity: 1; transform: translateY(0); }
+/* Custom scrollbar for non-hidden areas */
+::-webkit-scrollbar {
+  width: 6px;
 }
-.animate-slide-up {
-  animation: slide-up 0.2s ease-out;
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400;
 }
