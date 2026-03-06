@@ -187,6 +187,34 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
         raise HTTPException(status_code=500, detail="Failed to get user")
 
 
+@router.put("/auth/users/me")
+async def update_current_user(updates: dict, authorization: Optional[str] = Header(None)):
+    """Update current user profile"""
+    try:
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing authorization header")
+        
+        token = authorization.replace("Bearer ", "")
+        payload = auth_service.verify_token(token)
+        user_id = payload.get("sub")
+        
+        # Prevent certain fields from being updated
+        protected_fields = ["id", "email", "created_at", "role", "tier"]
+        for field in protected_fields:
+            updates.pop(field, None)
+        
+        user = await user_service.update_user(user_id, updates)
+        return {
+            "success": True,
+            "user": user.model_dump()
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+    except Exception as e:
+        logger.error(f"Update current user error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update user")
+
+
 @router.get("/users/{user_id}")
 async def get_user(user_id: str):
     """Get user profile"""

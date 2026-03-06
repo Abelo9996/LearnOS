@@ -41,10 +41,13 @@ function LoginContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-        <h1 className="text-3xl font-bold text-center mb-2 text-gray-900">LearnOS 🎓</h1>
-        <p className="text-center text-gray-500 mb-8">Sign in to start learning</p>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-50 via-white to-indigo-50">
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-8 w-full max-w-md">
+        <div className="text-center mb-8">
+          <span className="text-3xl">🎓</span>
+          <h1 className="text-2xl font-bold text-gray-900 mt-2">Welcome back</h1>
+          <p className="text-gray-500 text-sm mt-1">Sign in to LearnOS</p>
+        </div>
 
         {/* OAuth Buttons */}
         {(providers.google || providers.github) && (
@@ -118,7 +121,7 @@ function LoginContent() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+            className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white py-2.5 rounded-lg font-medium hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 transition-all"
           >
             {loading ? 'Logging in...' : 'Log In'}
           </button>
@@ -126,7 +129,7 @@ function LoginContent() {
 
         <p className="text-center text-gray-600 mt-6">
           Don't have an account?{' '}
-          <a href="/register" className="text-indigo-600 hover:text-indigo-700 font-medium">
+          <a href="/register" className="text-violet-600 hover:text-violet-700 font-medium">
             Register
           </a>
         </p>

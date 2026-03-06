@@ -1,5 +1,5 @@
 'use client'
-import { authFetch, API_URL } from '@/lib/api';;
+import { authFetch, API_URL } from '@/lib/api';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -96,107 +96,78 @@ export default function CoursesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-green-50 p-4 py-8">
-      <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="mb-8">
         {/* Header */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">
-                📚 My Learning Courses
-              </h1>
-              <p className="text-gray-600 text-lg">
-                Organized learning paths with AI-powered roadmaps, assignments, and insights
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => router.push('/ai-settings')}
-                className="text-purple-600 hover:text-purple-700 font-medium px-4 py-2 rounded-lg hover:bg-purple-50 transition-all"
-              >
-                ⚙️ Settings
-              </button>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">My Courses</h1>
+            <p className="text-gray-500 mt-1">
+              Your learning paths with AI-powered roadmaps and assignments
+            </p>
+          </div>
+          <button
+            onClick={() => router.push('/courses/create')}
+            className="hidden sm:flex items-center gap-1.5 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-medium rounded-lg hover:from-violet-700 hover:to-indigo-700 transition-all shadow-sm text-sm"
+          >
+            + Create Course
+          </button>
+        </div>
+
+        {/* Stats Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="text-sm text-gray-500 mb-1">Total Courses</div>
+            <div className="text-2xl font-bold text-gray-900">{courses.length}</div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="text-sm text-gray-500 mb-1">Active</div>
+            <div className="text-2xl font-bold text-green-600">
+              {courses.filter(c => c.status === 'active').length}
             </div>
           </div>
-
-          {/* Stats Row */}
-          <div className="grid md:grid-cols-4 gap-4">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-4">
-              <div className="text-sm text-blue-700 mb-1">Total Courses</div>
-              <div className="text-3xl font-bold text-blue-900">{courses.length}</div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="text-sm text-gray-500 mb-1">Completed</div>
+            <div className="text-2xl font-bold text-violet-600">
+              {courses.filter(c => c.status === 'completed').length}
             </div>
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-4">
-              <div className="text-sm text-green-700 mb-1">Active</div>
-              <div className="text-3xl font-bold text-green-900">
-                {courses.filter(c => c.status === 'active').length}
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-4">
-              <div className="text-sm text-purple-700 mb-1">Completed</div>
-              <div className="text-3xl font-bold text-purple-900">
-                {courses.filter(c => c.status === 'completed').length}
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-xl p-4">
-              <div className="text-sm text-orange-700 mb-1">Total Study Time</div>
-              <div className="text-3xl font-bold text-orange-900">
-                {Math.round(courses.reduce((acc, c) => acc + c.total_time_spent_minutes, 0) / 60)}h
-              </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="text-sm text-gray-500 mb-1">Study Time</div>
+            <div className="text-2xl font-bold text-indigo-600">
+              {Math.round(courses.reduce((acc, c) => acc + c.total_time_spent_minutes, 0) / 60)}h
             </div>
           </div>
         </div>
 
-        {/* Action Bar */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setStatusFilter('all')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  statusFilter === 'all'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                All ({courses.length})
-              </button>
-              <button
-                onClick={() => setStatusFilter('active')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  statusFilter === 'active'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Active ({courses.filter(c => c.status === 'active').length})
-              </button>
-              <button
-                onClick={() => setStatusFilter('planning')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  statusFilter === 'planning'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Planning ({courses.filter(c => c.status === 'planning').length})
-              </button>
-              <button
-                onClick={() => setStatusFilter('completed')}
-                className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                  statusFilter === 'completed'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Completed ({courses.filter(c => c.status === 'completed').length})
-              </button>
+        {/* Filter Bar */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap gap-2">
+              {[
+                { key: 'all', label: 'All', count: courses.length },
+                { key: 'active', label: 'Active', count: courses.filter(c => c.status === 'active').length },
+                { key: 'planning', label: 'Planning', count: courses.filter(c => c.status === 'planning').length },
+                { key: 'completed', label: 'Completed', count: courses.filter(c => c.status === 'completed').length },
+              ].map(f => (
+                <button
+                  key={f.key}
+                  onClick={() => setStatusFilter(f.key)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${
+                    statusFilter === f.key
+                      ? 'bg-violet-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {f.label} ({f.count})
+                </button>
+              ))}
             </div>
-            
             <button
               onClick={() => router.push('/courses/create')}
-              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold py-3 px-6 rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg"
+              className="sm:hidden px-4 py-1.5 bg-violet-600 text-white text-sm font-medium rounded-lg"
             >
-              ✨ Create New Course
+              + New Course
             </button>
           </div>
         </div>
@@ -208,40 +179,40 @@ export default function CoursesPage() {
         )}
 
         {loading && (
-          <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
-            <div className="text-gray-500 text-lg">Loading courses...</div>
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-gray-400">
+            Loading courses...
           </div>
         )}
 
         {/* Courses Grid */}
         {!loading && filteredCourses.length === 0 && (
-          <div className="bg-white rounded-2xl shadow-xl p-12 text-center">
-            <div className="text-6xl mb-4">📚</div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">No Courses Yet</h3>
-            <p className="text-gray-600 mb-6">
-              Create your first course to start your personalized learning journey with AI-powered roadmaps!
+          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+            <div className="text-4xl mb-3">📚</div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">No courses yet</h3>
+            <p className="text-gray-500 mb-4">
+              Create your first course to start learning with AI
             </p>
             <button
               onClick={() => router.push('/courses/create')}
-              className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold py-3 px-8 rounded-xl hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg"
+              className="px-5 py-2.5 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors text-sm"
             >
-              ✨ Create Your First Course
+              Create Your First Course
             </button>
           </div>
         )}
 
         {!loading && filteredCourses.length > 0 && (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredCourses.map((course) => (
               <div
                 key={course.course_id}
                 onClick={() => router.push(`/courses/${course.course_id}`)}
-                className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all cursor-pointer border-2 border-transparent hover:border-blue-300 p-6"
+                className="bg-white rounded-xl border border-gray-200 hover:border-violet-300 hover:shadow-md transition-all cursor-pointer p-6"
               >
                 {/* Status Badge */}
                 <div className="flex items-center justify-between mb-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getStatusColor(course.status)}`}>
-                    {getStatusIcon(course.status)} {course.status.toUpperCase()}
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(course.status)}`}>
+                    {getStatusIcon(course.status)} {course.status}
                   </span>
                   {course.roadmap_id && (
                     <span className="text-xs text-purple-600 font-semibold">🗺️ Has Roadmap</span>
@@ -272,7 +243,7 @@ export default function CoursesPage() {
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
-                      className="bg-gradient-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all"
+                      className="bg-gradient-to-r from-violet-500 to-indigo-500 h-2 rounded-full transition-all"
                       style={{ width: `${course.progress_percentage}%` }}
                     />
                   </div>

@@ -1,5 +1,5 @@
 'use client'
-import { authFetch, API_URL } from '@/lib/api';;
+import { authFetch, API_URL } from '@/lib/api';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -66,46 +66,43 @@ export default function CreateCoursePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-green-50 p-4 py-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="max-w-3xl mx-auto px-4 py-10">
         {/* Header */}
-        <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
+        <div className="mb-6">
           <button
             onClick={() => router.push('/courses')}
-            className="text-gray-600 hover:text-gray-800 font-medium mb-4"
+            className="text-sm text-gray-500 hover:text-gray-700 font-medium mb-4 inline-block"
           >
             ← Back to Courses
           </button>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            ✨ Create New Course
-          </h1>
-          <p className="text-gray-600 text-lg">
-            Let's build your personalized learning journey with AI
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900">Create New Course</h1>
+          <p className="text-gray-500 mt-1">Build your personalized learning journey with AI</p>
         </div>
 
         {/* Progress Steps */}
-        <div className="bg-white rounded-2xl shadow-xl p-6 mb-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
           <div className="flex items-center justify-between">
-            {[1, 2, 3].map((s) => (
+            {[
+              { s: 1, label: 'Course Info' },
+              { s: 2, label: 'Your Goal' },
+              { s: 3, label: 'Settings' },
+            ].map(({ s, label }, i) => (
               <div key={s} className="flex items-center flex-1">
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full font-bold ${
-                  step >= s ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-500'
-                }`}>
-                  {s}
+                <div className="flex items-center gap-2">
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold ${
+                    step >= s ? 'bg-violet-600 text-white' : 'bg-gray-200 text-gray-500'
+                  }`}>
+                    {s}
+                  </div>
+                  <span className="text-sm font-medium text-gray-700 hidden sm:inline">{label}</span>
                 </div>
-                {s < 3 && (
-                  <div className={`flex-1 h-1 mx-2 ${
-                    step > s ? 'bg-blue-600' : 'bg-gray-200'
+                {i < 2 && (
+                  <div className={`flex-1 h-0.5 mx-3 ${
+                    step > s ? 'bg-violet-600' : 'bg-gray-200'
                   }`} />
                 )}
               </div>
             ))}
-          </div>
-          <div className="flex items-center justify-between mt-2">
-            <div className="text-sm font-medium text-gray-700">Course Info</div>
-            <div className="text-sm font-medium text-gray-700">Your Goal</div>
-            <div className="text-sm font-medium text-gray-700">Settings</div>
           </div>
         </div>
 
@@ -117,7 +114,7 @@ export default function CreateCoursePage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit}>
-          <div className="bg-white rounded-2xl shadow-xl p-8 mb-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-8 mb-6">
             {/* Step 1: Course Info */}
             {step === 1 && (
               <div className="space-y-6">
@@ -284,7 +281,7 @@ export default function CreateCoursePage() {
                 type="button"
                 onClick={() => setStep(step + 1)}
                 disabled={!canProceed()}
-                className="ml-auto px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="ml-auto px-6 py-3 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
               >
                 Next →
               </button>
@@ -293,7 +290,7 @@ export default function CreateCoursePage() {
               <button
                 type="submit"
                 disabled={creating || !canProceed()}
-                className="ml-auto px-8 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-bold rounded-xl hover:from-purple-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
+                className="ml-auto px-8 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-medium rounded-lg hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
               >
                 {creating ? '⏳ Creating Course...' : '✨ Create Course'}
               </button>
