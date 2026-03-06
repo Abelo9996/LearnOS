@@ -41,13 +41,13 @@
 ## CP-2: Database Migration (SQLite → Postgres) 🗄️ ⏱️ ~4 hours
 **Goal:** Production-ready data layer.
 
-- [ ] SQLAlchemy + Alembic integration (replace raw SQLite)
-- [ ] Migration scripts for existing schema
-- [ ] Connection pooling
-- [ ] Keep SQLite as dev/local option via env toggle
-- [ ] Seed data script for development
+- [x] SQLAlchemy + Alembic integration (replace raw SQLite)
+- [x] Migration scripts for existing schema
+- [x] Connection pooling
+- [x] Keep SQLite as dev/local option via env toggle
+- [x] Seed data script for development
 
-**Done when:** App runs on Postgres in production, SQLite locally. Migrations are versioned.
+**Done when:** App runs on Postgres in production, SQLite locally. Migrations are versioned. ✅
 
 ---
 
