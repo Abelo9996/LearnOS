@@ -40,10 +40,12 @@ function NavBar() {
 
   return (
     <nav className={`sticky top-0 z-50 transition-all duration-300 ${
-      scrolled
-        ? 'bg-white/80 backdrop-blur-xl border-b border-gray-200/60 shadow-sm'
-        : isLanding
-          ? 'bg-transparent'
+      isLanding
+        ? scrolled
+          ? 'bg-[#0a0a0a]/80 backdrop-blur-xl border-b border-white/5'
+          : 'bg-transparent'
+        : scrolled
+          ? 'bg-white/80 backdrop-blur-xl border-b border-gray-200/60 shadow-sm'
           : 'bg-white/80 backdrop-blur-xl border-b border-gray-200/60'
     }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -52,7 +54,9 @@ function NavBar() {
           <div className="flex items-center gap-8">
             <Link href={user ? '/dashboard' : '/'} className="flex items-center gap-2 group">
               <span className="text-2xl group-hover:scale-110 transition-transform duration-200">🎓</span>
-              <span className="text-xl font-bold bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent">
+              <span className={`text-xl font-bold ${
+                isLanding ? 'text-white' : 'bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-transparent'
+              }`}>
                 LearnOS
               </span>
             </Link>
@@ -116,7 +120,9 @@ function NavBar() {
               <>
                 <Link
                   href="/login"
-                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-all duration-200"
+                  className={`px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                    isLanding ? 'text-gray-300 hover:text-white' : 'text-gray-600 hover:text-gray-900'
+                  }`}
                 >
                   Sign In
                 </Link>
@@ -189,7 +195,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${inter.className} antialiased`}>
         <AuthProvider>
           <NavBar />
-          <main className="min-h-screen">
+          <main className="min-h-screen bg-[#fafafa]">
             {children}
           </main>
         </AuthProvider>
