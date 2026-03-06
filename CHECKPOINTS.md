@@ -99,14 +99,14 @@
 ## CP-6: Certificates & Mastery Verification 🏅 ⏱️ ~4-5 hours
 **Goal:** Proof you actually learned something.
 
-- [ ] Certificate model: course, user, completion_date, mastery_score, verification_hash
-- [ ] Certificate generation (PDF with unique verification code)
-- [ ] Public verification page: `learnos.ai/verify/<hash>`
-- [ ] Mastery requirements per course (configurable by author)
-- [ ] Certificate gallery on user profile
-- [ ] LinkedIn-shareable format
+- [x] Certificate model: course, user, completion_date, mastery_score, verification_hash
+- [x] Certificate generation (PDF with unique verification code)
+- [x] Public verification page: `learnos.ai/verify/<hash>`
+- [x] Mastery requirements per course (configurable by author)
+- [x] Certificate gallery on user profile
+- [x] LinkedIn-shareable format
 
-**Done when:** Complete a course → get a PDF certificate → share a verification link that proves it.
+**Done when:** Complete a course → get a PDF certificate → share a verification link that proves it. ✅
 
 ---
 
