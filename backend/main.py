@@ -7,6 +7,7 @@ from routers import (
     ai_assignments, ai_tutor, ai_config, marketplace, social
 )
 from routers import certificates
+from routers import agents as agents_router
 from database import init_db
 from db import init_database
 from models_db import init_models
@@ -71,6 +72,9 @@ app.include_router(social.router, prefix="/api", tags=["social"])
 # Certificates
 app.include_router(certificates.router, prefix="/api", tags=["certificates"])
 
+# Agents
+app.include_router(agents_router.router, prefix="/api", tags=["agents"])
+
 @app.on_event("startup")
 async def startup_event():
     await init_models()      # SQLAlchemy: create new tables (users, llm_configs, etc.)
@@ -80,6 +84,8 @@ async def startup_event():
     await init_social_tables()  # Social: discussions, cohorts, activity feed
     from db import init_certificate_tables
     await init_certificate_tables()  # Certificates
+    from db import init_agent_tables
+    await init_agent_tables()  # Agent memory + interactions
 
 @app.get("/")
 async def root():

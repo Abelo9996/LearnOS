@@ -69,6 +69,13 @@ function NavBar() {
                 </Link>
                 <NotificationBell />
                 <Link
+                  href="/settings/agents"
+                  className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+                  title="AI Settings"
+                >
+                  ⚙️
+                </Link>
+                <Link
                   href="/profile"
                   className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-all"
                 >

@@ -1795,3 +1795,97 @@ async def save_mastery_requirements(course_id: str, reqs: dict):
             1 if reqs.get("require_final_assessment") else 0,
         ))
         await conn.commit()
+
+
+# ──────────────────── AGENT TABLES ────────────────────
+
+async def init_agent_tables():
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS agent_memory (
+                user_id TEXT NOT NULL,
+                agent_type TEXT NOT NULL,
+                key TEXT NOT NULL,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, agent_type, key)
+            )
+        """)
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS agent_interactions (
+                interaction_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                agent_type TEXT NOT NULL,
+                interaction_type TEXT NOT NULL,
+                input_text TEXT,
+                output_text TEXT,
+                quality_score REAL,
+                led_to_mastery INTEGER DEFAULT 0,
+                metadata TEXT DEFAULT '{}',
+                created_at TEXT NOT NULL
+            )
+        """)
+        await conn.execute("CREATE INDEX IF NOT EXISTS idx_ai_user ON agent_interactions(user_id)")
+        await conn.execute("CREATE INDEX IF NOT EXISTS idx_ai_agent ON agent_interactions(agent_type)")
+        await conn.commit()
+
+
+async def save_agent_memory(user_id: str, agent_type: str, key: str, value: str):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("""
+            INSERT OR REPLACE INTO agent_memory (user_id, agent_type, key, value, updated_at)
+            VALUES (?,?,?,?,?)
+        """, (user_id, agent_type, key, value, _now()))
+        await conn.commit()
+
+async def get_agent_memory(user_id: str, agent_type: str, key: str) -> Optional[str]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute(
+            "SELECT value FROM agent_memory WHERE user_id=? AND agent_type=? AND key=?",
+            (user_id, agent_type, key))
+        row = await cursor.fetchone()
+        return row[0] if row else None
+
+async def list_agent_memory(user_id: str, agent_type: str) -> dict:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute(
+            "SELECT key, value FROM agent_memory WHERE user_id=? AND agent_type=?",
+            (user_id, agent_type))
+        return {r[0]: r[1] for r in await cursor.fetchall()}
+
+async def save_agent_interaction(i: dict):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("""
+            INSERT INTO agent_interactions
+            (interaction_id, user_id, agent_type, interaction_type,
+             input_text, output_text, quality_score, led_to_mastery, metadata, created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
+        """, (
+            i["interaction_id"], i["user_id"], i["agent_type"], i["interaction_type"],
+            i.get("input_text", ""), i.get("output_text", ""),
+            i.get("quality_score"), 1 if i.get("led_to_mastery") else 0,
+            _json(i.get("metadata", {})), i.get("created_at", _now()),
+        ))
+        await conn.commit()
+
+async def rate_agent_interaction(interaction_id: str, quality_score: float, led_to_mastery: bool = False):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute(
+            "UPDATE agent_interactions SET quality_score=?, led_to_mastery=? WHERE interaction_id=?",
+            (quality_score, 1 if led_to_mastery else 0, interaction_id))
+        await conn.commit()
+
+async def get_agent_quality_stats(agent_type: str) -> dict:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute("""
+            SELECT COUNT(*) as total,
+                   AVG(quality_score) as avg_score,
+                   SUM(CASE WHEN led_to_mastery=1 THEN 1 ELSE 0 END) as mastery_count
+            FROM agent_interactions WHERE agent_type=? AND quality_score IS NOT NULL
+        """, (agent_type,))
+        row = await cursor.fetchone()
+        return {
+            "total_rated": row[0] or 0,
+            "avg_quality": round(row[1] or 0, 2),
+            "mastery_count": row[2] or 0,
+        }

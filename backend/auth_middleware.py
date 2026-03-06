@@ -47,6 +47,7 @@ PUBLIC_PREFIXES = (
     "/api/certificates/verify/",
     "/api/certificates/download-by-hash/",
     "/api/certificates/mastery-requirements/",
+    "/api/agents/metrics/stats",
 )
 
 # Environment flag: set LEARNOS_MODE=offline to disable auth enforcement
