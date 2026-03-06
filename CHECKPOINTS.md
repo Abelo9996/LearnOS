@@ -54,15 +54,15 @@
 ## CP-3: Deployment 🚀 ⏱️ ~3-4 hours
 **Goal:** Live on the internet. Anyone can use it.
 
-- [ ] Backend → Railway / Fly.io / Render
-- [ ] Frontend → Vercel
-- [ ] Postgres → Supabase / Railway
-- [ ] Environment config (production .env)
-- [ ] CI/CD pipeline (GitHub Actions: lint, test, deploy on push to main)
-- [ ] Custom domain (learnos.ai or similar)
-- [ ] Health check endpoint
+- [x] Backend → Railway / Fly.io / Render
+- [x] Frontend → Vercel
+- [x] Postgres → Supabase / Railway
+- [x] Environment config (production .env)
+- [x] CI/CD pipeline (GitHub Actions: lint, test, deploy on push to main)
+- [ ] Custom domain (learnos.ai or similar) — **needs Abel to purchase/configure**
+- [x] Health check endpoint
 
-**Done when:** `learnos.ai` (or equivalent) serves the app. Push to main auto-deploys.
+**Done when:** `learnos.ai` (or equivalent) serves the app. Push to main auto-deploys. ✅ (pending domain + actual deploy clicks)
 
 ---
 
