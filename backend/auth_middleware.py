@@ -41,6 +41,9 @@ PUBLIC_PREFIXES = (
     "/api/marketplace/featured",
     "/api/marketplace/course/",
     "/api/marketplace/author/",
+    "/api/social/discussions/",
+    "/api/social/leaderboard/",
+    "/api/social/activity",
 )
 
 # Environment flag: set LEARNOS_MODE=offline to disable auth enforcement

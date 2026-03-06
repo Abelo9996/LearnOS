@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/components/AuthProvider'
 import { authFetch, API_URL } from '@/lib/api'
 import { getUserId } from '@/lib/userId'
+import CommunityTab from '@/components/CommunityTab'
 import Link from 'next/link'
 
 interface Milestone {
@@ -236,6 +237,12 @@ export default function CourseDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Community */}
+      <div className="mt-6">
+        <h2 className="text-xl font-bold text-gray-900 mb-4">Community</h2>
+        <CommunityTab courseId={courseId} />
+      </div>
     </div>
   )
 }

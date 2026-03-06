@@ -9,6 +9,7 @@ import os
 import uuid
 import logging
 from datetime import datetime
+from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 logger = logging.getLogger("learnos.db")
@@ -315,6 +316,102 @@ async def init_database():
         await conn.commit()
     logger.info("Database initialized at %s", DB_PATH)
     await seed_categories()
+
+
+# ──────────────────── init (social tables) ────────────────────
+
+async def init_social_tables():
+    """Create social/cohort tables."""
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.executescript("""
+            CREATE TABLE IF NOT EXISTS discussions (
+                discussion_id TEXT PRIMARY KEY,
+                course_id TEXT NOT NULL,
+                milestone_id TEXT,
+                user_id TEXT NOT NULL,
+                parent_id TEXT,
+                title TEXT,
+                content TEXT NOT NULL,
+                upvotes INTEGER DEFAULT 0,
+                reply_count INTEGER DEFAULT 0,
+                pinned INTEGER DEFAULT 0,
+                created_at TEXT,
+                updated_at TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS discussion_votes (
+                user_id TEXT NOT NULL,
+                discussion_id TEXT NOT NULL,
+                vote INTEGER DEFAULT 1,
+                PRIMARY KEY (user_id, discussion_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS cohorts (
+                cohort_id TEXT PRIMARY KEY,
+                course_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                max_members INTEGER DEFAULT 50,
+                member_count INTEGER DEFAULT 0,
+                start_date TEXT,
+                end_date TEXT,
+                status TEXT DEFAULT 'active',
+                created_by TEXT NOT NULL,
+                created_at TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS cohort_members (
+                cohort_id TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                display_name TEXT DEFAULT '',
+                joined_at TEXT,
+                progress_percentage REAL DEFAULT 0.0,
+                streak_days INTEGER DEFAULT 0,
+                total_time_minutes INTEGER DEFAULT 0,
+                role TEXT DEFAULT 'member',
+                PRIMARY KEY (cohort_id, user_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS activity_feed (
+                activity_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                target_user_id TEXT,
+                course_id TEXT,
+                activity_type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                metadata TEXT DEFAULT '{}',
+                created_at TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS notifications (
+                notification_id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                message TEXT DEFAULT '',
+                link TEXT DEFAULT '',
+                read INTEGER DEFAULT 0,
+                created_at TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS streaks (
+                user_id TEXT PRIMARY KEY,
+                current_streak INTEGER DEFAULT 0,
+                longest_streak INTEGER DEFAULT 0,
+                last_activity_date TEXT,
+                total_active_days INTEGER DEFAULT 0
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_discussions_course ON discussions(course_id);
+            CREATE INDEX IF NOT EXISTS idx_discussions_parent ON discussions(parent_id);
+            CREATE INDEX IF NOT EXISTS idx_cohort_members_user ON cohort_members(user_id);
+            CREATE INDEX IF NOT EXISTS idx_activity_feed_user ON activity_feed(user_id);
+            CREATE INDEX IF NOT EXISTS idx_activity_feed_course ON activity_feed(course_id);
+            CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+        """)
+        await conn.commit()
+    logger.info("Social tables initialized")
 
 
 # ──────────────────── COURSES ────────────────────
@@ -1241,3 +1338,361 @@ async def get_author_stats(user_id: str) -> dict:
             "total_forks": row[2] or 0,
             "total_enrollments": row[3] or 0,
         }
+
+
+# ──────────────────── DISCUSSIONS ────────────────────
+
+async def save_discussion(d: dict):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("""
+            INSERT OR REPLACE INTO discussions
+            (discussion_id, course_id, milestone_id, user_id, parent_id,
+             title, content, upvotes, reply_count, pinned, created_at, updated_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            d["discussion_id"], d["course_id"], d.get("milestone_id"),
+            d["user_id"], d.get("parent_id"),
+            d.get("title", ""), d["content"],
+            d.get("upvotes", 0), d.get("reply_count", 0),
+            1 if d.get("pinned") else 0,
+            d.get("created_at", _now()), d.get("updated_at", _now()),
+        ))
+        # If this is a reply, increment parent reply_count
+        if d.get("parent_id"):
+            await conn.execute(
+                "UPDATE discussions SET reply_count = reply_count + 1 WHERE discussion_id = ?",
+                (d["parent_id"],))
+        await conn.commit()
+
+async def list_discussions(course_id: str, milestone_id: Optional[str] = None,
+                          parent_id: Optional[str] = None, limit: int = 50) -> List[dict]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        if parent_id:
+            # Replies to a specific post
+            cursor = await conn.execute(
+                "SELECT * FROM discussions WHERE parent_id = ? ORDER BY created_at ASC LIMIT ?",
+                (parent_id, limit))
+        elif milestone_id:
+            cursor = await conn.execute(
+                "SELECT * FROM discussions WHERE course_id = ? AND milestone_id = ? AND parent_id IS NULL ORDER BY pinned DESC, upvotes DESC, created_at DESC LIMIT ?",
+                (course_id, milestone_id, limit))
+        else:
+            cursor = await conn.execute(
+                "SELECT * FROM discussions WHERE course_id = ? AND parent_id IS NULL ORDER BY pinned DESC, upvotes DESC, created_at DESC LIMIT ?",
+                (course_id, limit))
+        rows = await cursor.fetchall()
+        results = []
+        for r in rows:
+            d = dict(r)
+            d["pinned"] = bool(d.get("pinned"))
+            results.append(d)
+        return results
+
+async def get_discussion(discussion_id: str) -> Optional[dict]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM discussions WHERE discussion_id = ?", (discussion_id,))
+        row = await cursor.fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        d["pinned"] = bool(d.get("pinned"))
+        return d
+
+async def vote_discussion(user_id: str, discussion_id: str, vote: int = 1) -> int:
+    """Vote on a discussion. Returns new vote count."""
+    async with aiosqlite.connect(DB_PATH) as conn:
+        existing = await conn.execute(
+            "SELECT vote FROM discussion_votes WHERE user_id = ? AND discussion_id = ?",
+            (user_id, discussion_id))
+        row = await existing.fetchone()
+        if row:
+            if row[0] == vote:
+                # Remove vote
+                await conn.execute(
+                    "DELETE FROM discussion_votes WHERE user_id = ? AND discussion_id = ?",
+                    (user_id, discussion_id))
+                await conn.execute(
+                    "UPDATE discussions SET upvotes = upvotes - ? WHERE discussion_id = ?",
+                    (vote, discussion_id))
+            else:
+                # Change vote
+                await conn.execute(
+                    "UPDATE discussion_votes SET vote = ? WHERE user_id = ? AND discussion_id = ?",
+                    (vote, user_id, discussion_id))
+                await conn.execute(
+                    "UPDATE discussions SET upvotes = upvotes + ? WHERE discussion_id = ?",
+                    (vote * 2, discussion_id))
+        else:
+            await conn.execute(
+                "INSERT INTO discussion_votes (user_id, discussion_id, vote) VALUES (?,?,?)",
+                (user_id, discussion_id, vote))
+            await conn.execute(
+                "UPDATE discussions SET upvotes = upvotes + ? WHERE discussion_id = ?",
+                (vote, discussion_id))
+        await conn.commit()
+
+        cursor = await conn.execute(
+            "SELECT upvotes FROM discussions WHERE discussion_id = ?", (discussion_id,))
+        r = await cursor.fetchone()
+        return r[0] if r else 0
+
+
+# ──────────────────── COHORTS ────────────────────
+
+async def save_cohort(c: dict):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("""
+            INSERT OR REPLACE INTO cohorts
+            (cohort_id, course_id, name, description, max_members,
+             member_count, start_date, end_date, status, created_by, created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            c["cohort_id"], c["course_id"], c["name"],
+            c.get("description", ""), c.get("max_members", 50),
+            c.get("member_count", 0), c.get("start_date"),
+            c.get("end_date"), c.get("status", "active"),
+            c["created_by"], c.get("created_at", _now()),
+        ))
+        await conn.commit()
+
+async def get_cohort(cohort_id: str) -> Optional[dict]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM cohorts WHERE cohort_id = ?", (cohort_id,))
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+async def list_cohorts(course_id: str) -> List[dict]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM cohorts WHERE course_id = ? AND status = 'active' ORDER BY created_at DESC",
+            (course_id,))
+        return [dict(r) for r in await cursor.fetchall()]
+
+async def join_cohort(cohort_id: str, user_id: str, display_name: str = "") -> bool:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        existing = await conn.execute(
+            "SELECT 1 FROM cohort_members WHERE cohort_id = ? AND user_id = ?",
+            (cohort_id, user_id))
+        if await existing.fetchone():
+            return False
+        # Check capacity
+        cohort = await conn.execute("SELECT max_members, member_count FROM cohorts WHERE cohort_id = ?", (cohort_id,))
+        r = await cohort.fetchone()
+        if r and r[1] >= r[0]:
+            return False
+        await conn.execute(
+            "INSERT INTO cohort_members (cohort_id, user_id, display_name, joined_at) VALUES (?,?,?,?)",
+            (cohort_id, user_id, display_name, _now()))
+        await conn.execute(
+            "UPDATE cohorts SET member_count = member_count + 1 WHERE cohort_id = ?",
+            (cohort_id,))
+        await conn.commit()
+        return True
+
+async def leave_cohort(cohort_id: str, user_id: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        existing = await conn.execute(
+            "SELECT 1 FROM cohort_members WHERE cohort_id = ? AND user_id = ?",
+            (cohort_id, user_id))
+        if not await existing.fetchone():
+            return False
+        await conn.execute(
+            "DELETE FROM cohort_members WHERE cohort_id = ? AND user_id = ?",
+            (cohort_id, user_id))
+        await conn.execute(
+            "UPDATE cohorts SET member_count = MAX(0, member_count - 1) WHERE cohort_id = ?",
+            (cohort_id,))
+        await conn.commit()
+        return True
+
+async def list_cohort_members(cohort_id: str) -> List[dict]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT * FROM cohort_members WHERE cohort_id = ? ORDER BY progress_percentage DESC",
+            (cohort_id,))
+        return [dict(r) for r in await cursor.fetchall()]
+
+async def update_cohort_member_progress(cohort_id: str, user_id: str,
+                                         progress: float, time_minutes: int = 0):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("""
+            UPDATE cohort_members SET progress_percentage = ?,
+            total_time_minutes = total_time_minutes + ? WHERE cohort_id = ? AND user_id = ?
+        """, (progress, time_minutes, cohort_id, user_id))
+        await conn.commit()
+
+
+# ──────────────────── ACTIVITY FEED ────────────────────
+
+async def save_activity(a: dict):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("""
+            INSERT INTO activity_feed
+            (activity_id, user_id, target_user_id, course_id, activity_type,
+             title, description, metadata, created_at)
+            VALUES (?,?,?,?,?,?,?,?,?)
+        """, (
+            a["activity_id"], a["user_id"], a.get("target_user_id"),
+            a.get("course_id"), a["activity_type"],
+            a["title"], a.get("description", ""),
+            _json(a.get("metadata", {})), a.get("created_at", _now()),
+        ))
+        await conn.commit()
+
+async def list_activity_feed(course_id: Optional[str] = None, user_id: Optional[str] = None,
+                             limit: int = 30) -> List[dict]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        if course_id:
+            cursor = await conn.execute(
+                "SELECT * FROM activity_feed WHERE course_id = ? ORDER BY created_at DESC LIMIT ?",
+                (course_id, limit))
+        elif user_id:
+            cursor = await conn.execute(
+                "SELECT * FROM activity_feed WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+                (user_id, limit))
+        else:
+            cursor = await conn.execute(
+                "SELECT * FROM activity_feed ORDER BY created_at DESC LIMIT ?", (limit,))
+        rows = await cursor.fetchall()
+        results = []
+        for r in rows:
+            d = dict(r)
+            d["metadata"] = _load(d.get("metadata", "{}")) or {}
+            results.append(d)
+        return results
+
+
+# ──────────────────── NOTIFICATIONS ────────────────────
+
+async def save_notification(n: dict):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("""
+            INSERT INTO notifications
+            (notification_id, user_id, type, title, message, link, read, created_at)
+            VALUES (?,?,?,?,?,?,?,?)
+        """, (
+            n["notification_id"], n["user_id"], n["type"],
+            n["title"], n.get("message", ""), n.get("link", ""),
+            0, n.get("created_at", _now()),
+        ))
+        await conn.commit()
+
+async def list_notifications(user_id: str, unread_only: bool = False, limit: int = 30) -> List[dict]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        if unread_only:
+            cursor = await conn.execute(
+                "SELECT * FROM notifications WHERE user_id = ? AND read = 0 ORDER BY created_at DESC LIMIT ?",
+                (user_id, limit))
+        else:
+            cursor = await conn.execute(
+                "SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+                (user_id, limit))
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+async def mark_notification_read(notification_id: str):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("UPDATE notifications SET read = 1 WHERE notification_id = ?", (notification_id,))
+        await conn.commit()
+
+async def mark_all_notifications_read(user_id: str):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("UPDATE notifications SET read = 1 WHERE user_id = ?", (user_id,))
+        await conn.commit()
+
+async def count_unread_notifications(user_id: str) -> int:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute(
+            "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND read = 0", (user_id,))
+        row = await cursor.fetchone()
+        return row[0] if row else 0
+
+
+# ──────────────────── STREAKS ────────────────────
+
+async def update_streak(user_id: str):
+    """Update streak for a user. Call when user does any learning activity."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM streaks WHERE user_id = ?", (user_id,))
+        row = await cursor.fetchone()
+
+        if not row:
+            await conn.execute(
+                "INSERT INTO streaks (user_id, current_streak, longest_streak, last_activity_date, total_active_days) VALUES (?,1,1,?,1)",
+                (user_id, today))
+        else:
+            d = dict(row)
+            last = d.get("last_activity_date", "")
+            if last == today:
+                await conn.commit()
+                return  # Already counted today
+
+            from datetime import timedelta
+            yesterday = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+            if last == yesterday:
+                new_streak = d["current_streak"] + 1
+            else:
+                new_streak = 1
+
+            longest = max(d.get("longest_streak", 0), new_streak)
+            total = d.get("total_active_days", 0) + 1
+
+            await conn.execute("""
+                UPDATE streaks SET current_streak = ?, longest_streak = ?,
+                last_activity_date = ?, total_active_days = ? WHERE user_id = ?
+            """, (new_streak, longest, today, total, user_id))
+
+        await conn.commit()
+
+async def get_streak(user_id: str) -> dict:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM streaks WHERE user_id = ?", (user_id,))
+        row = await cursor.fetchone()
+        if not row:
+            return {"current_streak": 0, "longest_streak": 0, "total_active_days": 0}
+        return dict(row)
+
+
+# ──────────────────── LEADERBOARD ────────────────────
+
+async def get_course_leaderboard(course_id: str, limit: int = 20) -> List[dict]:
+    """Get leaderboard for a course from cohort members or enrollments."""
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        # Try cohort members first
+        cursor = await conn.execute("""
+            SELECT cm.user_id, cm.display_name, cm.progress_percentage,
+                   cm.streak_days, cm.total_time_minutes,
+                   s.current_streak, s.longest_streak
+            FROM cohort_members cm
+            JOIN cohorts c ON cm.cohort_id = c.cohort_id
+            LEFT JOIN streaks s ON cm.user_id = s.user_id
+            WHERE c.course_id = ?
+            ORDER BY cm.progress_percentage DESC, cm.total_time_minutes DESC
+            LIMIT ?
+        """, (course_id, limit))
+        rows = await cursor.fetchall()
+        if rows:
+            return [dict(r) for r in rows]
+
+        # Fallback to enrollments
+        cursor = await conn.execute("""
+            SELECT e.user_id, e.progress_percentage,
+                   s.current_streak, s.longest_streak, s.total_active_days
+            FROM course_enrollments e
+            LEFT JOIN streaks s ON e.user_id = s.user_id
+            WHERE e.course_id = ?
+            ORDER BY e.progress_percentage DESC
+            LIMIT ?
+        """, (course_id, limit))
+        return [dict(r) for r in await cursor.fetchall()]

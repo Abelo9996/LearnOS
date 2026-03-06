@@ -4,7 +4,7 @@ from auth_middleware import AuthMiddleware
 from routers import (
     goals, sessions, progress, onboarding, assignments, resources,
     llm_config, auth, courses, ai_roadmap, ai_content, ai_habits,
-    ai_assignments, ai_tutor, ai_config, marketplace
+    ai_assignments, ai_tutor, ai_config, marketplace, social
 )
 from database import init_db
 from db import init_database
@@ -64,11 +64,16 @@ app.include_router(ai_config.router, prefix="/api", tags=["ai-config"])
 # Marketplace
 app.include_router(marketplace.router, prefix="/api", tags=["marketplace"])
 
+# Social
+app.include_router(social.router, prefix="/api", tags=["social"])
+
 @app.on_event("startup")
 async def startup_event():
     await init_models()      # SQLAlchemy: create new tables (users, llm_configs, etc.)
     await init_db()          # Legacy: in-memory auth store
     await init_database()    # Legacy: aiosqlite tables (courses, roadmaps, etc.)
+    from db import init_social_tables
+    await init_social_tables()  # Social: discussions, cohorts, activity feed
 
 @app.get("/")
 async def root():

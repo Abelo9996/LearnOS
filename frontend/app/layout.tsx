@@ -3,6 +3,7 @@
 import './globals.css'
 import { Inter } from 'next/font/google'
 import { AuthProvider, useAuth } from '@/components/AuthProvider'
+import NotificationBell from '@/components/NotificationBell'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
@@ -65,6 +66,7 @@ function NavBar() {
                 >
                   <span>+</span> Create Course
                 </Link>
+                <NotificationBell />
                 <Link
                   href="/profile"
                   className="hidden sm:flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-all"
