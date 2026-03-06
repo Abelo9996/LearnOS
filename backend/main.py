@@ -8,6 +8,7 @@ from routers import (
 )
 from database import init_db
 from db import init_database
+from models_db import init_models
 
 app = FastAPI(
     title="LearnOS API",
@@ -52,8 +53,9 @@ app.include_router(ai_config.router, prefix="/api", tags=["ai-config"])
 
 @app.on_event("startup")
 async def startup_event():
-    await init_db()
-    await init_database()
+    await init_models()      # SQLAlchemy: create new tables (users, llm_configs, etc.)
+    await init_db()          # Legacy: in-memory auth store
+    await init_database()    # Legacy: aiosqlite tables (courses, roadmaps, etc.)
 
 @app.get("/")
 async def root():
