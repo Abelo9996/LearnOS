@@ -1,593 +1,199 @@
-# LearnOS 3.0
+<p align="center">
+  <h1 align="center">🎓 LearnOS</h1>
+  <p align="center"><strong>The Open-Source AI University</strong></p>
+  <p align="center">
+    What if Coursera was rebuilt from scratch — with AI agents instead of pre-recorded lectures?
+  </p>
+</p>
 
-**A production-grade, AI-native, multi-LLM learning operating system**
+<p align="center">
+  <a href="https://github.com/Abelo9996/LearnOS/stargazers"><img src="https://img.shields.io/github/stars/Abelo9996/LearnOS?style=for-the-badge&logo=github&color=yellow" alt="Stars"></a>
+  <a href="https://github.com/Abelo9996/LearnOS/network/members"><img src="https://img.shields.io/github/forks/Abelo9996/LearnOS?style=for-the-badge&logo=github&color=blue" alt="Forks"></a>
+  <a href="https://github.com/Abelo9996/LearnOS/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License"></a>
+  <a href="https://github.com/Abelo9996/LearnOS/issues"><img src="https://img.shields.io/github/issues/Abelo9996/LearnOS?style=for-the-badge" alt="Issues"></a>
+</p>
 
-LearnOS is an AI-native learning platform that converts high-level learning goals into structured concept dependency graphs, actively adapts to learner understanding, and forces mastery through explanation and application—not passive consumption.
-
-**NEW IN 3.0**: Multi-LLM support (OpenAI, Anthropic, Groq, Ollama), intelligent routing, comprehensive frontend with authentication, content generation, and usage analytics.
-
-This is not a chatbot or tutorial system. It's an extensible platform designed for startup-scale production use.
-
----
-
-## 🚀 What's New in 3.0
-
-### Multi-LLM Integration ✨
-- **4 LLM Providers**: OpenAI (GPT-4), Anthropic (Claude), Groq (Mixtral), Ollama (local)
-- **Intelligent Routing**: Automatic provider selection based on task, cost, and speed
-- **Cost Optimization**: 40-60% cheaper than single-provider approach
-- **Failover Support**: Automatic retry with alternative provider
-
-### Enhanced Frontend 🎨
-- **User Authentication**: Secure JWT-based login/registration
-- **Content Generation**: AI-powered multi-modal content (explanations, analogies, code, diagrams, questions)
-- **LLM Dashboard**: Manage providers, set API keys from the UI, track usage, optimize costs
-- **User Profiles**: Manage settings and preferences
-- **Responsive UI**: Works on desktop, tablet, and mobile
-
-### Advanced Agents 🤖
-- **Content Generation Agent**: Creates 7 types of educational content
-- **Test Generation Agent**: Adaptive tests with misconception targeting
-- **Feedback Adaptation Agent**: Real-time learning path adjustment
-- **Resource Curation Agent**: Smart discovery and sequencing of learning materials
-
-### Enterprise Features 💼
-- **User Management**: Roles (learner, instructor, admin), tiers (free, basic, pro, enterprise)
-- **Analytics**: Track usage, costs, performance by provider
-- **Budget Control**: Cost limits and alerts
-- **Audit Logging**: Complete user activity tracking
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/Next.js-14-000000?style=flat-square&logo=nextdotjs&logoColor=white" />
+  <img src="https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white" />
+  <img src="https://img.shields.io/badge/GPT--4o-412991?style=flat-square&logo=openai&logoColor=white" />
+</p>
 
 ---
 
-## Quick Start (5 Minutes)
-
-### Step 1: Clone & Install
-
-```bash
-# Backend
-cd backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# Frontend (new terminal)
-cd frontend
-npm install
-```
-
-### Step 2: Configure LLM Providers (Optional)
-
-```bash
-# Set environment variables in backend/.env
-OPENAI_API_KEY=sk-...              # For GPT-4
-ANTHROPIC_API_KEY=sk-ant-...       # For Claude
-GROQ_API_KEY=gsk-...               # For Mixtral (often free!)
-OLLAMA_BASE_URL=http://localhost:11434  # For local Ollama
-
-# Or use Ollama locally:
-ollama pull mistral
-ollama serve
-```
-
-### Step 3: Start Servers
-
-```bash
-# Terminal 1: Backend
-cd backend
-python main.py
-
-# Terminal 2: Frontend
-cd frontend
-npm run dev
-```
-
-### Step 4: Open in Browser
-
-```
-http://localhost:3000
-```
-
-Register → Configure LLM → Start Learning! 🚀
+> **Coursera charges $49/course. Degrees cost $15,000+. Education shouldn't have a paywall.**
+>
+> LearnOS is building the world's first **agentic AI university** — where AI agents teach, adapt, and certify. Community-driven. Open-source. Free to learn.
 
 ---
 
-## Architecture Overview
+## 📸 Screenshots
 
-LearnOS implements a **modular, agent-based architecture** with strict separation of concerns.
+<p align="center">
+  <img src="docs/screenshots/landing.png" alt="LearnOS Landing Page" width="100%">
+  <br><em>🏠 Landing — AI-powered learning at a glance</em>
+</p>
 
-### Backend
-- **Framework**: FastAPI (async-first)
-- **Language**: Python 3.10+
-- **Models**: Pydantic (typed)
-- **LLM Integration**: Multi-provider architecture
-- **Authentication**: JWT tokens
-- **Storage**: In-memory (extensible to PostgreSQL)
+<p align="center">
+  <img src="docs/screenshots/course_page.png" alt="Course Module View" width="100%">
+  <br><em>📚 Course Modules — structured content with real-world applications</em>
+</p>
 
-### Frontend
-- **Framework**: Next.js 14 (App Router) - **NEW 3.0**
-- **Language**: TypeScript
-- **Styling**: TailwindCSS
-- **Auth**: JWT-based with context provider - **NEW 3.0**
-- **UI Philosophy**: Minimal, professional, responsive
-
-### Agent System
-Each agent has a clearly defined:
-- **Role**: Specific responsibility in the learning system
-- **Inputs**: Typed input schema
-- **Outputs**: Typed output schema
-- **Memory**: Short-term and long-term state
-- **Decision Logic**: Domain-specific processing
+<p align="center">
+  <img src="docs/screenshots/ai_tutor.png" alt="AI Tutor" width="100%">
+  <br><em>🧑‍🏫 AI Tutor — pick a module, start a Socratic tutoring session</em>
+</p>
 
 ---
 
-## Core Agents
+## 🌍 The Problem
 
-### 1. **Goal Decomposition Agent**
-**Purpose**: Converts high-level goals into structured concept dependency graphs (DAG)
+Online education is broken:
 
-**Input**:
-```python
-{"goal": "Learn reinforcement learning well enough to build agents"}
-```
+- 💸 **Expensive** — Coursera, edX, and Udacity charge per course, per certificate, per degree
+- 📹 **Static** — Pre-recorded lectures from 2019 teaching a 2026 world
+- 🧱 **One-size-fits-all** — Same content whether you're a beginner or an expert
+- 🏝️ **Isolated** — You learn alone, drop out alone (completion rates: ~5-15%)
 
-**Output**:
-- Concept dependency graph with prerequisites
-- Difficulty scores (0-1)
-- Estimated time per concept
+## 🚀 The Vision
 
----
+LearnOS is an **AI-native university platform** where:
 
-### 2. **Concept Graph Engine**
-**Purpose**: Manages concept metadata, validates prerequisites, tracks mastery
+| Traditional Platforms | LearnOS |
+|---|---|
+| Pre-recorded video lectures | AI agents that teach in real-time, adapting to *you* |
+| Pay per course ($49-$99) | One subscription, unlimited everything |
+| Static content that ages | Living courses powered by real-time web knowledge |
+| Learn alone, drop out alone | Cohort-based learning with AI + human communities |
+| Certificates that nobody trusts | Mastery-verified certificates backed by AI assessment |
+| Courses created by institutions only | **GitHub of Courses** — anyone can create, fork, and improve |
 
-**Responsibilities**:
-- Determine available vs. blocked concepts
-- Select next optimal concept
-- Validate prerequisite completion
-- Track progress metrics
+### 🧬 The "GitHub of Courses" Model
 
-**Location**: `backend/agents/concept_graph_engine.py`
+Think of LearnOS as **GitHub, but for education**:
 
----
+- 📚 **Create** courses using AI-assisted authoring — or let AI generate entire curricula
+- 🌟 **Star & fork** courses from the community — the best rise to the top
+- 🤝 **Collaborate** — improve courses together, submit PRs, suggest resources
+- 📊 **Rank** by learning outcomes, not marketing budgets
+- 🌐 **Share** globally — any course, any language, any level
 
-### 3. **Learning Orchestrator Agent**
-**Purpose**: Decides what to teach, how deep to go, and which modality to use
+### 🤖 Agentic Architecture
 
-**Modalities**:
-- Text explanation
-- Code example
-- Interactive question
-- Diagram (extensible)
+LearnOS isn't "a platform with an AI chatbot." It's a **system of specialized AI agents** that collaborate to deliver a complete university experience:
 
-**Adaptation**: Adjusts based on attempts, confidence, and performance signals
+| Agent | Role |
+|---|---|
+| 🗺️ **Curriculum Agent** | Designs personalized learning roadmaps from your goals |
+| 🧑‍🏫 **Tutor Agent** | Teaches via Socratic dialogue — adapts in real-time |
+| 📝 **Assessment Agent** | Generates assignments, grades work, provides feedback |
+| 🔍 **Research Agent** | Pulls from articles, papers, videos — always up-to-date |
+| 📊 **Analytics Agent** | Tracks your learning patterns and optimizes your schedule |
+| 🎯 **Profiling Agent** | Understands your level, style, and goals |
+| 🏅 **Certification Agent** | Issues mastery-verified certificates |
+| 👥 **Community Agent** | Connects you with cohorts, study groups, and mentors |
 
-**Location**: `backend/agents/learning_orchestrator.py`
+Every feature is an agent. Every agent has memory. Together, they're your personal university.
 
----
+## ✨ Features (What Works Today)
 
-### 4. **Attention & Adaptation Agent**
-**Purpose**: Monitors learner signals and triggers interventions
+- 🗺️ **AI-Generated Learning Roadmaps** — Tell it what you want to learn, get a structured path with milestones and resources
+- 🧑‍🏫 **Personal AI Tutor** — Socratic tutoring that adapts to your understanding
+- 📝 **Smart Assignments** — Auto-generated with rubrics, hints, test cases, and AI grading
+- 📊 **Learning Analytics** — Real-time tracking of sessions, mastery, and progress
+- 🧠 **Habit Intelligence** — AI analyzes your learning patterns and suggests optimizations
+- 🎯 **Learner Profiling** — Onboarding that tailors everything to your level and style
+- 💾 **Persistent Progress** — SQLite storage, your data survives restarts
 
-**Monitors**:
-- Response times (slow/fast)
-- Accuracy trends
-- Skip patterns
-- Confusion signals
+## 🛣️ Roadmap
 
-**Adaptations**:
-- Switch modality
-- Shorten content
-- Force retrieval
-- Introduce analogy
-- Add scaffolding
+| Phase | Status | Description |
+|---|---|---|
+| **v1 – Foundation** | ✅ Done | Core platform, AI roadmaps, tutor, assignments |
+| **v2 – Community** | 🔨 Building | User auth, course marketplace, starring/forking courses |
+| **v3 – University** | 📋 Planned | Cohort learning, certificates, study groups, leaderboards |
+| **v4 – Scale** | 🔮 Vision | Multi-language, mobile app, institutional partnerships |
+| **v5 – Disruption** | 🔮 Vision | Accreditation pathways, employer verification, global reach |
 
-**Runs**: After every learner interaction
+**Currently focused on:** STEM courses (CS, Math, Data Science, Engineering) → expanding outward.
 
-**Location**: `backend/agents/attention_adaptation.py`
-
----
-
-### 5. **Socratic Evaluation Agent**
-**Purpose**: Evaluates understanding through reasoning, not multiple choice
-
-**Evaluation Criteria**:
-- Depth of explanation
-- Use of reasoning indicators ("because", "therefore")
-- Concrete examples
-- Avoidance of vague language
-
-**Progression**: Blocked until reasoning quality exceeds threshold (default: 0.7)
-
-**Location**: `backend/agents/socratic_evaluation.py`
-
----
-
-## Learning Loop
-
-Every concept follows this mandatory loop:
-
-```
-1. Micro-explanation (≤3 minutes)
-   ↓
-2. Concrete example
-   ↓
-3. Active recall question
-   ↓
-4. Transfer challenge
-   ↓
-5. Socratic evaluation
-   ↓
-   ├─ Passed → Next concept
-   └─ Failed → Adapt and retry
-```
-
-**No passive consumption. No fake progress.**
-
----
-
-## API Endpoints
-
-### POST `/api/goal`
-Create a learning goal and generate concept graph
-
-**Request**:
-```json
-{
-  "goal": "Learn reinforcement learning",
-  "user_id": "demo_user"
-}
-```
-
-**Response**:
-```json
-{
-  "goal_id": "uuid",
-  "graph_id": "uuid",
-  "graph": { "ConceptGraph": "..." },
-  "concepts": ["MDP", "Value Functions", "..."]
-}
-```
-
----
-
-### GET `/api/graph/{goal_id}`
-Retrieve concept graph for a goal
-
-**Response**:
-```json
-{
-  "graph": {
-    "nodes": { "concept_name": "ConceptNode" },
-    "edges": [["prereq", "concept"]]
-  },
-  "goal": "Learn reinforcement learning"
-}
-```
-
----
-
-### POST `/api/session/start`
-Start a new learning session
-
-**Request**:
-```json
-{
-  "goal_id": "uuid",
-  "user_id": "demo_user"
-}
-```
-
-**Response**:
-```json
-{
-  "session_id": "uuid",
-  "first_concept": "Markov Decision Process",
-  "content": "LearningContent",
-  "progress": 0
-}
-```
-
----
-
-### POST `/api/session/interact`
-Submit learner response and get next content
-
-**Request**:
-```json
-{
-  "session_id": "uuid",
-  "response": "MDP is a framework for modeling sequential decision making..."
-}
-```
-
-**Response** (if not passed):
-```json
-{
-  "passed": false,
-  "feedback": "Good start. To strengthen your answer...",
-  "follow_up_question": "Why is MDP important?",
-  "adaptation_applied": "introduce_analogy",
-  "next_content": "LearningContent",
-  "reasoning_quality": 0.62
-}
-```
-
-**Response** (if mastered):
-```json
-{
-  "concept_mastered": true,
-  "new_concept": "Value Functions",
-  "next_content": "LearningContent",
-  "progress_percentage": 14.3
-}
-```
-
----
-
-### GET `/api/session/state`
-Get current session state
-
-**Query Params**: `session_id`
-
-**Response**:
-```json
-{
-  "session_id": "uuid",
-  "current_concept": "Value Functions",
-  "progress_percentage": 14.3,
-  "mastered_concepts": ["Markov Decision Process"],
-  "next_content": "LearningContent"
-}
-```
-
----
-
-### GET `/api/progress`
-Get detailed progress for a goal
-
-**Query Params**: `user_id`, `goal_id`
-
-**Response**:
-```json
-{
-  "goal": "Learn reinforcement learning",
-  "progress_percentage": 42.8,
-  "mastered_concepts": ["MDP", "Value Functions", "Bellman Equations"],
-  "available_concepts": ["Q-Learning"],
-  "blocked_concepts": { "DQN": ["Neural Networks"] },
-  "engagement_score": 0.83,
-  "concept_details": ["ConceptDetail"]
-}
-```
-
----
-
-## Data Models
-
-All models are in `backend/models.py`:
-
-- **User**: User profile and goals
-- **LearningGoal**: User's learning objective
-- **ConceptNode**: Single concept with metadata
-- **ConceptGraph**: Full dependency graph (DAG)
-- **LearningSession**: Active learning session
-- **InteractionEvent**: Single learner interaction
-- **MasteryState**: Mastery tracking per concept
-- **LearningContent**: Content delivered to learner
-- **SessionState**: Current session snapshot
-
----
-
-## Local Setup
+## 🏗️ Quick Start
 
 ### Prerequisites
-- Python 3.10+
-- Node.js 18+
-- npm or yarn
 
-### Backend Setup
+- Python 3.11+
+- Node.js 18+
+- OpenAI API key
+
+### 1. Clone & Backend
 
 ```bash
-cd backend
-
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
+git clone https://github.com/Abelo9996/LearnOS.git
+cd LearnOS/backend
 pip install -r requirements.txt
-
-# Run server
-python main.py
+cp .env.example .env       # Add your OPENAI_API_KEY
+python main.py             # API at http://localhost:8000
 ```
 
-Backend runs on `http://localhost:8000`
-
-API docs: `http://localhost:8000/docs`
-
----
-
-### Frontend Setup
+### 2. Frontend
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
-
-# Run development server
-npm run dev
+cp .env.local.example .env.local
+npm run dev                # App at http://localhost:3000
 ```
 
-Frontend runs on `http://localhost:3000`
+### 3. Start Learning
 
----
+1. Go to **⚙️ Settings** → enter your OpenAI API key
+2. **Create a Course** → describe what you want to learn
+3. Enable **AI Roadmap** → get a personalized learning path
+4. Work through milestones, take assignments, track your progress
 
-## Demo Mode (Out-of-the-Box)
-
-1. Start backend: `cd backend && python main.py`
-2. Start frontend: `cd frontend && npm run dev`
-3. Navigate to `http://localhost:3000`
-4. Enter a learning goal (e.g., "Learn reinforcement learning well enough to build agents")
-5. System generates concept graph automatically
-6. Click "Begin Learning"
-7. First learning loop begins immediately
-
-**No authentication required for demo.**
-
----
-
-## Project Structure
+## 🏛️ Architecture
 
 ```
 LearnOS/
-├── backend/
-│   ├── main.py                 # FastAPI app entry point
-│   ├── models.py               # Pydantic data models
-│   ├── database.py             # In-memory database
-│   ├── agents/
-│   │   ├── base.py             # Base agent class
-│   │   ├── goal_decomposition.py
-│   │   ├── concept_graph_engine.py
-│   │   ├── learning_orchestrator.py
-│   │   ├── attention_adaptation.py
-│   │   └── socratic_evaluation.py
-│   ├── routers/
-│   │   ├── goals.py            # /goal, /graph endpoints
-│   │   ├── sessions.py         # /session/* endpoints
-│   │   └── progress.py         # /progress endpoint
-│   └── requirements.txt
-│
-├── frontend/
-│   ├── app/
-│   │   ├── layout.tsx          # Root layout
-│   │   ├── page.tsx            # Goal input page
-│   │   ├── graph/[goalId]/
-│   │   │   └── page.tsx        # Concept graph view
-│   │   ├── learn/[sessionId]/
-│   │   │   └── page.tsx        # Learning session
-│   │   ├── progress/
-│   │   │   └── page.tsx        # Progress dashboard
-│   │   └── globals.css
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── tailwind.config.js
-│   └── next.config.js
-│
-└── README.md
+├── backend/                  # FastAPI + SQLite
+│   ├── main.py               # Entry point
+│   ├── db.py                 # Persistence layer
+│   ├── agents/               # AI agent modules
+│   ├── services/             # OpenAI integration (41KB of agent logic)
+│   ├── routers/              # REST API endpoints
+│   └── models_ai.py          # Pydantic v2 schemas
+├── frontend/                 # Next.js 14 + Tailwind CSS
+│   ├── app/                  # App Router
+│   │   ├── courses/          # Course creation & management
+│   │   ├── tutor/            # AI tutoring interface
+│   │   ├── habits/           # Learning analytics
+│   │   └── ai-settings/      # Configuration
+│   ├── components/           # Shared UI components
+│   └── lib/                  # Utilities
+└── docs/                     # Documentation
 ```
 
----
+## 🤝 Contributing
 
-## Extension Points
+LearnOS is **open-source because education should be free.** We welcome contributions of all kinds:
 
-### Adding New Agents
-1. Extend `agents/base.py::Agent`
-2. Implement `async def process(inputs) -> outputs`
-3. Define clear input/output schemas
-4. Integrate into appropriate router
+- 🐛 **Bug reports** — found something broken? [Open an issue](https://github.com/Abelo9996/LearnOS/issues)
+- 💡 **Feature ideas** — have a vision for how learning should work? Share it
+- 🔧 **Code** — pick up an issue or propose a PR
+- 📚 **Courses** — create community courses (coming in v2)
+- 📖 **Docs** — help us explain the vision
 
-### Adding New Domains
-1. Extend `goal_decomposition.py` with domain-specific concept trees
-2. Add domain-specific examples and misconceptions
-3. Update transfer tests
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-### Switching to LLM-based Generation
-Replace hardcoded concept decomposition with LLM calls:
-```python
-# In goal_decomposition.py
-async def _decompose_goal(self, goal: str):
-    response = await llm_client.generate(
-        prompt=f"Decompose learning goal into concept DAG: {goal}",
-        schema=ConceptGraphSchema
-    )
-    return response.nodes
-```
+## 📄 License
 
-### Persistent Storage
-Replace `database.py` with PostgreSQL/MongoDB:
-- Models are already Pydantic (easy serialization)
-- Add SQLAlchemy or Motor adapter
-- Update `db.save_*` and `db.get_*` methods
+MIT — because knowledge should be free.
 
 ---
 
-## Design Principles
-
-### ✅ What This Is
-- Production-grade architecture
-- Extensible agent system
-- Mastery-focused learning
-- Startup-ready codebase
-
-### ❌ What This Is Not
-- A chatbot wrapper
-- A static course platform
-- A gamified XP system
-- A toy project
-
----
-
-## Non-Goals (Explicitly Excluded)
-
-- ❌ Generic chat UI
-- ❌ Static pre-made courses
-- ❌ Fake progress indicators
-- ❌ Hardcoded learning paths
-- ❌ Multiple-choice quizzes
-
----
-
-## Code Quality Standards
-
-This codebase is written to be:
-- **Read by YC partners**: Clear, professional, no hacks
-- **Forked by senior engineers**: Modular, well-documented
-- **Extended into a company**: Scalable architecture
-
----
-
-## Future Enhancements
-
-Contributors can extend:
-- **LLM Integration**: Replace hardcoded logic with GPT-4/Claude
-- **Spaced Repetition**: Add forgetting curve tracking
-- **Multi-User**: Add authentication and user isolation
-- **Analytics**: Track learning patterns across users
-- **Mobile**: React Native app using same API
-- **Video Modality**: Add video explanations as content type
-- **Collaborative Learning**: Peer explanation challenges
-
----
-
-## Contributing
-
-This is an open-source project designed for extensibility.
-
-**Where to contribute**:
-- New domain-specific concept trees
-- Additional learning modalities
-- Better evaluation heuristics
-- LLM integration for concept generation
-- Persistent storage adapters
-- Test coverage
-
-**Code style**:
-- Type everything (Pydantic, TypeScript)
-- Clear naming
-- One responsibility per agent/component
-- Document complex logic
-
----
-
-## License
-
-MIT License - See LICENSE file for details
-
----
-
-## Contact
-
-Built as a demonstration of production-grade agentic systems.
-
-**This is LearnOS. A learning operating system, not a chatbot.**
+<p align="center">
+  <strong>⭐ Star this repo if you believe education should be free and AI-native.</strong>
+  <br>
+  <sub>Built with conviction that the next university won't have a campus — it'll have a GitHub repo.</sub>
+</p>
