@@ -85,14 +85,14 @@
 ## CP-5: Cohort & Social Learning 👥 ⏱️ ~6-8 hours
 **Goal:** Learn together. The "university" feel.
 
-- [ ] Enroll in a course (join alongside others)
-- [ ] Cohort system: groups of learners on the same course
-- [ ] Discussion threads per course / per milestone
-- [ ] Leaderboard: progress, mastery, streaks
-- [ ] Activity feed: "Abel completed Milestone 3," "Sara starred your course"
-- [ ] Basic notifications (in-app)
+- [x] Enroll in a course (join alongside others)
+- [x] Cohort system: groups of learners on the same course
+- [x] Discussion threads per course / per milestone
+- [x] Leaderboard: progress, mastery, streaks
+- [x] Activity feed: "Abel completed Milestone 3," "Sara starred your course"
+- [x] Basic notifications (in-app)
 
-**Done when:** 5 users can enroll in the same course, see each other's progress, and discuss in threads.
+**Done when:** 5 users can enroll in the same course, see each other's progress, and discuss in threads. ✅
 
 ---
 
