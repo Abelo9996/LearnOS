@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import axios from 'axios'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || `${API_URL}/api`
+import { API_URL } from '@/lib/api'
 
 interface ConceptNode {
   concept: string

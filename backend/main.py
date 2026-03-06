@@ -4,7 +4,7 @@ from auth_middleware import AuthMiddleware
 from routers import (
     goals, sessions, progress, onboarding, assignments, resources,
     llm_config, auth, courses, ai_roadmap, ai_content, ai_habits,
-    ai_assignments, ai_tutor, ai_config
+    ai_assignments, ai_tutor, ai_config, marketplace
 )
 from database import init_db
 from db import init_database
@@ -60,6 +60,9 @@ app.include_router(ai_habits.router, prefix="/api", tags=["ai-habits"])
 app.include_router(ai_assignments.router, tags=["ai-assignments"])  # already has /api prefix
 app.include_router(ai_tutor.router, prefix="/api", tags=["ai-tutor"])
 app.include_router(ai_config.router, prefix="/api", tags=["ai-config"])
+
+# Marketplace
+app.include_router(marketplace.router, prefix="/api", tags=["marketplace"])
 
 @app.on_event("startup")
 async def startup_event():

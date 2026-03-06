@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getUserId } from '@/lib/userId';
+import { API_URL } from '@/lib/api';
 
 interface Message {
   role: 'user' | 'assistant';

@@ -6,6 +6,7 @@ Uses aiosqlite for async access. Complex nested objects stored as JSON.
 import aiosqlite
 import json
 import os
+import uuid
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
@@ -247,14 +248,73 @@ async def init_database():
                 ai_model TEXT DEFAULT 'gpt-4'
             );
 
+            -- ── Marketplace: Course Visibility & Social ──
+
+            -- Add marketplace columns to courses (idempotent via IF NOT EXISTS workaround)
+            -- SQLite doesn't support ADD COLUMN IF NOT EXISTS, so we use a separate table approach
+
+            CREATE TABLE IF NOT EXISTS course_meta (
+                course_id TEXT PRIMARY KEY,
+                visibility TEXT DEFAULT 'private',
+                author_name TEXT DEFAULT '',
+                author_avatar TEXT DEFAULT '',
+                category TEXT DEFAULT 'general',
+                tags TEXT DEFAULT '[]',
+                star_count INTEGER DEFAULT 0,
+                fork_count INTEGER DEFAULT 0,
+                enrollment_count INTEGER DEFAULT 0,
+                forked_from TEXT,
+                featured INTEGER DEFAULT 0,
+                language TEXT DEFAULT 'en',
+                thumbnail_url TEXT DEFAULT '',
+                short_description TEXT DEFAULT '',
+                published_at TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS course_stars (
+                user_id TEXT NOT NULL,
+                course_id TEXT NOT NULL,
+                starred_at TEXT NOT NULL,
+                PRIMARY KEY (user_id, course_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS course_enrollments (
+                user_id TEXT NOT NULL,
+                course_id TEXT NOT NULL,
+                enrolled_at TEXT NOT NULL,
+                progress_percentage REAL DEFAULT 0.0,
+                status TEXT DEFAULT 'active',
+                PRIMARY KEY (user_id, course_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS course_tags (
+                tag TEXT NOT NULL,
+                course_id TEXT NOT NULL,
+                PRIMARY KEY (tag, course_id)
+            );
+
+            CREATE TABLE IF NOT EXISTS categories (
+                slug TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT DEFAULT '',
+                icon TEXT DEFAULT '',
+                course_count INTEGER DEFAULT 0,
+                sort_order INTEGER DEFAULT 0
+            );
+
             CREATE INDEX IF NOT EXISTS idx_courses_user ON courses(user_id);
             CREATE INDEX IF NOT EXISTS idx_roadmaps_user ON roadmaps(user_id);
             CREATE INDEX IF NOT EXISTS idx_assignments_user ON assignments(user_id);
             CREATE INDEX IF NOT EXISTS idx_assignments_course ON assignments(course_id);
             CREATE INDEX IF NOT EXISTS idx_sessions_user ON learning_sessions(user_id);
+            CREATE INDEX IF NOT EXISTS idx_course_meta_category ON course_meta(category);
+            CREATE INDEX IF NOT EXISTS idx_course_meta_visibility ON course_meta(visibility);
+            CREATE INDEX IF NOT EXISTS idx_course_stars_course ON course_stars(course_id);
+            CREATE INDEX IF NOT EXISTS idx_course_tags_tag ON course_tags(tag);
         """)
         await conn.commit()
     logger.info("Database initialized at %s", DB_PATH)
+    await seed_categories()
 
 
 # ──────────────────── COURSES ────────────────────
@@ -819,3 +879,365 @@ def _content_from_row(row: dict) -> dict:
     if row.get("helpful") is not None:
         row["helpful"] = bool(row["helpful"])
     return row
+
+
+# ──────────────────── MARKETPLACE: COURSE META ────────────────────
+
+async def save_course_meta(meta: dict):
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("""
+            INSERT OR REPLACE INTO course_meta
+            (course_id, visibility, author_name, author_avatar, category, tags,
+             star_count, fork_count, enrollment_count, forked_from, featured,
+             language, thumbnail_url, short_description, published_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            meta["course_id"], meta.get("visibility", "private"),
+            meta.get("author_name", ""), meta.get("author_avatar", ""),
+            meta.get("category", "general"), _json(meta.get("tags", [])),
+            meta.get("star_count", 0), meta.get("fork_count", 0),
+            meta.get("enrollment_count", 0), meta.get("forked_from"),
+            1 if meta.get("featured") else 0,
+            meta.get("language", "en"), meta.get("thumbnail_url", ""),
+            meta.get("short_description", ""), meta.get("published_at"),
+        ))
+        await conn.commit()
+
+async def get_course_meta(course_id: str) -> Optional[dict]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM course_meta WHERE course_id = ?", (course_id,))
+        row = await cursor.fetchone()
+        if not row:
+            return None
+        return _meta_from_row(dict(row))
+
+def _meta_from_row(row: dict) -> dict:
+    row["tags"] = _load(row.get("tags", "[]")) or []
+    row["featured"] = bool(row.get("featured"))
+    return row
+
+
+# ──────────────────── MARKETPLACE: EXPLORE / SEARCH ────────────────────
+
+async def explore_courses(
+    category: Optional[str] = None,
+    tag: Optional[str] = None,
+    search: Optional[str] = None,
+    sort: str = "stars",  # stars, newest, trending
+    limit: int = 20,
+    offset: int = 0,
+) -> List[dict]:
+    """Return public courses with their metadata, sorted for the explore page."""
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+
+        query = """
+            SELECT c.*, m.visibility, m.author_name, m.author_avatar, m.category,
+                   m.tags, m.star_count, m.fork_count, m.enrollment_count,
+                   m.forked_from, m.featured, m.short_description, m.published_at,
+                   m.thumbnail_url
+            FROM courses c
+            JOIN course_meta m ON c.course_id = m.course_id
+            WHERE m.visibility = 'public'
+        """
+        params: list = []
+
+        if category and category != "all":
+            query += " AND m.category = ?"
+            params.append(category)
+
+        if tag:
+            query += " AND c.course_id IN (SELECT course_id FROM course_tags WHERE tag = ?)"
+            params.append(tag)
+
+        if search:
+            query += " AND (c.title LIKE ? OR c.description LIKE ? OR c.goal LIKE ?)"
+            s = f"%{search}%"
+            params.extend([s, s, s])
+
+        if sort == "stars":
+            query += " ORDER BY m.star_count DESC, m.enrollment_count DESC"
+        elif sort == "newest":
+            query += " ORDER BY m.published_at DESC"
+        elif sort == "trending":
+            query += " ORDER BY m.star_count DESC, m.published_at DESC"
+        elif sort == "enrolled":
+            query += " ORDER BY m.enrollment_count DESC"
+
+        query += " LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+
+        cursor = await conn.execute(query, params)
+        rows = await cursor.fetchall()
+        results = []
+        for r in rows:
+            d = _course_from_row(dict(r))
+            d["tags"] = _load(d.get("tags", "[]")) or []
+            d["featured"] = bool(d.get("featured"))
+            results.append(d)
+        return results
+
+
+async def count_explore_courses(
+    category: Optional[str] = None,
+    tag: Optional[str] = None,
+    search: Optional[str] = None,
+) -> int:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        query = """
+            SELECT COUNT(*) FROM courses c
+            JOIN course_meta m ON c.course_id = m.course_id
+            WHERE m.visibility = 'public'
+        """
+        params: list = []
+        if category and category != "all":
+            query += " AND m.category = ?"
+            params.append(category)
+        if tag:
+            query += " AND c.course_id IN (SELECT course_id FROM course_tags WHERE tag = ?)"
+            params.append(tag)
+        if search:
+            query += " AND (c.title LIKE ? OR c.description LIKE ? OR c.goal LIKE ?)"
+            s = f"%{search}%"
+            params.extend([s, s, s])
+        cursor = await conn.execute(query, params)
+        row = await cursor.fetchone()
+        return row[0] if row else 0
+
+
+# ──────────────────── MARKETPLACE: STARS ────────────────────
+
+async def star_course(user_id: str, course_id: str) -> bool:
+    """Star a course. Returns True if newly starred, False if already starred."""
+    async with aiosqlite.connect(DB_PATH) as conn:
+        existing = await conn.execute(
+            "SELECT 1 FROM course_stars WHERE user_id = ? AND course_id = ?",
+            (user_id, course_id))
+        if await existing.fetchone():
+            return False
+        await conn.execute(
+            "INSERT INTO course_stars (user_id, course_id, starred_at) VALUES (?,?,?)",
+            (user_id, course_id, _now()))
+        await conn.execute(
+            "UPDATE course_meta SET star_count = star_count + 1 WHERE course_id = ?",
+            (course_id,))
+        await conn.commit()
+        return True
+
+async def unstar_course(user_id: str, course_id: str) -> bool:
+    """Unstar a course. Returns True if unstarred, False if wasn't starred."""
+    async with aiosqlite.connect(DB_PATH) as conn:
+        existing = await conn.execute(
+            "SELECT 1 FROM course_stars WHERE user_id = ? AND course_id = ?",
+            (user_id, course_id))
+        if not await existing.fetchone():
+            return False
+        await conn.execute(
+            "DELETE FROM course_stars WHERE user_id = ? AND course_id = ?",
+            (user_id, course_id))
+        await conn.execute(
+            "UPDATE course_meta SET star_count = MAX(0, star_count - 1) WHERE course_id = ?",
+            (course_id,))
+        await conn.commit()
+        return True
+
+async def has_starred(user_id: str, course_id: str) -> bool:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute(
+            "SELECT 1 FROM course_stars WHERE user_id = ? AND course_id = ?",
+            (user_id, course_id))
+        return await cursor.fetchone() is not None
+
+async def list_user_stars(user_id: str) -> List[str]:
+    """Return list of course_ids starred by user."""
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute(
+            "SELECT course_id FROM course_stars WHERE user_id = ? ORDER BY starred_at DESC",
+            (user_id,))
+        rows = await cursor.fetchall()
+        return [r[0] for r in rows]
+
+
+# ──────────────────── MARKETPLACE: FORK ────────────────────
+
+async def fork_course(source_course_id: str, new_course_id: str, new_user_id: str) -> Optional[dict]:
+    """Fork a public course. Copies course + meta + roadmap. Returns the new course dict."""
+    source = await get_course(source_course_id)
+    if not source:
+        return None
+    source_meta = await get_course_meta(source_course_id)
+
+    now = _now()
+    new_course = {**source}
+    new_course["course_id"] = new_course_id
+    new_course["user_id"] = new_user_id
+    new_course["status"] = "planning"
+    new_course["progress_percentage"] = 0.0
+    new_course["total_time_spent_minutes"] = 0
+    new_course["sessions_count"] = 0
+    new_course["concepts_mastered"] = []
+    new_course["created_at"] = now
+    new_course["updated_at"] = now
+    new_course["last_accessed"] = now
+    new_course["assignment_ids"] = []
+    new_course["onboarding_completed"] = False
+
+    # Copy roadmap if exists
+    if source.get("roadmap_id"):
+        roadmap = await get_roadmap(source["roadmap_id"])
+        if roadmap:
+            new_roadmap_id = str(uuid.uuid4()) if 'uuid' in dir() else f"fork-{new_course_id[:8]}"
+            new_roadmap = {**roadmap}
+            new_roadmap["roadmap_id"] = new_roadmap_id
+            new_roadmap["user_id"] = new_user_id
+            new_roadmap["course_id"] = new_course_id
+            new_roadmap["generated_at"] = now
+            new_roadmap["last_updated"] = now
+            # Reset milestone completion
+            for m in new_roadmap.get("milestones", []):
+                m["completed"] = False
+            await save_roadmap(new_roadmap)
+            new_course["roadmap_id"] = new_roadmap_id
+
+    await save_course(new_course)
+
+    # Create private meta for fork
+    await save_course_meta({
+        "course_id": new_course_id,
+        "visibility": "private",
+        "author_name": "",
+        "category": source_meta.get("category", "general") if source_meta else "general",
+        "tags": source_meta.get("tags", []) if source_meta else [],
+        "forked_from": source_course_id,
+    })
+
+    # Increment fork count on source
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute(
+            "UPDATE course_meta SET fork_count = fork_count + 1 WHERE course_id = ?",
+            (source_course_id,))
+        await conn.commit()
+
+    return new_course
+
+
+# ──────────────────── MARKETPLACE: ENROLLMENTS ────────────────────
+
+async def enroll_in_course(user_id: str, course_id: str) -> bool:
+    """Enroll a user in a public course. Returns True if newly enrolled."""
+    async with aiosqlite.connect(DB_PATH) as conn:
+        existing = await conn.execute(
+            "SELECT 1 FROM course_enrollments WHERE user_id = ? AND course_id = ?",
+            (user_id, course_id))
+        if await existing.fetchone():
+            return False
+        await conn.execute(
+            "INSERT INTO course_enrollments (user_id, course_id, enrolled_at) VALUES (?,?,?)",
+            (user_id, course_id, _now()))
+        await conn.execute(
+            "UPDATE course_meta SET enrollment_count = enrollment_count + 1 WHERE course_id = ?",
+            (course_id,))
+        await conn.commit()
+        return True
+
+async def list_user_enrollments(user_id: str) -> List[dict]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("""
+            SELECT e.*, c.title, c.description, c.goal, m.author_name, m.star_count, m.category
+            FROM course_enrollments e
+            JOIN courses c ON e.course_id = c.course_id
+            LEFT JOIN course_meta m ON e.course_id = m.course_id
+            ORDER BY e.enrolled_at DESC
+        """)
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+# ──────────────────── MARKETPLACE: CATEGORIES ────────────────────
+
+async def seed_categories():
+    """Seed default categories if they don't exist."""
+    cats = [
+        ("cs", "Computer Science", "Programming, algorithms, data structures, systems", "💻", 0),
+        ("math", "Mathematics", "Calculus, linear algebra, statistics, discrete math", "📐", 1),
+        ("data-science", "Data Science", "ML, data analysis, visualization, big data", "📊", 2),
+        ("ai-ml", "AI & Machine Learning", "Neural networks, NLP, computer vision, RL", "🤖", 3),
+        ("engineering", "Engineering", "Software, electrical, mechanical, civil", "⚙️", 4),
+        ("physics", "Physics", "Classical mechanics, quantum, thermodynamics, relativity", "🔬", 5),
+        ("chemistry", "Chemistry", "Organic, inorganic, physical, biochemistry", "🧪", 6),
+        ("biology", "Biology", "Molecular, genetics, ecology, neuroscience", "🧬", 7),
+        ("business", "Business", "Finance, marketing, management, entrepreneurship", "💼", 8),
+        ("design", "Design", "UI/UX, graphic design, product design", "🎨", 9),
+        ("languages", "Languages", "Programming languages, natural languages", "🌐", 10),
+        ("general", "General", "Other topics and interdisciplinary courses", "📚", 99),
+    ]
+    async with aiosqlite.connect(DB_PATH) as conn:
+        for slug, name, desc, icon, order in cats:
+            await conn.execute(
+                "INSERT OR IGNORE INTO categories (slug, name, description, icon, sort_order) VALUES (?,?,?,?,?)",
+                (slug, name, desc, icon, order))
+        await conn.commit()
+
+async def list_categories() -> List[dict]:
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT * FROM categories ORDER BY sort_order")
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+async def update_category_counts():
+    """Recalculate course_count for each category."""
+    async with aiosqlite.connect(DB_PATH) as conn:
+        await conn.execute("""
+            UPDATE categories SET course_count = (
+                SELECT COUNT(*) FROM course_meta
+                WHERE course_meta.category = categories.slug AND course_meta.visibility = 'public'
+            )
+        """)
+        await conn.commit()
+
+
+# ──────────────────── MARKETPLACE: AUTHOR PROFILES ────────────────────
+
+async def get_author_courses(user_id: str) -> List[dict]:
+    """Get all public courses by a specific author."""
+    async with aiosqlite.connect(DB_PATH) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("""
+            SELECT c.*, m.visibility, m.author_name, m.author_avatar, m.category,
+                   m.tags, m.star_count, m.fork_count, m.enrollment_count,
+                   m.short_description, m.published_at
+            FROM courses c
+            JOIN course_meta m ON c.course_id = m.course_id
+            WHERE c.user_id = ? AND m.visibility = 'public'
+            ORDER BY m.star_count DESC
+        """, (user_id,))
+        rows = await cursor.fetchall()
+        results = []
+        for r in rows:
+            d = _course_from_row(dict(r))
+            d["tags"] = _load(d.get("tags", "[]")) or []
+            results.append(d)
+        return results
+
+async def get_author_stats(user_id: str) -> dict:
+    """Get aggregate stats for an author."""
+    async with aiosqlite.connect(DB_PATH) as conn:
+        cursor = await conn.execute("""
+            SELECT COUNT(*) as courses,
+                   COALESCE(SUM(m.star_count), 0) as total_stars,
+                   COALESCE(SUM(m.fork_count), 0) as total_forks,
+                   COALESCE(SUM(m.enrollment_count), 0) as total_enrollments
+            FROM courses c
+            JOIN course_meta m ON c.course_id = m.course_id
+            WHERE c.user_id = ? AND m.visibility = 'public'
+        """, (user_id,))
+        row = await cursor.fetchone()
+        return {
+            "courses": row[0] or 0,
+            "total_stars": row[1] or 0,
+            "total_forks": row[2] or 0,
+            "total_enrollments": row[3] or 0,
+        }

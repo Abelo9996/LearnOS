@@ -36,6 +36,11 @@ PUBLIC_PREFIXES = (
     "/docs",
     "/redoc",
     "/openapi",
+    "/api/marketplace/explore",
+    "/api/marketplace/categories",
+    "/api/marketplace/featured",
+    "/api/marketplace/course/",
+    "/api/marketplace/author/",
 )
 
 # Environment flag: set LEARNOS_MODE=offline to disable auth enforcement
