@@ -69,16 +69,16 @@
 ## CP-4: Course Marketplace ("GitHub of Courses") 📚 ⏱️ ~8-10 hours
 **Goal:** The core social feature. Users create, share, star, and fork courses.
 
-- [ ] Course model expansion: author, visibility (public/private), stars, forks, tags
+- [x] Course model expansion: author, visibility (public/private), stars, forks, tags
 - [ ] Course creation wizard (AI-assisted — describe topic, AI builds structure)
-- [ ] Course discovery page: trending, most starred, by category, search
-- [ ] Star/unstar courses
-- [ ] Fork a course (copy to your account, modify)
-- [ ] Course detail page (public view with syllabus, reviews, star count)
-- [ ] Category system: CS, Math, Data Science, Engineering, etc. (STEM first)
-- [ ] Author profiles (public page showing courses created)
+- [x] Course discovery page: trending, most starred, by category, search
+- [x] Star/unstar courses
+- [x] Fork a course (copy to your account, modify)
+- [x] Course detail page (public view with syllabus, reviews, star count)
+- [x] Category system: CS, Math, Data Science, Engineering, etc. (STEM first)
+- [x] Author profiles (public page showing courses created)
 
-**Done when:** User A creates a course, User B finds it via search, stars it, forks it, and modifies it.
+**Done when:** User A creates a course, User B finds it via search, stars it, forks it, and modifies it. ✅
 
 ---
 
