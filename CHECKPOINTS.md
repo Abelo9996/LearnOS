@@ -113,15 +113,15 @@
 ## CP-7: Agent Upgrades 🤖 ⏱️ ~6-8 hours
 **Goal:** Make the AI actually remarkable. This is the moat.
 
-- [ ] Research Agent: real-time web search for resources (articles, videos, papers)
-- [ ] Community Agent: recommend study partners, form groups
-- [ ] Certification Agent: evaluate mastery, issue certs
-- [ ] Agent memory persistence (long-term learner context across sessions)
-- [ ] Multi-agent collaboration: agents share insights about a learner
-- [ ] Agent quality metrics: track which agent interactions lead to mastery
-- [ ] Pluggable LLM backend (OpenAI, Anthropic, local models)
+- [x] Research Agent: real-time web search for resources (articles, videos, papers)
+- [x] Community Agent: recommend study partners, form groups
+- [x] Certification Agent: evaluate mastery, issue certs
+- [x] Agent memory persistence (long-term learner context across sessions)
+- [x] Multi-agent collaboration: agents share insights about a learner
+- [x] Agent quality metrics: track which agent interactions lead to mastery
+- [x] Pluggable LLM backend (OpenAI, Anthropic, local models)
 
-**Done when:** The tutor references real articles. Agents share context. Users can choose their LLM.
+**Done when:** The tutor references real articles. Agents share context. Users can choose their LLM. ✅
 
 ---
 
