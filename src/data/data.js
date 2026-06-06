@@ -1,17 +1,5 @@
 // data.js — content for LearnOS
 
-export const USER = {
-  name: 'Alex Learner',
-  email: 'alex@learnos.dev',
-  level: 4,
-  xp: 2350,
-  xpToNext: 3000,
-  streak: 12,
-  bestStreak: 18,
-  plan: 'Pro',
-  avatarInitials: 'AL',
-};
-
 export const AGENTS = {
   TU: { code: 'TU', name: 'Tutor',         color: 'var(--agent-tu)', short: 'Teaches concepts, answers questions, explains deeply.', icon: 'cap' },
   PR: { code: 'PR', name: 'Profiling',     color: 'var(--agent-pr)', short: 'Understands you — your goals, pace, background.', icon: 'user' },
@@ -100,54 +88,6 @@ export const RECENT_ACTIVITY = [
 export const LEARNING_PROGRESS = [
   { d: 'Mon', v: 1.4 }, { d: 'Tue', v: 2.0 }, { d: 'Wed', v: 1.6 },
   { d: 'Thu', v: 2.4 }, { d: 'Fri', v: 1.2 }, { d: 'Sat', v: 2.6 }, { d: 'Sun', v: 1.9 },
-];
-
-export const STREAK_BARS = [3, 5, 4, 6, 5, 7, 8, 6, 7, 9, 8, 12];
-
-export const SESSION = {
-  title: 'Bias–Variance Tradeoff',
-  subtitle: 'Understanding the balance between bias and variance to build better models.',
-  course: 'Machine Learning',
-  level: 'Intermediate',
-  index: 6, total: 12,
-  outline: [
-    { label: 'What is Bias?',           state: 'done' },
-    { label: 'What is Variance?',       state: 'done' },
-    { label: 'The Tradeoff Intuition',  state: 'done' },
-    { label: 'Underfitting vs Overfitting', state: 'done' },
-    { label: 'Visualizing the Tradeoff', state: 'done' },
-    { label: 'Finding the Right Balance', state: 'active' },
-    { label: 'Practical Guidelines',    state: 'queued' },
-  ],
-  concepts: ['Bias','Variance','Underfitting','Overfitting','Model Complexity','Generalization','Cross Validation'],
-  signals: [
-    { label: 'Mastery — Machine Learning', value: 0.68, sub: 'overall' },
-    { label: 'Bias–Variance Tradeoff',      value: 0.72, sub: 'this session' },
-  ],
-};
-
-export const QUIZ = {
-  prompt: "A model with very high variance is most likely to:",
-  options: [
-    { id: 'a', text: 'Underfit the training data',                       verdict: 'wrong', feedback: "High variance is the opposite — it fits training too well, including noise." },
-    { id: 'b', text: 'Have high error on both train and test',           verdict: 'wrong', feedback: "That's high bias. High variance has LOW train error but HIGH test error." },
-    { id: 'c', text: 'Overfit — low train error, high test error',       verdict: 'right', feedback: "Exactly. High variance memorizes training noise, so it generalizes poorly to unseen data." },
-    { id: 'd', text: 'Generalize perfectly to new data',                 verdict: 'wrong', feedback: "Generalization is what we want — but it's the opposite of high variance." },
-  ],
-};
-
-export const SEED_MESSAGES = [
-  { role: 'agent', agent: 'TU', kind: 'text', t: '10:32 AM',
-    body: "Great question! The bias-variance tradeoff is one of the foundational concepts in machine learning. Let\'s break it down visually." },
-  { role: 'agent', agent: 'TU', kind: 'text',
-    body: "Imagine we\'re trying to predict house prices.\nA model with high bias makes strong assumptions and tends to underfit.\nA model with high variance is too flexible and tends to overfit the training data." },
-  { role: 'agent', agent: 'TU', kind: 'viz', vizKind: 'tradeoff-trio',
-    body: "Here\'s a visualization:" },
-  { role: 'agent', agent: 'TU', kind: 'text',
-    body: "The goal is to find that sweet spot in the middle." },
-  { role: 'user', kind: 'text', t: '10:34 AM',
-    body: "Can you show me an example with real data?" },
-  { role: 'agent', agent: 'AS', kind: 'quiz', quiz: QUIZ },
 ];
 
 export const COURSES = [

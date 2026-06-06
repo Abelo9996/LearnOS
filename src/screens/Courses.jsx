@@ -1,13 +1,15 @@
 import React from 'react';
 import { I } from '../components/Icons';
 import { Card, Btn, ProgressBar, Tag, Avatar, Kbd, PageScroll, SectionHead } from '../components/UI';
-import { COURSE_VERSIONS, USER } from '../data/data';
+import { COURSE_VERSIONS } from '../data/data';
+import { useUser } from '../UserContext.jsx';
 import API from '../api.js';
 import { useToast, useModal } from '../App';
 
 export default function Courses() {
   const { add: toast } = useToast();
   const { open: openModal, close: closeModal } = useModal();
+  const user = useUser();
   const [courses, setCourses]   = React.useState([]);
   const [loading, setLoading]   = React.useState(true);
   const [search, setSearch]     = React.useState('');
@@ -138,8 +140,8 @@ export default function Courses() {
     const totalLessons = courseModules.reduce((s, m) => s + (m.lessons?.length || 0), 0);
     const completedLessons = progress?.completed?.length || 0;
     const progressPct = totalLessons > 0 ? completedLessons / totalLessons : 0;
-    const isAuthor = USER.email === c.author || USER.name === c.author;
-    const isAdmin = USER.role === 'admin';
+    const isAuthor = user.email === c.author || user.name === c.author;
+    const isAdmin = user.role === 'admin';
 
     // Lesson reader view
     if (selectedLesson) {

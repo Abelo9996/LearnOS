@@ -72,7 +72,7 @@ app.use('/api', requireAuth);
 app.use('/api/uploads', uploadRoutes);
 
 // ── Daily activity stats (F-04) ───────────────────────────────────────────────
-app.get('/api/stats/daily', (req, res) => {
+app.get('/api/daily-stats', (req, res) => {
   try {
     const uid = req.userId;
     const win = Math.min(parseInt(req.query.window) || 14, 90);
