@@ -13,8 +13,10 @@ export default function Dashboard({ onOpenSession, onOpenRoadmap, onOpenCourses,
   const [sessions, setSessions]   = React.useState([]);
   const [activity, setActivity]   = React.useState([]);
   const [stats, setStats]         = React.useState(null);
+  const [dailyStats, setDailyStats] = React.useState([]);
 
   React.useEffect(() => {
+    API.getDailyStats(14).then(rows => { if (Array.isArray(rows)) setDailyStats(rows); }).catch(() => {});
     API.getRoadmaps().then(rows => {
       if (Array.isArray(rows) && rows.length) {
         setRoadmaps(rows.map(r => ({
@@ -68,6 +70,11 @@ export default function Dashboard({ onOpenSession, onOpenRoadmap, onOpenCourses,
   const completedSessions = stats?.completedSessions ?? 0;
   const dueFlashcards = stats?.dueFlashcards ?? 0;
 
+  // F-04: Derive mini-bar values from real daily stats
+  const streakBars = dailyStats.length >= 7
+    ? dailyStats.slice(-7).map(d => Math.max(0.1, (d.xp || 0) / 40))
+    : [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1];
+
   return (
     <PageScroll>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, marginBottom: 24 }}>
@@ -77,7 +84,7 @@ export default function Dashboard({ onOpenSession, onOpenRoadmap, onOpenCourses,
         </div>
         <StreakCard streak={streak} />
       </div>
-      <StatRow streak={streak} bestStreak={bestStreak} mastery={mastery} pending={pending} totalSessions={totalSessions} completedSessions={completedSessions} onOpenAssignments={() => setScreen('assignments')} />
+      <StatRow streak={streak} bestStreak={bestStreak} mastery={mastery} pending={pending} totalSessions={totalSessions} completedSessions={completedSessions} onOpenAssignments={() => setScreen('assignments')} streakBars={streakBars} />
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) minmax(0, 1fr)', gap: 16, marginTop: 16 }}>
         <RoadmapsRow setScreen={setScreen} onOpenRoadmap={onOpenRoadmap} roadmaps={roadmaps} />
         <UpcomingSessionsCard onOpenSession={onOpenSession} setScreen={setScreen} sessions={sessions} />
@@ -105,12 +112,12 @@ function StreakCard({ streak }) {
   );
 }
 
-function StatRow({ streak, bestStreak, mastery, pending, totalSessions, completedSessions, onOpenAssignments }) {
+function StatRow({ streak, bestStreak, mastery, pending, totalSessions, completedSessions, onOpenAssignments, streakBars }) {
   return (
     <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16, marginTop: 8 }}>
-      <StatCard icon={React.cloneElement(I.flame, { size: 16 })} label="Learning Streak" value={streak} unit="days" sub={`Best: ${bestStreak} days`} accent="oklch(0.75 0.18 45)" chart={<MiniBars values={STREAK_BARS} color="oklch(0.75 0.18 45)" />} />
+      <StatCard icon={React.cloneElement(I.flame, { size: 16 })} label="Learning Streak" value={streak} unit="days" sub={`Best: ${bestStreak} days`} accent="oklch(0.75 0.18 45)" chart={<MiniBars values={streakBars} color="oklch(0.75 0.18 45)" />} />
       <StatCard icon={React.cloneElement(I.bolt, { size: 16 })} label="Mastery Score" value={mastery} unit="%" sub="weighted average" accent="var(--brand-3)" chart={<Ring value={mastery / 100} size={44} sw={5} color="var(--brand-3)" />} />
-      <StatCard icon={React.cloneElement(I.cap, { size: 16 })} label="Sessions" value={String(totalSessions)} unit="" sub={`${completedSessions} completed`} accent="var(--brand)" chart={<MiniBars values={STREAK_BARS.slice(-7)} color="var(--brand)" />} />
+      <StatCard icon={React.cloneElement(I.cap, { size: 16 })} label="Sessions" value={String(totalSessions)} unit="" sub={`${completedSessions} completed`} accent="var(--brand)" chart={<MiniBars values={streakBars.slice(-7)} color="var(--brand)" />} />
       <Card pad={false} onClick={onOpenAssignments} className="hover-lift" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10, cursor: 'pointer' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ width: 28, height: 28, borderRadius: 6, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'oklch(0.78 0.16 155 / 0.18)', color: 'var(--good)' }}>{React.cloneElement(I.check, { size: 16 })}</span>
@@ -245,7 +252,6 @@ function RecentActivityCard({ activity, setScreen }) {
 
 function LearningProgressCard({ activity, totalSessions, completedSessions, pending, mastery }) {
   const W = 480, H = 180, padX = 28, padY = 28;
-  // Build chart points from real activity data (last 7 days)
   const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const now = new Date();
   const pts = Array.from({ length: 7 }, (_, i) => {
@@ -254,7 +260,7 @@ function LearningProgressCard({ activity, totalSessions, completedSessions, pend
     const dayStr = d.toISOString().split('T')[0];
     const dayActivity = (activity || []).filter(a => a.created_at && a.created_at.startsWith(dayStr));
     const xpEarned = dayActivity.reduce((s, a) => s + (a.xp || 0), 0);
-    return { d: dayNames[i], v: Math.max(0.1, xpEarned / 20) }; // Normalize: 20 XP = 1 unit
+    return { d: dayNames[i], v: Math.max(0.1, xpEarned / 20) };
   });
   const max = Math.max(...pts.map(p => p.v));
   const x = (i) => padX + (i / (pts.length - 1)) * (W - padX * 2);
@@ -329,7 +335,6 @@ function QuickActionsCard({ onOpenSession, onOpenRoadmap, onOpenCourses, onOpenC
 }
 
 function AgentActivityStrip({ setScreen }) {
-  // Real agent activity from /api/ai/runs — falls back to "Idle" per-agent if none.
   const [runs, setRuns] = React.useState([]);
   React.useEffect(() => {
     let alive = true;

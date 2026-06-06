@@ -52,7 +52,8 @@ const API = {
   getMe: () => API.get('/auth/me'),
 
   // ── Stats / Dashboard ──────────────────────────────────────────────────────
-  getStats:    () => API.get('/stats'),
+  getStats:       () => API.get('/stats'),
+	  getDailyStats:  (window) => API.get('/daily-stats' + (window ? `?window=${window}` : '')),
 
   // ── Roadmaps ──────────────────────────────────────────────────────────────
   getRoadmaps:  () => API.get('/roadmaps'),
