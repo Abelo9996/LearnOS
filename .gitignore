@@ -1,0 +1,10 @@
+node_modules/
+db/learnos.db
+db/learnos.db-shm
+db/learnos.db-wal
+dist/
+uploads/
+logs/
+.env
+*.log
+.DS_Store
