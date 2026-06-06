@@ -1,14 +1,16 @@
 import React from 'react';
 import { I } from '../components/Icons';
 import { Card, Btn, ProgressBar, Tag, Avatar, AgentChip } from '../components/UI';
-import { USER, SESSION, QUIZ, AGENTS } from '../data/data';
+import { AGENTS } from '../data/data';
 import API from '../api';
 // LLM calls go through /api/ai/chat
 import { useToast } from '../App';
+import { useUser } from '../UserContext.jsx';
 import MarkdownText from '../components/Markdown';
 
 export default function Session({ setScreen }) {
   const { add: toast } = useToast();
+  const user = useUser();
   const [messages, setMessages] = React.useState([]);
   const [input, setInput] = React.useState('');
   const [thinking, setThinking] = React.useState(false);
@@ -19,7 +21,7 @@ export default function Session({ setScreen }) {
   const [noKeyBanner, setNoKeyBanner] = React.useState(false);
   const scrollerRef = React.useRef(null);
 
-  // Load existing session or create a new one on mount
+  // Load existing session or show empty state
   React.useEffect(() => {
     const normalize = (sessData) => {
       const rawMsgs = sessData?.messages || [];
@@ -50,26 +52,10 @@ export default function Session({ setScreen }) {
           setSession(s);
           const sessData = await API.getSession(s.id);
           normalize(sessData);
-        } else {
-          // Create a new session
-          const created = await API.createSession({
-            title: SESSION.title,
-            subtitle: SESSION.subtitle,
-            agent: 'TU',
-            course: SESSION.course,
-            level: SESSION.level,
-          });
-          const newSess = created.session || created;
-          setSession(newSess);
-          // Add the seed greeting
-          const welcomeMsg = { role: 'agent', agent: 'TU', kind: 'text', body: `Welcome to "${SESSION.title}"! I'm your Tutor Agent. What would you like to explore first?` };
-          setMessages([welcomeMsg]);
-          await API.postMessage(newSess.id, welcomeMsg);
         }
-      } catch (err) {
-        // Fallback: start an offline session
-        setSession({ id: 'local', title: SESSION.title, status: 'active' });
-        setMessages([{ role: 'agent', agent: 'TU', kind: 'text', body: `Welcome to "${SESSION.title}"! I'm your Tutor Agent. What would you like to explore first? Ask me anything about the topic, request a quiz, or ask for examples and sources.` }]);
+        // If no sessions, session stays null — parent shows empty state
+      } catch {
+        // API failure — stay at null (empty state)
       }
     };
     initSession();
@@ -82,6 +68,7 @@ export default function Session({ setScreen }) {
 
   const submit = async (text) => {
     if (sessionEnded) { toast('Session has ended. Start a new session from the Roadmap.', 'info'); return; }
+    if (!session) return;
     const t = (text ?? input).trim();
     if (!t) return;
 
@@ -91,16 +78,9 @@ export default function Session({ setScreen }) {
     setThinking(true);
 
     // Save user message to API
-    if (session && session.id && session.id !== 'local') {
+    if (session.id && session.id !== 'local') {
       try { await API.postMessage(session.id, userMsg); } catch {}
     }
-
-    // Build conversation history for the LLM
-    const conversationHistory = messages
-      .filter(m => m.role === 'user' || (m.role === 'agent' && m.kind === 'text'))
-      .slice(-10)
-      .map(m => `${m.role === 'user' ? 'Learner' : 'Tutor'}: ${m.body || ''}`)
-      .join('\n');
 
     const sessionContextObj = session ? {
       text: `Session: ${session.title}\nCourse: ${session.course || 'General'}\nLevel: ${session.level || 'Intermediate'}`,
@@ -127,8 +107,7 @@ export default function Session({ setScreen }) {
       if (!replyBody) throw new Error('Empty response');
       replyAgent = 'TU';
     } catch (err) {
-      // Topic-aware offline fallback. Uses the current session, NOT a hardcoded
-      // example. Triggered when no Anthropic key is configured or the call fails.
+      // Topic-aware offline fallback. Uses the current session, NOT a hardcoded example.
       usedFallback = true;
       const lower = t.toLowerCase();
       const topic = (session && session.title) || 'this module';
@@ -136,21 +115,17 @@ export default function Session({ setScreen }) {
       const level  = (session && session.level)  || 'intermediate';
       if (lower.includes('quiz') || lower.includes('test') || lower.includes('assess')) {
         replyAgent = 'AS';
-        // Try AS quiz generation; fallback to static QUIZ on NO_KEY.
         try {
           const { quiz } = await API.generateQuiz({ node_id: session?.roadmap_node_id || null });
           replyKind = 'quiz';
           if (quiz?.questions?.length) {
-            // Adapt AS schema {q, options:[str], correct:int, why} into QuizCard's
-            // legacy shape {prompt, options:[{id, text, verdict, feedback}]} using
-            // the first question for the in-chat quick check.
             const Q = quiz.questions[0];
             const ids = ['a', 'b', 'c', 'd'];
             window.__learnos_dynamic_quiz = {
               prompt: Q.q,
-              options: (Q.options || []).map((text, i) => ({
+              options: (Q.options || []).map((txt, i) => ({
                 id: ids[i] || String(i),
-                text,
+                text: txt,
                 verdict: i === Q.correct ? 'right' : 'wrong',
                 feedback: i === Q.correct ? (Q.why || 'Correct.') : `Not quite. ${Q.why || ''}`.trim(),
               })),
@@ -162,8 +137,6 @@ export default function Session({ setScreen }) {
         }
       } else if (lower.includes('cite') || lower.includes('source') || lower.includes('paper') || lower.includes('read')) {
         replyAgent = 'RE';
-        // Pull verified resources for this node (G2) if we have one — otherwise
-        // tell the user honestly that we can't surface sources without a key.
         let resources = [];
         try {
           if (session && session.roadmap_node_id) {
@@ -190,14 +163,14 @@ export default function Session({ setScreen }) {
     }
 
     const reply = replyKind === 'quiz'
-      ? { role: 'agent', agent: replyAgent, kind: 'quiz', quiz: (window.__learnos_dynamic_quiz || QUIZ) }
+      ? { role: 'agent', agent: replyAgent, kind: 'quiz', quiz: (window.__learnos_dynamic_quiz || null) }
       : { role: 'agent', agent: replyAgent, kind: 'text', body: replyBody };
 
     setMessages((m) => [...m, reply]);
     setThinking(false);
 
     // Save agent reply to API
-    if (session && session.id && session.id !== 'local') {
+    if (session.id && session.id !== 'local') {
       try { await API.postMessage(session.id, reply); } catch {}
     }
   };
@@ -206,17 +179,11 @@ export default function Session({ setScreen }) {
     setSessionEnded(true);
     if (session && session.id && session.id !== 'local') {
       try {
-        // Completing the session triggers the real backend cascade:
-        // +XP, node mastery → done, next node unlocked, roadmap recalculated,
-        // and a certificate if the (verified) roadmap is now finished.
         await API.patchSession(session.id, { status: 'completed', mastery_score: 1 });
-
-        // Drop a placeholder while the AN agent runs.
         const placeholder = { role: 'agent', agent: 'AN', kind: 'text', body: `**Session Summary — ${session.title || 'Module'}**\n\n_The Analytics agent is reviewing your session…_` };
         setMessages(m => [...m, placeholder]);
         toast('Session completed · mastery updated · +25 XP', 'success');
 
-        // Poll the AN job (kicked off server-side on the patchSession call).
         let analysisResult = null;
         for (let i = 0; i < 20; i++) {
           await new Promise(r => setTimeout(r, 1500));
@@ -237,7 +204,6 @@ export default function Session({ setScreen }) {
           }
           summaryBody = `**Session Summary — ${session.title || 'Module'}**\n\n${lines.join('\n')}`;
         } else {
-          // Fallback: build the same kind of summary heuristically (e.g. job failed).
           const userQs = messages.filter(m => m.role === 'user' && m.kind === 'text');
           summaryBody = `**Session Summary — ${session.title || 'Module'}**\n\n- Exchanged ${userQs.length} question${userQs.length === 1 ? '' : 's'} with the Tutor.\n- Module marked complete — mastery updated and next module unlocked.\n- Try a spaced-review session in a few days to lock it in.`;
         }
@@ -251,19 +217,18 @@ export default function Session({ setScreen }) {
   const handleNewSession = async () => {
     try {
       const newSess = await API.createSession({
-        title: SESSION.title,
-        subtitle: SESSION.subtitle,
+        title: 'New Session',
+        subtitle: '',
         agent: 'TU',
-        course: SESSION.course,
-        level: SESSION.level,
       });
       setSession(newSess);
-      const welcomeMsg = { role: 'agent', agent: 'TU', kind: 'text', body: `Welcome to "${SESSION.title}"! I'm your Tutor Agent. What would you like to explore first?` };
+      const welcomeMsg = { role: 'agent', agent: 'TU', kind: 'text', body: `Welcome! I'm your Tutor Agent. What would you like to explore first?` };
       setMessages([welcomeMsg]);
       await API.postMessage(newSess.id, welcomeMsg);
     } catch {
-      setSession({ id: 'local', title: SESSION.title, status: 'active' });
-      setMessages([{ role: 'agent', agent: 'TU', kind: 'text', body: `Welcome to "${SESSION.title}"! What would you like to explore?` }]);
+      // Fallback: start an offline session
+      setSession({ id: 'local', title: 'Offline Session', status: 'active' });
+      setMessages([{ role: 'agent', agent: 'TU', kind: 'text', body: `Welcome! I'm your Tutor Agent. What would you like to explore first?` }]);
     }
     setInput('');
     setThinking(false);
@@ -274,7 +239,7 @@ export default function Session({ setScreen }) {
 
   const handleExportSession = () => {
     const text = messages.map(m => {
-      const who = m.role === 'user' ? USER.name : `${AGENTS[m.agent]?.name || m.agent} Agent`;
+      const who = m.role === 'user' ? user.name : `${AGENTS[m.agent]?.name || m.agent} Agent`;
       return `[${who}]\n${m.body || ''}`;
     }).join('\n\n');
     const blob = new Blob([text], { type: 'text/plain' });
@@ -300,11 +265,29 @@ export default function Session({ setScreen }) {
     }
   };
 
+  // F-01: If no session is active, render empty state with CTA to roadmaps
+  if (!session) {
+    return (
+      <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
+        <div style={{ textAlign: 'center', maxWidth: 420, padding: 40 }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>💬</div>
+          <div className="display" style={{ fontSize: 24, color: 'var(--ink)', marginBottom: 8 }}>No active session</div>
+          <div style={{ fontSize: 14, color: 'var(--muted)', lineHeight: 1.6, marginBottom: 24 }}>
+            Pick a roadmap node to start a tutoring session, or create a new session from your roadmaps.
+          </div>
+          <Btn variant="primary" onClick={() => setScreen && setScreen('roadmaps')}>
+            Go to Roadmaps
+          </Btn>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
       <SessionHeader onEndSession={handleEndSession} onAction={handleAction} sessionEnded={sessionEnded} onNewSession={handleNewSession} session={session} />
       <div style={{ flex: 1, minHeight: 0, display: 'grid', gridTemplateColumns: 'minmax(0, 1.05fr) minmax(0, 1fr) 280px', gap: 16, padding: '0 20px 20px' }}>
-        <ChatColumn scrollerRef={scrollerRef} messages={messages} thinking={thinking} input={input} setInput={setInput} submit={submit} sessionEnded={sessionEnded} session={session} noKeyBanner={noKeyBanner} dismissBanner={() => { localStorage.setItem('learnos_nokey_banner_dismissed', '1'); setNoKeyBanner(false); }} setScreen={setScreen} />
+        <ChatColumn scrollerRef={scrollerRef} messages={messages} thinking={thinking} input={input} setInput={setInput} submit={submit} sessionEnded={sessionEnded} session={session} noKeyBanner={noKeyBanner} dismissBanner={() => { localStorage.setItem('learnos_nokey_banner_dismissed', '1'); setNoKeyBanner(false); }} setScreen={setScreen} user={user} />
         <VisualizerColumn vizTab={vizTab} setVizTab={setVizTab} complexity={complexity} setComplexity={setComplexity} session={session} />
         <RightRail onExport={handleExportSession} setScreen={setScreen} session={session} />
       </div>
@@ -313,12 +296,12 @@ export default function Session({ setScreen }) {
 }
 
 function SessionHeader({ onEndSession, onAction, sessionEnded, onNewSession, session }) {
-  const title    = session?.title || SESSION.title;
-  const subtitle = session?.subtitle || SESSION.subtitle;
-  const course   = session?.course || SESSION.course;
-  const level    = session?.level || SESSION.level;
-  const idx      = session?.session_index || SESSION.index;
-  const total    = session?.total_sessions || SESSION.total;
+  const title    = session?.title || 'Session';
+  const subtitle = session?.subtitle || '';
+  const course   = session?.course || '';
+  const level    = session?.level || '';
+  const idx      = session?.session_index || '';
+  const total    = session?.total_sessions || '';
   return (
     <div style={{ padding: '20px 32px 16px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24 }}>
@@ -336,7 +319,7 @@ function SessionHeader({ onEndSession, onAction, sessionEnded, onNewSession, ses
               </span>
             )}
           </div>
-          <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 10, maxWidth: 640 }}>{subtitle}</div>
+          {subtitle && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 10, maxWidth: 640 }}>{subtitle}</div>}
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           {!sessionEnded && (
@@ -348,9 +331,9 @@ function SessionHeader({ onEndSession, onAction, sessionEnded, onNewSession, ses
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-        <MetaPill label="Course" value={course} />
-        <MetaPill label="Level" value={level} />
-        <MetaPill label="Session" value={`${idx} of ${total}`} />
+        {course && <MetaPill label="Course" value={course} />}
+        {level && <MetaPill label="Level" value={level} />}
+        {idx && total && <MetaPill label="Session" value={`${idx} of ${total}`} />}
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
         {[{ icon: I.spark, label: 'Ask follow-up' }, { icon: I.check, label: 'Generate quiz' }, { icon: I.book, label: 'Explain simpler' }, { icon: I.plus, label: 'Show examples' }, { icon: I.upload, label: 'Export session' }].map((a) => (
@@ -384,7 +367,7 @@ function SessionAction({ icon, label, onClick }) {
   );
 }
 
-function ChatColumn({ scrollerRef, messages, thinking, input, setInput, submit, sessionEnded, session, noKeyBanner, dismissBanner, setScreen }) {
+function ChatColumn({ scrollerRef, messages, thinking, input, setInput, submit, sessionEnded, session, noKeyBanner, dismissBanner, setScreen, user }) {
   return (
     <Card pad={false} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
       {noKeyBanner && (
@@ -396,7 +379,7 @@ function ChatColumn({ scrollerRef, messages, thinking, input, setInput, submit, 
       )}
       <div ref={scrollerRef} className="scroll" style={{ flex: 1, padding: '20px 22px 8px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {messages.map((m, i) => <ChatMessage key={i} m={m} session={session} />)}
+          {messages.map((m, i) => <ChatMessage key={i} m={m} session={session} user={user} />)}
           {thinking && (
             <div>
               <ChatHeader code="TU" t="typing" />
@@ -427,14 +410,14 @@ function ChatHeader({ code, t }) {
 }
 
 
-function ChatMessage({ m, session }) {
+function ChatMessage({ m, session, user }) {
   const { add: toast } = useToast();
   if (m.role === 'user') {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{m.t || ''}</span>
-          <Avatar name={USER.name} size={26} hue={295} />
+          <Avatar name={user.name} size={26} hue={295} />
         </div>
         <div style={{ maxWidth: '82%', padding: '10px 14px', background: 'var(--brand-grad)', color: 'oklch(0.16 0.02 270)', borderRadius: 14, borderTopRightRadius: 4, fontSize: 13.5, lineHeight: 1.5, fontWeight: 500 }}><MarkdownText text={m.body} /></div>
         <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
@@ -455,7 +438,10 @@ function ChatMessage({ m, session }) {
       </div>
     );
   }
-  if (m.kind === 'quiz') return <QuizCard q={m.quiz || QUIZ} />;
+  if (m.kind === 'quiz') {
+    if (!m.quiz) return null; // F-01: no QUIZ fallback — render nothing
+    return <QuizCard q={m.quiz} />;
+  }
   if (m.kind === 'viz' && m.vizKind === 'tradeoff-trio') {
     return (
       <div>
@@ -757,25 +743,21 @@ function WhiteboardView({ session }) {
   const [tool, setTool]       = React.useState('pen');
   const [drawing, setDrawing] = React.useState(false);
   const [lastPos, setLastPos] = React.useState(null);
-  const [strokes, setStrokes] = React.useState([]); // persisted strokes
+  const [strokes, setStrokes] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
 
   const sid = session?.id || 'local';
   const isOnline = sid && sid !== 'local';
 
-  // Load persisted strokes on mount
   React.useEffect(() => {
     if (!isOnline) { setLoading(false); return; }
     setLoading(true);
     API.getWhiteboardStrokes(sid)
-      .then(rows => {
-        setStrokes(rows || []);
-      })
+      .then(rows => { setStrokes(rows || []); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [sid, isOnline]);
 
-  // Redraw canvas whenever strokes change
   const redrawCanvas = React.useCallback(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -798,8 +780,6 @@ function WhiteboardView({ session }) {
     }
   }, [strokes]);
 
-  // Match the canvas backing store to its rendered size (DPR-aware) so strokes
-  // are sharp AND the cursor maps 1:1.
   React.useEffect(() => {
     const canvas = canvasRef.current; if (!canvas) return;
     const fit = () => {
@@ -817,10 +797,7 @@ function WhiteboardView({ session }) {
     return () => window.removeEventListener('resize', fit);
   }, [redrawCanvas]);
 
-  // Redraw when strokes change
-  React.useEffect(() => {
-    redrawCanvas();
-  }, [strokes, redrawCanvas]);
+  React.useEffect(() => { redrawCanvas(); }, [strokes, redrawCanvas]);
 
   const getPos = (e, canvas) => {
     const r = canvas.getBoundingClientRect();
@@ -836,7 +813,6 @@ function WhiteboardView({ session }) {
     setDrawing(true);
     const pos = getPos(e, canvas);
     setLastPos(pos);
-    // Start a new stroke
     setStrokes(prev => [...prev, { id: `local-${Date.now()}`, stroke_json: JSON.stringify({ tool, points: [pos], color: currentColor(), width: currentWidth() }) }]);
   };
 
@@ -856,7 +832,6 @@ function WhiteboardView({ session }) {
       ctx.lineCap     = 'round';
       ctx.stroke();
     }
-    // Append point to the last stroke
     setStrokes(prev => {
       const updated = [...prev];
       const last = { ...updated[updated.length - 1] };
@@ -875,13 +850,11 @@ function WhiteboardView({ session }) {
     if (!drawing) return;
     setDrawing(false);
     setLastPos(null);
-    // Persist the last stroke to the server
     if (isOnline && strokes.length > 0) {
       const last = strokes[strokes.length - 1];
       if (last.id.startsWith('local-')) {
         try {
           const res = await API.saveWhiteboardStroke(sid, { stroke_json: last.stroke_json });
-          // Replace local id with server id
           setStrokes(prev => {
             const updated = [...prev];
             updated[updated.length - 1] = { ...updated[updated.length - 1], id: res.id };
@@ -941,8 +914,6 @@ function WhiteboardView({ session }) {
 }
 
 function RightRail({ onExport, setScreen, session }) {
-  // Real outline = the node's learning objectives. Real concepts = derived from
-  // the session title. Real mastery = session.mastery_score + roadmap mastery.
   const [outline, setOutline] = React.useState([]);
   const [assignment, setAssignment] = React.useState(null);
   const [roadmapMastery, setRoadmapMastery] = React.useState(null);

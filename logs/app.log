@@ -4313,3 +4313,39 @@
 {"ts":"2026-06-06T02:02:47.096Z","level":"INFO","msg":"GET /api/health → 200","duration":"4ms"}
 {"ts":"2026-06-06T02:02:47.222Z","level":"INFO","msg":"POST /api/auth/login → 200","duration":"61ms"}
 {"ts":"2026-06-06T02:02:47.233Z","level":"INFO","msg":"GET /api/stats → 200","duration":"1ms"}
+{"ts":"2026-06-06T02:32:41.819Z","level":"INFO","msg":"POST /api/auth/login → 200","duration":"71ms"}
+{"ts":"2026-06-06T02:32:41.848Z","level":"WARN","msg":"GET /api/sessions/active → 404","duration":"2ms"}
+{"ts":"2026-06-06T02:34:53.987Z","level":"INFO","msg":"GET /api/health → 200","duration":"2ms"}
+{"ts":"2026-06-06T02:34:54.080Z","level":"INFO","msg":"POST /api/auth/login → 200","duration":"54ms"}
+{"ts":"2026-06-06T02:34:54.088Z","level":"WARN","msg":"404 Not Found: GET /api/stats/daily?window=5"}
+{"ts":"2026-06-06T02:34:54.088Z","level":"WARN","msg":"GET /api/stats/daily?window=5 → 404","duration":"1ms"}
+{"ts":"2026-06-06T02:45:45.149Z","level":"INFO","msg":"GET /api/health → 200","duration":"1ms"}
+{"ts":"2026-06-06T02:45:45.236Z","level":"INFO","msg":"POST /api/auth/login → 200","duration":"54ms"}
+{"ts":"2026-06-06T02:45:45.244Z","level":"WARN","msg":"404 Not Found: GET /api/stats/daily?window=5"}
+{"ts":"2026-06-06T02:45:45.244Z","level":"WARN","msg":"GET /api/stats/daily?window=5 → 404","duration":"0ms"}
+{"ts":"2026-06-06T02:45:45.262Z","level":"WARN","msg":"GET /api/sessions/active → 404","duration":"1ms"}
+{"ts":"2026-06-06T02:46:23.145Z","level":"INFO","msg":"POST /api/auth/login → 200","duration":"71ms"}
+{"ts":"2026-06-06T02:46:23.153Z","level":"WARN","msg":"404 Not Found: GET /api/stats/daily?window=5"}
+{"ts":"2026-06-06T02:46:23.153Z","level":"WARN","msg":"GET /api/stats/daily?window=5 → 404","duration":"0ms"}
+{"ts":"2026-06-06T02:47:01.170Z","level":"INFO","msg":"POST /api/auth/login → 200","duration":"67ms"}
+{"ts":"2026-06-06T02:47:01.178Z","level":"WARN","msg":"404 Not Found: GET /api/stats/daily?window=5"}
+{"ts":"2026-06-06T02:47:01.178Z","level":"WARN","msg":"GET /api/stats/daily?window=5 → 404","duration":"0ms"}
+{"ts":"2026-06-06T02:47:52.165Z","level":"WARN","msg":"GET /api/stats/daily → 401","duration":"0ms"}
+{"ts":"2026-06-06T02:47:52.243Z","level":"INFO","msg":"POST /api/auth/login → 200","duration":"66ms"}
+{"ts":"2026-06-06T02:47:52.251Z","level":"WARN","msg":"404 Not Found: GET /api/stats/daily?window=5"}
+{"ts":"2026-06-06T02:47:52.251Z","level":"WARN","msg":"GET /api/stats/daily?window=5 → 404","duration":"0ms"}
+{"ts":"2026-06-06T02:48:34.245Z","level":"INFO","msg":"POST /api/auth/login → 200","duration":"70ms"}
+{"ts":"2026-06-06T02:48:34.253Z","level":"WARN","msg":"404 Not Found: GET /api/stats/daily?window=5"}
+{"ts":"2026-06-06T02:48:34.253Z","level":"WARN","msg":"GET /api/stats/daily?window=5 → 404","duration":"0ms"}
+{"ts":"2026-06-06T02:51:28.533Z","level":"INFO","msg":"POST /api/auth/login → 200","duration":"71ms"}
+{"ts":"2026-06-06T02:51:28.541Z","level":"INFO","msg":"GET /api/stats → 200","duration":"1ms"}
+{"ts":"2026-06-06T02:51:28.558Z","level":"WARN","msg":"404 Not Found: GET /api/stats/daily"}
+{"ts":"2026-06-06T02:51:28.558Z","level":"WARN","msg":"GET /api/stats/daily → 404","duration":"0ms"}
+{"ts":"2026-06-06T02:55:00.188Z","level":"INFO","msg":"POST /api/auth/login → 200","duration":"67ms"}
+{"ts":"2026-06-06T02:55:00.196Z","level":"WARN","msg":"404 Not Found: GET /api/stats/daily"}
+{"ts":"2026-06-06T02:55:00.196Z","level":"WARN","msg":"GET /api/stats/daily → 404","duration":"0ms"}
+{"ts":"2026-06-06T02:55:00.202Z","level":"INFO","msg":"GET /api/stats → 200","duration":"1ms"}
+{"ts":"2026-06-06T02:59:16.728Z","level":"INFO","msg":"POST /api/auth/login → 200","duration":"72ms"}
+{"ts":"2026-06-06T02:59:16.736Z","level":"WARN","msg":"404 Not Found: GET /api/stats/daily?window=3"}
+{"ts":"2026-06-06T02:59:16.736Z","level":"WARN","msg":"GET /api/stats/daily?window=3 → 404","duration":"0ms"}
+{"ts":"2026-06-06T02:59:16.742Z","level":"INFO","msg":"GET /api/stats → 200","duration":"1ms"}

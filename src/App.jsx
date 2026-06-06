@@ -1,8 +1,8 @@
 import React from 'react';
 import { I } from './components/Icons';
 import { Btn, Avatar } from './components/UI';
-import { USER } from './data/data';
 import API, { timeAgo } from './api.js';
+import { UserProvider, useUser } from './UserContext.jsx';
 import Auth from './screens/Auth.jsx';
 import Landing from './screens/Landing';
 import Dashboard from './screens/Dashboard';
@@ -154,7 +154,6 @@ function AppRoot() {
       setPhase('loading');
       try {
         const user = await API.getMe();
-        await hydrate(user);
         const needsOnboarding = await checkOnboarding();
         if (!needsOnboarding) {
           setVersion(v => v + 1);
@@ -169,7 +168,6 @@ function AppRoot() {
   }
 
   async function handleAuthSuccess(user) {
-    await hydrate(user).catch(() => {});
     const needsOnboarding = await checkOnboarding();
     if (!needsOnboarding) {
       setVersion(v => v + 1);
@@ -192,21 +190,6 @@ function AppRoot() {
   if (phase === 'auth')    return <Auth onSuccess={handleAuthSuccess} />;
   if (phase === 'onboarding') return <Onboarding onComplete={handleOnboardingComplete} />;
   return <App key={version} onLogout={handleLogout} />;
-}
-
-async function hydrate(user) {
-  Object.assign(USER, {
-    name:       user.name,
-    email:      user.email,
-    level:      user.level,
-    xp:         user.xp,
-    xpToNext:   user.xpToNext ?? user.xp_to_next,
-    streak:     user.streak,
-    bestStreak: user.bestStreak ?? user.best_streak,
-    plan:       user.plan,
-    role:       user.role || 'user',
-    avatar_url: user.avatar_url || null,
-  });
 }
 
 function AppLoader() {
@@ -241,6 +224,24 @@ export default AppRoot;
 
 // ── Main authenticated app ────────────────────────────────────────────────────
 function App({ onLogout }) {
+  const [me, setMe] = React.useState(null);
+
+  React.useEffect(() => {
+    API.getMe().then(u => {
+      setMe({
+        name:       u.name || '',
+        email:      u.email || '',
+        level:      u.level || 1,
+        xp:         u.xp || 0,
+        xpToNext:   u.xpToNext ?? u.xp_to_next ?? 500,
+        streak:     u.streak || 0,
+        bestStreak: u.bestStreak ?? u.best_streak ?? 0,
+        plan:       u.plan || 'Free',
+        role:       u.role || 'user',
+        avatar_url: u.avatar_url || null,
+      });
+    }).catch(() => {});
+  }, []);
   const [screen, setScreen]               = React.useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const [density, setDensity]             = React.useState('regular');
@@ -314,24 +315,28 @@ function App({ onLogout }) {
     document.documentElement.style.setProperty('--sidebar-w',  `${sw}px`);
   }, [density, sw, tk.accent, tk.soft, tk.line, tk.grad]);
 
+  if (!me) return <AppLoader />;
+
   return (
-    <ToastProvider><ModalProvider>
-      <div style={{ display: 'flex', minHeight: '100vh', minWidth: 1280, width: 'max-content' }}>
-        <Sidebar screen={screen} setScreen={go} collapsed={sidebarCollapsed} onToggle={toggleSidebar} onLogout={onLogout} counts={navCounts} />
-        <main style={{
-          flex: 1,
-          width: `calc(100vw - ${sw}px)`,
-          minWidth: `calc(1280px - ${sw}px)`,
-          display: 'flex', flexDirection: 'column', minHeight: '100vh',
-          transition: 'width var(--dur-normal) var(--ease-smooth), min-width var(--dur-normal) var(--ease-smooth)',
-        }}>
-          <TopBar setScreen={go} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} onLogout={onLogout} />
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <ScreenRouter screen={screen} setScreen={go} onLogout={onLogout} />
-          </div>
-        </main>
-      </div>
-    </ModalProvider></ToastProvider>
+    <UserProvider user={me}>
+      <ToastProvider><ModalProvider>
+        <div style={{ display: 'flex', minHeight: '100vh', minWidth: 1280, width: 'max-content' }}>
+          <Sidebar screen={screen} setScreen={go} collapsed={sidebarCollapsed} onToggle={toggleSidebar} onLogout={onLogout} counts={navCounts} />
+          <main style={{
+            flex: 1,
+            width: `calc(100vw - ${sw}px)`,
+            minWidth: `calc(1280px - ${sw}px)`,
+            display: 'flex', flexDirection: 'column', minHeight: '100vh',
+            transition: 'width var(--dur-normal) var(--ease-smooth), min-width var(--dur-normal) var(--ease-smooth)',
+          }}>
+            <TopBar setScreen={go} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} onLogout={onLogout} />
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <ScreenRouter screen={screen} setScreen={go} onLogout={onLogout} />
+            </div>
+          </main>
+        </div>
+      </ModalProvider></ToastProvider>
+    </UserProvider>
   );
 }
 
@@ -360,16 +365,17 @@ function ScreenRouter({ screen, setScreen, onLogout }) {
 function ProgressPopup({ onClose }) {
   const [stats, setStats]     = React.useState(null);
   const [roadmaps, setRoadmaps] = React.useState([]);
+  const user = useUser();
 
   React.useEffect(() => {
     API.getStats().then(s => { if (s) setStats(s); }).catch(() => {});
     API.getRoadmaps().then(rows => { if (Array.isArray(rows)) setRoadmaps(rows.slice(0, 3)); }).catch(() => {});
   }, []);
 
-  const level    = stats?.level     ?? USER.level ?? 1;
-  const xp       = stats?.xp        ?? USER.xp    ?? 0;
-  const xpToNext = stats?.xpToNext  ?? USER.xpToNext ?? 500;
-  const streak   = stats?.streak    ?? USER.streak ?? 0;
+  const level    = stats?.level     ?? user.level ?? 1;
+  const xp       = stats?.xp        ?? user.xp    ?? 0;
+  const xpToNext = stats?.xpToNext  ?? user.xpToNext ?? 500;
+  const streak   = stats?.streak    ?? user.streak ?? 0;
   const mastery  = stats?.mastery   ?? 0;
   const pct      = Math.min(1, xp / Math.max(xpToNext, 1));
 
@@ -438,6 +444,7 @@ function ProgressPopup({ onClose }) {
 /* ── Sidebar ──────────────────────────────────────────────────────────────── */
 function Sidebar({ screen, setScreen, collapsed, onToggle, onLogout, counts = {} }) {
   const { open: openModal, close: closeModal } = useModal();
+  const user = useUser();
   const w = collapsed ? 64 : 240;
   return (
     <aside style={{
@@ -516,12 +523,12 @@ function Sidebar({ screen, setScreen, collapsed, onToggle, onLogout, counts = {}
             <span className="cap" style={{ color: 'oklch(0.82 0.18 295)' }}>Current Plan</span>
             <span style={{ color: 'var(--muted)' }}>ⓘ</span>
           </div>
-          <div className="display" style={{ fontSize: 16, color: 'var(--ink)' }}>{USER.plan || 'Free'}</div>
+          <div className="display" style={{ fontSize: 16, color: 'var(--ink)' }}>{user.plan || 'Free'}</div>
           <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', margin: '6px 0' }}>
-            Level {USER.level} · {Math.round(((USER.xp || 0) / (USER.xpToNext || 500)) * 100)}% to Level {(USER.level || 1) + 1}
+            Level {user.level} · {Math.round(((user.xp || 0) / (user.xpToNext || 500)) * 100)}% to Level {(user.level || 1) + 1}
           </div>
           <div style={{ background: 'var(--surface-3)', height: 3, borderRadius: 999, overflow: 'hidden' }}>
-            <div style={{ width: `${Math.round(((USER.xp || 0) / (USER.xpToNext || 500)) * 100)}%`, height: '100%', background: 'var(--brand-grad)', borderRadius: 999, transition: 'width var(--dur-slow) var(--ease-out)' }} />
+            <div style={{ width: `${Math.round(((user.xp || 0) / (user.xpToNext || 500)) * 100)}%`, height: '100%', background: 'var(--brand-grad)', borderRadius: 999, transition: 'width var(--dur-slow) var(--ease-out)' }} />
           </div>
           <Btn variant="outline" size="md" full style={{ marginTop: 8 }} onClick={() => openModal(<ProgressPopup onClose={closeModal} />)}>View Progress</Btn>
         </div>
@@ -535,11 +542,11 @@ function Sidebar({ screen, setScreen, collapsed, onToggle, onLogout, counts = {}
         justifyContent: collapsed ? 'center' : 'flex-start',
         transition: 'padding var(--dur-normal) var(--ease-smooth)',
       }}>
-        <Avatar name={USER.name} size={32} hue={295} />
+        <Avatar name={user.name} size={32} hue={295} />
         {!collapsed && (
           <div style={{ flex: 1, minWidth: 0, animation: 'labelFadeIn var(--dur-normal) var(--ease-smooth) both' }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)' }}>{USER.name}</div>
-            <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{USER.email}</div>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)' }}>{user.name}</div>
+            <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>
           </div>
         )}
         {!collapsed && (
@@ -729,6 +736,7 @@ function TopBarSearch({ setScreen }) {
 
 /* ── TopBar ───────────────────────────────────────────────────────────────── */
 function TopBar({ setScreen, onToggleSidebar, collapsed, onLogout }) {
+  const user = useUser();
   const [showUserMenu, setShowUserMenu]           = React.useState(false);
   const [showNotifs, setShowNotifs]               = React.useState(false);
   const [notifs, setNotifs]                       = React.useState([]);
@@ -838,13 +846,13 @@ function TopBar({ setScreen, onToggleSidebar, collapsed, onLogout }) {
       <div ref={menuRef} style={{ position: 'relative' }}>
         <button className="topbar-user" onClick={() => setShowUserMenu(!showUserMenu)}
           style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '5px 12px 5px 5px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 999, cursor: 'pointer' }}>
-          <Avatar name={USER.name} size={28} hue={295} avatarUrl={USER.avatar_url} />
+          <Avatar name={user.name} size={28} hue={295} avatarUrl={user.avatar_url} />
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', lineHeight: 1 }}>{USER.name}</div>
-              {USER.role === 'admin' && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'var(--brand)', color: 'oklch(0.16 0.02 270)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Admin</span>}
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', lineHeight: 1 }}>{user.name}</div>
+              {user.role === 'admin' && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'var(--brand)', color: 'oklch(0.16 0.02 270)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Admin</span>}
             </div>
-            <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Level {USER.level} · {(USER.xp || 0).toLocaleString()} XP</div>
+            <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Level {user.level} · {(user.xp || 0).toLocaleString()} XP</div>
           </div>
           <span style={{ color: 'var(--muted)', flexShrink: 0, transform: showUserMenu ? 'rotate(180deg)' : 'none', transition: 'transform var(--dur-normal) var(--ease-spring)' }}>{React.cloneElement(I.chevronD, { size: 14 })}</span>
         </button>
