@@ -1,7 +1,7 @@
 import React from 'react';
 import { I } from '../components/Icons';
 import { Card, Btn, ProgressBar, Ring, MiniBars, Tag, Avatar, AgentChip, PageScroll, PageHeader, SectionHead } from '../components/UI';
-import { COURSES, AGENTS } from '../data/data';
+import { AGENTS } from '../data/data';
 import API, { timeAgo, fmtDate, dueLabel } from '../api.js';
 import { useToast, useModal } from '../App';
 

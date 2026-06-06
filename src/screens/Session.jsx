@@ -202,6 +202,11 @@ export default function Session({ setScreen }) {
             lines.push(`\n**Revisit:** ${r.weak_areas.slice(0,3).join(' · ')}`);
             lines.push('Extra spaced-review cards have been queued for these areas.');
           }
+          // B-02: If AN inserted remediation nodes, notify and flag for roadmap refetch
+          if (r.replanned && r.inserted_node_ids?.length) {
+            lines.push(`\n🔄 The Curriculum agent inserted ${r.inserted_node_ids.length} remediation node(s) into your roadmap.`);
+            try { localStorage.setItem('learnos_replanned', '1'); } catch {}
+          }
           summaryBody = `**Session Summary — ${session.title || 'Module'}**\n\n${lines.join('\n')}`;
         } else {
           const userQs = messages.filter(m => m.role === 'user' && m.kind === 'text');

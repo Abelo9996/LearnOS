@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import db from '../db/database.js';
 import { signToken, requireAuth } from '../middleware/auth.js';
-import { sendEmail } from './email.js';
+import { sendEmail, isEmailConfigured } from './email.js';
 
 const router = Router();
 
@@ -112,6 +112,9 @@ router.post('/logout', requireAuth, (req, res) => {
 
 // Forgot password — always returns 200 to avoid user enumeration
 router.post('/forgot', async (req, res) => {
+  if (process.env.NODE_ENV === 'production' && !isEmailConfigured()) {
+    return res.status(503).json({ error: true, code: 'EMAIL_NOT_CONFIGURED', message: 'Email service is not configured' });
+  }
   const { email } = req.body;
   if (!email) return res.json({ ok: true });
   const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email.toLowerCase());
@@ -167,6 +170,9 @@ router.get('/verify', (req, res) => {
 
 // Resend verification email
 router.post('/resend-verification', requireAuth, async (req, res) => {
+  if (process.env.NODE_ENV === 'production' && !isEmailConfigured()) {
+    return res.status(503).json({ error: true, code: 'EMAIL_NOT_CONFIGURED', message: 'Email service is not configured' });
+  }
   const user = db.prepare('SELECT email, email_verified FROM users WHERE id = ?').get(req.userId);
   if (!user) return res.status(404).json({ error: true, message: 'User not found' });
   if (user.email_verified) return res.json({ ok: true, alreadyVerified: true });

@@ -13,8 +13,9 @@ export default function Onboarding({ onComplete }) {
   const [hours, setHours] = React.useState(5);
   const [styles, setStyles] = React.useState([]);
   const [submitting, setSubmitting] = React.useState(false);
-  const [jobStatus, setJobStatus] = React.useState(null); // null | 'working' | { jobId }
+  const [jobStatus, setJobStatus] = React.useState(null); // null | { jobId }
   const [error, setError] = React.useState(null);
+  const [pollProgress, setPollProgress] = React.useState(0);
 
   const toggleStyle = (s) => {
     setStyles(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
@@ -22,10 +23,19 @@ export default function Onboarding({ onComplete }) {
 
   const canSubmit = goal.trim().length >= 3;
 
+  // F-02: Exponential backoff poll delays: 1s, 2s, 3s, 5s, 5s, ... up to ~5 min total
+  const pollDelay = (i) => {
+    if (i < 1) return 1000;
+    if (i < 2) return 2000;
+    if (i < 3) return 3000;
+    return 5000;
+  };
+
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
     setError(null);
+    setPollProgress(0);
     try {
       // Persist the PR profile
       await API.postIntake({
@@ -33,25 +43,30 @@ export default function Onboarding({ onComplete }) {
         answers: { level, time_per_week: hours, learning_style: styles },
       });
 
-      // Mark onboarded
-      await API.patchUserSettings({ onboarded_at: new Date().toISOString() }).catch(() => {});
-
       // Kick off roadmap generation
       const { jobId } = await API.genRoadmap(goal.trim(), { level, time_per_week: hours, learning_style: styles });
       setJobStatus({ jobId });
 
-      // Poll for completion
+      // F-02: Poll up to ~5 minutes with exponential backoff
       let result = null;
+      let elapsed = 0;
       for (let i = 0; i < 60; i++) {
-        await new Promise(r => setTimeout(r, 1000));
+        const delay = pollDelay(i);
+        await new Promise(r => setTimeout(r, delay));
+        elapsed += delay;
+        setPollProgress(Math.min(100, Math.round((elapsed / 300000) * 100)));
         const job = await API.getJob(jobId).catch(() => null);
         if (job?.status === 'done') { result = job.result; break; }
         if (job?.status === 'failed') throw new Error(job.error || 'Generation failed');
       }
       if (!result?.roadmapId) throw new Error('Generation timed out — try again from Roadmaps');
 
-      onComplete(result.roadmapId);
+      // F-02: Only mark onboarded AFTER successful generation
+      await API.patchUserSettings({ onboarded_at: new Date().toISOString() }).catch(() => {});
+
+      onComplete(result.roadmapId, { source: result.source || 'ai' });
     } catch (e) {
+      // F-02: On error, do NOT set onboarded_at — user stays on intake with retry
       setError(e.message || 'Something went wrong');
       setSubmitting(false);
     }
@@ -225,18 +240,40 @@ export default function Onboarding({ onComplete }) {
               <h2 className="display" style={{ fontSize: 20, marginBottom: 8 }}>
                 {jobStatus ? 'Curriculum agent is designing your roadmap…' : 'Setting up your profile…'}
               </h2>
-              <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
                 This usually takes 30–90 seconds. We'll take you to your roadmap when it's ready.
+              </div>
+              {/* F-02: Progress bar showing poll progress */}
+              <div style={{ maxWidth: 280, margin: '0 auto' }}>
+                <div style={{ height: 4, background: 'var(--surface-2)', borderRadius: 999, overflow: 'hidden' }}>
+                  <div style={{
+                    width: `${pollProgress}%`, height: '100%', background: 'var(--brand-grad)',
+                    borderRadius: 999, transition: 'width 1s linear',
+                  }} />
+                </div>
+                <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 4 }}>
+                  {pollProgress < 100 ? `Waiting… ${pollProgress}%` : 'Almost done…'}
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Error */}
+        {/* Error — F-02: keeps user on intake screen with Retry button */}
         {error && (
-          <div style={{ marginTop: 16, padding: '12px 16px', background: 'oklch(0.7 0.2 25 / 0.12)', border: '1px solid oklch(0.7 0.2 25 / 0.4)', borderRadius: 10, color: 'var(--bad)', fontSize: 13 }}>
-            {error}
-            <button onClick={() => { setError(null); setSubmitting(false); }} style={{ float: 'right', background: 'none', border: 0, color: 'var(--bad)', cursor: 'pointer', fontSize: 16 }}>×</button>
+          <div style={{ marginTop: 16 }}>
+            <div style={{ padding: '12px 16px', background: 'oklch(0.7 0.2 25 / 0.12)', border: '1px solid oklch(0.7 0.2 25 / 0.4)', borderRadius: 10, color: 'var(--bad)', fontSize: 13 }}>
+              {error}
+              <button onClick={() => { setError(null); setSubmitting(false); setJobStatus(null); setPollProgress(0); }} style={{ float: 'right', background: 'none', border: 0, color: 'var(--bad)', cursor: 'pointer', fontSize: 16 }}>×</button>
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
+              <Btn variant="outline" onClick={() => { setError(null); setSubmitting(false); setJobStatus(null); setPollProgress(0); setStep(3); }}>
+                ← Back to questions
+              </Btn>
+              <Btn variant="primary" icon={I.spark} onClick={handleSubmit}>
+                Retry generation →
+              </Btn>
+            </div>
           </div>
         )}
       </div>

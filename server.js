@@ -7,6 +7,8 @@ import express from 'express';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
@@ -35,20 +37,99 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const PORT = process.env.PORT || 3001;
 const distPath = join(__dirname, 'dist');
+const isProd = process.env.NODE_ENV === 'production';
+
+// ── S-01: JWT secret enforcement ──────────────────────────────────────────────
+const JWT_SECRET = process.env.JWT_SECRET;
+if (isProd && !JWT_SECRET) {
+  console.error('FATAL: LEARNOS_JWT_SECRET is required in production. Set it and re-start.');
+  process.exit(1);
+}
 
 const app = express();
+
+// ── S-06: Helmet / CSP ────────────────────────────────────────────────────────
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      connectSrc: ["'self'", "https://api.anthropic.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+      objectSrc: ["'none'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+  hsts: { maxAge: 31536000, includeSubDomains: true },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+}));
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '1mb' }));
 app.use(requestLogger);
 
+// ── S-04: CORS — restrict to APP_URL in prod, open in dev ─────────────────────
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const origin = isProd
+    ? (process.env.APP_URL || '')
+    : (process.headers?.origin || '*');
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+  }
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
+
+// ── S-02: Rate limiting ───────────────────────────────────────────────────────
+// General API rate limit: 100 req / 15 min / IP
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: true, code: 'RATE_LIMITED', message: 'Too many requests, please try again later' },
+});
+app.use('/api/', generalLimiter);
+
+// Auth rate limit: 5 req / 15 min / IP (login, register, forgot)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: true, code: 'RATE_LIMITED', message: 'Too many auth attempts, please try again in 15 minutes' },
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/forgot', authLimiter);
+
+// AI endpoints rate limit: 30 req / 1 min / user
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: true, code: 'RATE_LIMITED', message: 'AI rate limit exceeded, please slow down' },
+});
+app.use('/api/ai/', aiLimiter);
+
+// Uploads rate limit: 10 req / 1 min / user
+const uploadLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: true, code: 'RATE_LIMITED', message: 'Upload rate limit exceeded' },
+});
+app.use('/api/uploads', uploadLimiter);
 
 // ── Static assets ─────────────────────────────────────────────────────────────
 if (fs.existsSync(distPath)) {
@@ -72,7 +153,9 @@ app.use('/api', requireAuth);
 app.use('/api/uploads', uploadRoutes);
 
 // ── Daily activity stats (F-04) ───────────────────────────────────────────────
-app.get('/api/daily-stats', (req, res) => {
+// Spec contract is GET /api/stats/daily; /api/daily-stats kept as alias for
+// backward-compat with the frontend api.js method that already shipped.
+function dailyStatsHandler(req, res) {
   try {
     const uid = req.userId;
     const win = Math.min(parseInt(req.query.window) || 14, 90);
@@ -96,7 +179,9 @@ app.get('/api/daily-stats', (req, res) => {
   } catch (e) {
     res.status(500).json({ error: true, message: e.message });
   }
-});
+}
+app.get('/api/daily-stats', dailyStatsHandler);
+app.get('/api/stats/daily', dailyStatsHandler);
 
 // ── Stats/dashboard ───────────────────────────────────────────────────────────
 app.get('/api/stats', (req, res) => {

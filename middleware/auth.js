@@ -1,7 +1,18 @@
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import db from '../db/database.js';
 
-const SECRET = process.env.JWT_SECRET || 'learnos-dev-secret-change-in-prod';
+// S-01: In production, LEARNOS_JWT_SECRET must be set (server.js exits if missing).
+// In dev, we fall back to a per-boot random secret (sessions don't survive restarts).
+const SECRET = process.env.JWT_SECRET || (() => {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('FATAL: LEARNOS_JWT_SECRET is not set');
+    process.exit(1);
+  }
+  const devSecret = crypto.randomBytes(32).toString('hex');
+  console.warn('⚠️  LEARNOS_JWT_SECRET not set — using per-boot random secret (dev only). Tokens won\'t survive restarts.');
+  return devSecret;
+})();
 
 export function requireAuth(req, res, next) {
   const header = req.headers.authorization;

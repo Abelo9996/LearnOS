@@ -108,31 +108,74 @@ export async function analyzeSession({ userId, sessionId }) {
 
 // ── AN-driven roadmap re-planning (§3.6) ─────────────────────────────────────
 // After analysis, if a user has 2+ sessions on the same node with combined
-// mastery < 0.5, enqueue a CR job to insert a remedial node.
+// mastery < 0.5, insert a remedial node inline and return the inserted node IDs.
 async function checkAndReplan({ userId, sessionId, analysis }) {
   const sess = db.prepare('SELECT roadmap_node_id, roadmap_id FROM sessions WHERE id = ?').get(sessionId);
-  if (!sess?.roadmap_node_id) return;
+  if (!sess?.roadmap_node_id) return { inserted_node_ids: [] };
 
   const nodeId = sess.roadmap_node_id;
+  const roadmapId = sess.roadmap_id;
   const weakAreas = analysis?.weak_areas || [];
-  if (weakAreas.length === 0) return;
+  if (weakAreas.length === 0) return { inserted_node_ids: [] };
 
   // Check: 2+ sessions on this node with combined mastery < 0.5
   const recentSessions = db.prepare(
     "SELECT mastery_score FROM sessions WHERE user_id = ? AND roadmap_node_id = ? AND status = 'completed' ORDER BY created_at DESC LIMIT 3"
   ).all(userId, nodeId);
 
-  if (recentSessions.length < 2) return;
+  if (recentSessions.length < 2) return { inserted_node_ids: [] };
 
   const avgMastery = recentSessions.reduce((s, r) => s + (r.mastery_score || 0), 0) / recentSessions.length;
-  if (avgMastery >= 0.5) return;
+  if (avgMastery >= 0.5) return { inserted_node_ids: [] };
 
   // Rate limit: don't replan more than once per node per week
   const lastReplanned = db.prepare("SELECT last_replanned_at FROM roadmap_nodes WHERE id = ?").get(nodeId)?.last_replanned_at;
-  if (lastReplanned && new Date(lastReplanned) > new Date(Date.now() - 604800000)) return;
+  if (lastReplanned && new Date(lastReplanned) > new Date(Date.now() - 604800000)) return { inserted_node_ids: [] };
 
-  // Enqueue CR replan job
-  enqueueJob(userId, 'replan-node', { nodeId, roadmapId: sess.roadmap_id, weakAreas });
+  // Build remedial spec (try LLM, fall back to heuristic)
+  const node = db.prepare('SELECT id, title, col FROM roadmap_nodes WHERE id = ?').get(nodeId);
+  if (!node) return { inserted_node_ids: [] };
+
+  let remedialSpec = null;
+  try {
+    const out = await complete({
+      userId, agentCode: 'CR', maxTokens: 1024,
+      system: `You are the Curriculum agent for LearnOS. A learner is struggling with a module.
+Design a single remedial ("foundation") node that breaks down the weak objectives into simpler parts.
+Return JSON: {"title": "...", "objectives": ["...", "..."]}`,
+      messages: `Failing module: ${node.title}\nWeak objectives:\n${weakAreas.map(w => '- ' + w).join('\n')}\n\nReturn JSON: {"title": "...", "objectives": ["..."]}`,
+    });
+    if (out.json && out.json.title) remedialSpec = out.json;
+  } catch {}
+
+  if (!remedialSpec) {
+    remedialSpec = {
+      title: `Foundations: ${node.title}`,
+      objectives: weakAreas.slice(0, 3).map(w => `Review and practice: ${w}`),
+    };
+  }
+
+  // Insert the remedial node inline
+  const remedialId = `rn-remedial-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const tx = db.transaction(() => {
+    db.prepare('UPDATE roadmap_nodes SET col = col + 1 WHERE roadmap_id = ? AND col >= ?').run(roadmapId, node.col);
+    db.prepare("INSERT INTO roadmap_nodes (id, roadmap_id, title, col, row_idx, mastery, status, source) VALUES (?, ?, ?, ?, 0, 0, 'next', 'replan')")
+      .run(remedialId, roadmapId, remedialSpec.title, node.col);
+    (remedialSpec.objectives || []).forEach((o, i) => {
+      db.prepare('INSERT INTO node_objectives (id, node_id, roadmap_id, text, order_idx) VALUES (?, ?, ?, ?, ?)')
+        .run(`obj-${remedialId}-${i}`, remedialId, roadmapId, o, i);
+    });
+    db.prepare('INSERT OR IGNORE INTO roadmap_edges (roadmap_id, from_node, to_node) VALUES (?, ?, ?)').run(roadmapId, remedialId, nodeId);
+    const prereqs = db.prepare('SELECT from_node FROM roadmap_edges WHERE roadmap_id = ? AND to_node = ?').all(roadmapId, nodeId);
+    for (const p of prereqs) {
+      db.prepare('INSERT OR IGNORE INTO roadmap_edges (roadmap_id, from_node, to_node) VALUES (?, ?, ?)').run(roadmapId, p.from_node, remedialId);
+    }
+    db.prepare("UPDATE roadmap_nodes SET status = 'locked' WHERE id = ? AND roadmap_id = ?").run(nodeId, roadmapId);
+    db.prepare("UPDATE roadmap_nodes SET last_replanned_at = datetime('now') WHERE id = ?").run(nodeId);
+  });
+  tx();
+
+  return { inserted_node_ids: [remedialId] };
 }
 
 // Wrap the analyzeSession to include re-planning check
@@ -140,7 +183,13 @@ const originalAnalyzeSession = analyzeSession;
 async function analyzeSessionWithReplan({ userId, sessionId }) {
   const result = await originalAnalyzeSession({ userId, sessionId });
   if (result.ok) {
-    try { await checkAndReplan({ userId, sessionId, analysis: result }); } catch (e) { console.log('Replan check error:', e.message); }
+    try {
+      const replanResult = await checkAndReplan({ userId, sessionId, analysis: result });
+      if (replanResult && replanResult.inserted_node_ids.length > 0) {
+        result.replanned = true;
+        result.inserted_node_ids = replanResult.inserted_node_ids;
+      }
+    } catch (e) { console.log('Replan check error:', e.message); }
   }
   return result;
 }

@@ -95,6 +95,24 @@ export async function complete(opts = {}) {
     throw err;
   }
 
+  // S-03: Enforce managed-key usage caps for non-BYOK users
+  if (creds.managed && userId) {
+    const capTokens = parseInt(process.env.MANAGED_MONTHLY_TOKEN_CAP || '0') || Infinity;
+    const capCost = parseFloat(process.env.MANAGED_MONTHLY_COST_CAP || '0') || Infinity;
+    if (capTokens < Infinity || capCost < Infinity) {
+      const period = new Date().toISOString().slice(0, 7); // YYYY-MM
+      const usage = db.prepare('SELECT tokens, cost_usd FROM usage_counters WHERE user_id = ? AND period = ?').get(userId, period);
+      const usedTokens = usage?.tokens || 0;
+      const usedCost = usage?.cost_usd || 0;
+      if (usedTokens >= capTokens || usedCost >= capCost) {
+        const err = new Error('Monthly managed-key usage cap exceeded. Add your own Anthropic key in Settings → API Keys to continue.');
+        err.code = 'USAGE_CAP_EXCEEDED';
+        err.status = 402;
+        throw err;
+      }
+    }
+  }
+
   const client = new Anthropic({ apiKey: creds.apiKey });
 
   const req = {

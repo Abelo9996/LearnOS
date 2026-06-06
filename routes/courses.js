@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import db, { logActivity, awardXP } from '../db/database.js';
 import { requireAuth } from '../middleware/auth.js';
+import { isPublicUrl } from '../middleware/url-safety.js';
 
 const router = Router();
 
@@ -61,6 +62,10 @@ router.patch('/:slug/enroll', requireAuth, (req, res) => {
 router.post('/', requireAuth, (req, res) => {
   const { slug, title, blurb, author, hours, tags, syllabus, rating, stars, forks, thumbnail_url } = req.body;
   if (!slug || !title) return res.status(400).json({ error: true, message: 'slug and title required' });
+  // S-07: SSRF guard on user-supplied thumbnail URL.
+  if (thumbnail_url && !isPublicUrl(thumbnail_url)) {
+    return res.status(400).json({ error: true, code: 'UNSAFE_URL', message: 'thumbnail_url must be a public http(s) URL' });
+  }
   const id = 'cr-' + Date.now();
   db.prepare('INSERT OR REPLACE INTO courses (slug, title, blurb, author, verified, rating, stars, forks, hours, version, tags, thumbnail_url) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)')
     .run(slug, title, blurb || '', author || '', rating || 0, stars || 0, forks || 0, hours || 0, 'v1.0', tags || '[]', thumbnail_url || null);
