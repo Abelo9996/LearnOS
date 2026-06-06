@@ -71,10 +71,37 @@ app.use('/api', requireAuth);
 // ── Uploads (§3.3) ────────────────────────────────────────────────────────────
 app.use('/api/uploads', uploadRoutes);
 
+// ── Daily activity stats (F-04) ───────────────────────────────────────────────
+app.get('/api/stats/daily', (req, res) => {
+  try {
+    const uid = req.userId;
+    const win = Math.min(parseInt(req.query.window) || 14, 90);
+    const rows = db.prepare(
+      "SELECT date(created_at) as date, COALESCE(SUM(xp), 0) as xp," +
+      " COUNT(CASE WHEN kind = 'session' THEN 1 END) as sessions," +
+      " COUNT(CASE WHEN kind = 'assignment_graded' THEN 1 END) as assignments_graded" +
+      " FROM activity_log" +
+      " WHERE user_id = ? AND created_at >= date('now', ?)" +
+      " GROUP BY date(created_at)" +
+      " ORDER BY date(created_at)"
+    ).all(uid, '-' + win + ' days');
+    const map = new Map(rows.map(r => [r.date, r]));
+    const result = [];
+    for (let i = win - 1; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000).toISOString().split('T')[0];
+      const r = map.get(d) || { date: d, xp: 0, sessions: 0, assignments_graded: 0 };
+      result.push(r);
+    }
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: true, message: e.message });
+  }
+});
+
 // ── Stats/dashboard ───────────────────────────────────────────────────────────
 app.get('/api/stats', (req, res) => {
   const uid = req.userId;
-  updateStreak(uid); // Track daily streak
+  updateStreak(uid);
   const user              = db.prepare('SELECT level, xp, xp_to_next, streak, best_streak FROM users WHERE id = ?').get(uid);
   const totalSessions     = db.prepare('SELECT COUNT(*) as c FROM sessions WHERE user_id = ?').get(uid).c;
   const completedSessions = db.prepare("SELECT COUNT(*) as c FROM sessions WHERE user_id = ? AND status = 'completed'").get(uid).c;
@@ -95,6 +122,14 @@ app.get('/api/stats', (req, res) => {
   });
 });
 
+// ── Most-recent active session (F-01) ─────────────────────────────────────────
+app.get('/api/sessions/active', (req, res) => {
+  const uid = req.userId;
+  const row = db.prepare("SELECT * FROM sessions WHERE user_id = ? AND status = 'active' ORDER BY updated_at DESC LIMIT 1").get(uid);
+  if (!row) return res.status(404).json({ error: true, code: 'NO_ACTIVE_SESSION', message: 'No active session found' });
+  res.json(row);
+});
+
 // ── Protected API routes ──────────────────────────────────────────────────────
 app.use('/api/users/starred', starredRoutes);
 app.use('/api/users',         userRoutes);
@@ -105,10 +140,10 @@ app.use('/api/assignments',   assignmentRoutes);
 app.use('/api/flashcards',    flashcardRoutes);
 app.use('/api/schedule',      scheduleRoutes);
 app.use('/api/activity',      activityRoutes);
-app.use('/api/courses', courseRoutes); // course browse + module/lesson CRUD (auth-protected)
+app.use('/api/courses', courseRoutes);
 app.use('/api/certificates',  certificateRoutes);
 app.use('/api/badges',        badgeRoutes);
-		app.use('/api/community',     communityRoutes);
+app.use('/api/community',     communityRoutes);
 app.use('/api/ai',            aiRoutes);
 app.use('/api/jobs',          jobRoutes);
 app.use('/api/profile',       profileRoutes);
@@ -130,7 +165,7 @@ app.use(notFound);
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 app.listen(PORT, '0.0.0.0', () => {
-  resumeJobs(); // re-pick any async jobs left from a previous process
-  console.log(`\n  ✅ LearnOS running at http://localhost:${PORT}`);
-  console.log(`  Dev login: alex@learnos.dev / learnos123\n`);
+  resumeJobs();
+  console.log('\n  ✅ LearnOS running at http://localhost:' + PORT);
+  console.log('  Dev login: alex@learnos.dev / learnos123\n');
 });

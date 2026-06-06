@@ -1,12 +1,14 @@
 import React from 'react';
 import { I } from '../components/Icons';
 import { Card, StatCard, Btn, ProgressBar, Ring, MiniBars, Tag, Avatar, AgentChip, PageScroll, SectionHead } from '../components/UI';
-import { USER, AGENTS, STREAK_BARS } from '../data/data';
+import { AGENTS } from '../data/data';
 import API, { timeAgo } from '../api.js';
 import { useToast } from '../App';
+import { useUser } from '../UserContext.jsx';
 
 export default function Dashboard({ onOpenSession, onOpenRoadmap, onOpenCourses, onOpenCards, setScreen }) {
   const { add: toast } = useToast();
+  const user = useUser();
   const [roadmaps, setRoadmaps]   = React.useState([]);
   const [sessions, setSessions]   = React.useState([]);
   const [activity, setActivity]   = React.useState([]);
@@ -58,8 +60,8 @@ export default function Dashboard({ onOpenSession, onOpenRoadmap, onOpenCourses,
     API.getStats().then(s => { if (s) setStats(s); }).catch(() => {});
   }, []);
 
-  const streak    = stats?.streak     ?? USER.streak;
-  const bestStreak = stats?.bestStreak ?? USER.bestStreak;
+  const streak    = stats?.streak     ?? user.streak;
+  const bestStreak = stats?.bestStreak ?? user.bestStreak;
   const mastery   = stats?.mastery    ?? 0;
   const pending   = stats?.pendingAssignments ?? 0;
   const totalSessions = stats?.totalSessions ?? 0;
@@ -70,7 +72,7 @@ export default function Dashboard({ onOpenSession, onOpenRoadmap, onOpenCourses,
     <PageScroll>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, marginBottom: 24 }}>
         <div>
-          <div className="display" style={{ fontSize: 32, lineHeight: 1.05, color: 'var(--ink)' }}>Welcome back, {USER.name.split(' ')[0]} 👋</div>
+          <div className="display" style={{ fontSize: 32, lineHeight: 1.05, color: 'var(--ink)' }}>Welcome back, {user.name.split(' ')[0]} 👋</div>
           <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 8 }}>Let's continue your learning journey. You're doing great!</div>
         </div>
         <StreakCard streak={streak} />
