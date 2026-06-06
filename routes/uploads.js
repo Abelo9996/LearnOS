@@ -8,6 +8,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { fileTypeFromBuffer } from 'file-type';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,12 +48,35 @@ const upload = multer({
 });
 
 router.post('/', (req, res) => {
-  upload.single('file')(req, res, (err) => {
+  upload.single('file')(req, res, async (err) => {
     if (err) {
       const msg = err.message || 'Upload failed';
       return res.status(400).json({ error: true, message: msg });
     }
     if (!req.file) return res.status(400).json({ error: true, message: 'No file provided' });
+
+    // S-08: Magic-byte sniff — the multer mime is client-asserted. Read the
+    // first bytes and verify the real format matches the allowlist. If
+    // mismatched (e.g. a JS file renamed to .png), delete and 400.
+    try {
+      const fd = fs.openSync(req.file.path, 'r');
+      const buf = Buffer.alloc(4100);
+      const n = fs.readSync(fd, buf, 0, 4100, 0);
+      fs.closeSync(fd);
+      const sniff = await fileTypeFromBuffer(buf.slice(0, n));
+      if (!sniff || !ALLOWED_MIMES.includes(sniff.mime)) {
+        fs.unlinkSync(req.file.path);
+        return res.status(400).json({
+          error: true,
+          code: 'INVALID_FILE_CONTENT',
+          message: `File content does not match an allowed image format (detected: ${sniff?.mime || 'unknown'})`,
+        });
+      }
+    } catch (e) {
+      try { fs.unlinkSync(req.file.path); } catch {}
+      return res.status(400).json({ error: true, message: 'Could not verify file contents' });
+    }
+
     const url = `/uploads/${req.file.filename}`;
     res.json({ url, kind: 'image' });
   });

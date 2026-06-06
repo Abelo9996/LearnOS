@@ -1,7 +1,7 @@
 import React from 'react';
 import { I } from '../components/Icons';
 import { Card, Btn, Tag, Avatar, AgentChip } from '../components/UI';
-import { AGENTS, LEARNING_PROGRESS } from '../data/data';
+import { AGENTS, LEARNING_PROGRESS as MARKETING_CHART_DATA } from '../data/data';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Shared landing primitives
@@ -301,7 +301,7 @@ function DashboardPreview() {
 }
 
 function AreaChart() {
-  const data = LEARNING_PROGRESS.map((d) => d.v);
+  const data = MARKETING_CHART_DATA.map((d) => d.v);
   const w = 380, h = 96, max = Math.max(...data) * 1.15;
   const pts = data.map((v, i) => [(i / (data.length - 1)) * w, h - (v / max) * h]);
   const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
@@ -819,7 +819,7 @@ function LandingNav({ onEnterApp }) {
             border: '1px solid var(--border)', background: 'oklch(0.13 0.02 270 / 0.6)',
             transition: 'all var(--dur-fast)',
           }}>
-            {React.cloneElement(I.github, { size: 15 })} <span style={{ fontWeight: 600, color: 'var(--ink)' }}>28.4k</span>
+            {React.cloneElement(I.github, { size: 15 })} <span style={{ fontWeight: 600, color: 'var(--ink)' }}>Open Source</span>
           </a>
           <PillBtn variant="primary" size="md" iconRight={React.cloneElement(I.arrowR, { size: 16 })} onClick={onEnterApp}>Start Learning</PillBtn>
         </div>

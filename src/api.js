@@ -24,6 +24,7 @@ const API = {
     if (!res.ok) {
       const err = new Error(data?.message || `Server error (${res.status})`);
       err.status = res.status;
+      err.code = data?.code || null;
       throw err;
     }
     return data;
@@ -53,7 +54,7 @@ const API = {
 
   // ── Stats / Dashboard ──────────────────────────────────────────────────────
   getStats:       () => API.get('/stats'),
-	  getDailyStats:  (window) => API.get('/daily-stats' + (window ? `?window=${window}` : '')),
+  getDailyStats:  (window) => API.get('/daily-stats' + (window ? `?window=${window}` : '')),
 
   // ── Roadmaps ──────────────────────────────────────────────────────────────
   getRoadmaps:  () => API.get('/roadmaps'),

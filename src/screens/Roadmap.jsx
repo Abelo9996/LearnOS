@@ -14,6 +14,8 @@ export default function Roadmap({ onOpenSession }) {
   const [view, setView]                 = React.useState('graph');
   const [selected, setSelected]         = React.useState(null);
   const [generating, setGenerating]    = React.useState(false);
+  // B-02: Track node IDs that were just inserted by AN for highlighting
+  const [highlightedIds, setHighlightedIds] = React.useState([]);
 
   const loadAllRoadmaps = React.useCallback(async () => {
     try {
@@ -30,10 +32,32 @@ export default function Roadmap({ onOpenSession }) {
       setRoadmap(full);
       const active = full.nodes?.find(n => n.status === 'active') || full.nodes?.find(n => n.status === 'next') || full.nodes?.[0];
       setSelected(active ? active.id : null);
+      // B-02: Check for replanned nodes (source === 'replan') and highlight them
+      const replanned = (full.nodes || []).filter(n => n.source === 'replan').map(n => n.id);
+      if (replanned.length > 0) {
+        setHighlightedIds(replanned);
+        setSelected(replanned[0]);
+        toast(`Curriculum agent inserted ${replanned.length} remediation node(s) based on your recent sessions.`, 'info');
+        setTimeout(() => setHighlightedIds([]), 10000);
+      }
     } catch { toast('Could not load roadmap', 'error'); } finally {
       setLoading(false);
     }
   }, [toast]);
+
+  // B-02: Refetch roadmap when returning from a session that triggered replan
+  React.useEffect(() => {
+    const checkReplan = () => {
+      const flag = localStorage.getItem('learnos_replanned');
+      if (flag) {
+        localStorage.removeItem('learnos_replanned');
+        if (roadmap?.id) loadRoadmap(roadmap.id);
+      }
+    };
+    checkReplan();
+    window.addEventListener('focus', checkReplan);
+    return () => window.removeEventListener('focus', checkReplan);
+  }, [roadmap?.id, loadRoadmap]);
 
   React.useEffect(() => {
     (async () => {
@@ -48,7 +72,6 @@ export default function Roadmap({ onOpenSession }) {
     closeModal();
     setGenerating(true);
     try {
-      // Build the learner profile (PR), then kick off async roadmap generation (CR).
       await API.postIntake({ goal, answers: { level, time_per_week: Number(hours) || 5 } }).catch(() => {});
       const { jobId } = await API.genRoadmap(goal);
       let result = null;
@@ -73,6 +96,23 @@ export default function Roadmap({ onOpenSession }) {
     }
   };
 
+  // F-09: Delete node handler
+  const handleDeleteNode = React.useCallback(async (nodeId) => {
+    if (!roadmap?.id) return;
+    try {
+      await API.deleteRoadmapNode(roadmap.id, nodeId);
+      toast('Node deleted', 'info');
+      loadRoadmap(roadmap.id);
+    } catch { toast('Could not delete node', 'error'); }
+  }, [roadmap?.id, loadRoadmap, toast]);
+
+  // Listen for delete events from ModuleDetail
+  React.useEffect(() => {
+    const handler = (e) => handleDeleteNode(e.detail.nodeId);
+    window.addEventListener('roadmap-delete-node', handler);
+    return () => window.removeEventListener('roadmap-delete-node', handler);
+  }, [handleDeleteNode]);
+
   if (!roadmap && !loading) return (<PageScroll><div style={{padding:48,textAlign:'center',color:'var(--muted)'}}>No roadmaps yet. Generate one to get started!</div></PageScroll>);
   if (!roadmap) return null;
   const r = roadmap;
@@ -86,9 +126,6 @@ export default function Roadmap({ onOpenSession }) {
 
   const sel = nodes.find(n => n.id === selected) || nodes.find(n => n.status === 'active') || nodes[0];
 
-  // Open (or create) the session for a specific module node, then hand off to
-  // the Session screen via a localStorage handoff so it loads THIS session —
-  // not whatever happens to be most recent.
   const openNodeSession = async (node) => {
     const n = node || sel;
     if (!n) return;
@@ -97,7 +134,6 @@ export default function Roadmap({ onOpenSession }) {
       return;
     }
     try {
-      // Reuse an existing session for this node if one exists; otherwise create one.
       const sessions = await API.getSessions().catch(() => []);
       let target = (sessions || []).find(s => s.roadmap_node_id === n.id);
       if (!target) {
@@ -111,7 +147,6 @@ export default function Roadmap({ onOpenSession }) {
           level: 'Intermediate',
         });
         target = res.session || res;
-        // Seed a topic-specific greeting so the session opens with real context.
         const objs = n.objectives?.length
           ? `\n\nIn this module we'll work through:\n${n.objectives.map(o => `- ${o}`).join('\n')}`
           : '';
@@ -121,7 +156,6 @@ export default function Roadmap({ onOpenSession }) {
         };
         await API.postMessage(target.id, greeting).catch(() => {});
       }
-      // Hand the specific session id to the Session screen.
       localStorage.setItem('learnos_active_session', target.id);
       toast(n.status === 'done' ? `Reviewing "${n.title}"` : `Opening "${n.title}"`, 'success');
       onOpenSession();
@@ -141,7 +175,6 @@ export default function Roadmap({ onOpenSession }) {
 
   return (
     <PageScroll>
-      {/* Roadmap switcher — every roadmap the learner owns, click to switch */}
       {allRoadmaps.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <div className="cap" style={{ marginBottom: 8 }}>Your roadmaps · {allRoadmaps.length}</div>
@@ -203,8 +236,8 @@ export default function Roadmap({ onOpenSession }) {
           </div>
         ) : (
           <>
-            {view === 'graph'  && <RoadmapGraph  nodes={nodes} edges={r.edges || []} selected={selected} setSelected={setSelected} />}
-            {view === 'list'   && <ModuleList    nodes={nodes} selected={selected}   setSelected={setSelected} onResume={openNodeSession} toast={toast} />}
+            {view === 'graph'  && <RoadmapGraph  nodes={nodes} edges={r.edges || []} selected={selected} setSelected={setSelected} highlightedIds={highlightedIds} />}
+            {view === 'list'   && <ModuleList    nodes={nodes} selected={selected}   setSelected={setSelected} onResume={openNodeSession} toast={toast} highlightedIds={highlightedIds} />}
             {view === 'kanban' && <Kanban        nodes={nodes} toast={toast} />}
           </>
         )}
@@ -282,7 +315,7 @@ function ViewToggle({ view, setView }) {
   );
 }
 
-function RoadmapGraph({ nodes, edges, selected, setSelected }) {
+function RoadmapGraph({ nodes, edges, selected, setSelected, highlightedIds = [] }) {
   const W = 1080, H = 380, padX = 90, padY = 80;
   const colW = (W - padX * 2) / 5;
   const rowH = (H - padY * 2);
@@ -324,12 +357,16 @@ function RoadmapGraph({ nodes, edges, selected, setSelected }) {
           const isDone   = n.status === 'done';
           const isActive = n.status === 'active';
           const isLocked = n.status === 'locked';
+          const isHighlighted = highlightedIds.includes(n.id);
           const fill   = isDone ? 'var(--good)' : isActive ? 'oklch(0.74 0.21 295)' : n.status === 'next' ? 'var(--surface-2)' : 'var(--surface)';
           const stroke = isDone ? 'var(--good)' : isActive ? 'oklch(0.78 0.16 195)' : n.status === 'next' ? 'var(--brand)' : 'var(--border)';
           return (
             <g key={n.id} onClick={() => setSelected(n.id)} style={{ cursor: 'pointer' }}>
               {on       && <circle cx={p.x} cy={p.y} r={42} fill="var(--accent-soft)" />}
               {isActive && <circle cx={p.x} cy={p.y} r={36} fill="none" stroke="oklch(0.78 0.16 195 / 0.4)" strokeWidth="1" />}
+              {isHighlighted && <circle cx={p.x} cy={p.y} r={48} fill="none" stroke="oklch(0.78 0.16 85)" strokeWidth="2" strokeDasharray="4 3">
+                <animateTransform attributeName="transform" type="rotate" from={`0 ${p.x} ${p.y}`} to={`360 ${p.x} ${p.y}`} dur="8s" repeatCount="3" />
+              </circle>}
               <circle cx={p.x} cy={p.y} r={26} fill={fill} stroke={stroke} strokeWidth={isActive ? 2 : 1.2} />
               {isDone   && <path d={`M ${p.x - 7} ${p.y} L ${p.x - 2} ${p.y + 5} L ${p.x + 8} ${p.y - 6}`} stroke="oklch(0.16 0.02 270)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />}
               {isActive && <text x={p.x} y={p.y + 4} textAnchor="middle" fontFamily="var(--font-display)" fontSize="13" fontWeight="700" fill="oklch(0.16 0.02 270)">{Math.round((n.mastery || 0) * 100)}</text>}
@@ -343,7 +380,7 @@ function RoadmapGraph({ nodes, edges, selected, setSelected }) {
   );
 }
 
-function ModuleList({ nodes, selected, setSelected, onResume, toast }) {
+function ModuleList({ nodes, selected, setSelected, onResume, toast, highlightedIds = [] }) {
   return (
     <div>
       <div className="cap" style={{ display: 'grid', gridTemplateColumns: '40px 1fr 110px 200px 100px', gap: 12, padding: '10px 22px', borderBottom: '1px solid var(--border)' }}>
@@ -351,10 +388,14 @@ function ModuleList({ nodes, selected, setSelected, onResume, toast }) {
       </div>
       {nodes.map((n, i) => {
         const on = n.id === selected;
+        const isHighlighted = highlightedIds.includes(n.id);
         return (
-          <div key={n.id} onClick={() => setSelected(n.id)} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 110px 200px 100px', gap: 12, padding: '12px 22px', alignItems: 'center', borderTop: '1px solid var(--border)', background: on ? 'var(--accent-soft)' : 'transparent', cursor: 'pointer', transition: 'background var(--dur-fast)' }}>
+          <div key={n.id} onClick={() => setSelected(n.id)} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 110px 200px 100px', gap: 12, padding: '12px 22px', alignItems: 'center', borderTop: '1px solid var(--border)', background: on ? 'var(--accent-soft)' : isHighlighted ? 'oklch(0.78 0.16 85 / 0.08)' : 'transparent', cursor: 'pointer', transition: 'background var(--dur-fast)' }}>
             <div className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{String(i+1).padStart(2,'0')}</div>
-            <div style={{ fontSize: 13, color: 'var(--ink)', fontWeight: on ? 600 : 500 }}>{n.title}</div>
+            <div style={{ fontSize: 13, color: 'var(--ink)', fontWeight: on ? 600 : 500 }}>
+              {n.title}
+              {isHighlighted && <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: 'oklch(0.78 0.16 85 / 0.2)', color: 'oklch(0.78 0.16 85)', border: '1px solid oklch(0.78 0.16 85 / 0.4)' }}>Suggested by AN</span>}
+            </div>
             <div>
               {n.status === 'done'   && <Tag tone="good">DONE</Tag>}
               {n.status === 'active' && <Tag tone="accent">ACTIVE</Tag>}
@@ -416,13 +457,11 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast }) {
   const isLocked = node.status === 'locked';
   const isDone   = node.status === 'done';
   const isNext   = node.status === 'next';
-  // Prerequisites = nodes that have an edge pointing INTO this node.
   const prereqs = (edges || [])
     .filter(e => (Array.isArray(e) ? e[1] : e.to_node) === node.id)
     .map(e => nodes.find(n => n.id === (Array.isArray(e) ? e[0] : e.from_node)))
     .filter(Boolean);
 
-  // Live resources from RE agent (#9 / G2) and lesson body (P10).
   const [resources, setResources] = React.useState([]);
   const [proposing, setProposing] = React.useState(false);
   const [lesson, setLesson] = React.useState(null);
@@ -438,7 +477,6 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast }) {
     try {
       const { jobId } = await API.proposeNodeResources(node.id);
       toast && toast('Research agent is proposing resources… (this can take ~20s)', 'info');
-      // Poll the job
       let done = false;
       for (let i = 0; i < 30 && !done; i++) {
         await new Promise(r => setTimeout(r, 1500));
@@ -479,6 +517,15 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast }) {
           {(isActive || isNext) && <Btn variant="primary" size="md" icon={I.play} onClick={onOpenSession}>{isActive ? 'Resume session' : 'Start session'}</Btn>}
           {isDone && <Btn variant="outline" size="md" onClick={onOpenSession}>Review</Btn>}
           {isLocked && <Btn variant="ghost" size="md" onClick={() => toast('Complete prerequisites to unlock this module', 'info')}>Locked</Btn>}
+          {/* F-09: Delete node button (not for done/active nodes to prevent accidental data loss) */}
+          {!isActive && !isDone && (
+            <Btn variant="ghost" size="md" icon={I.trash || I.x} onClick={() => {
+              if (confirm(`Delete "${node.title}" from this roadmap? This cannot be undone.`)) {
+                // Need access to onDelete — handled via parent
+                window.dispatchEvent(new CustomEvent('roadmap-delete-node', { detail: { nodeId: node.id } }));
+              }
+            }} style={{ color: 'var(--bad)' }}>Delete</Btn>
+          )}
         </div>
       </div>
       {lesson && (
@@ -550,7 +597,7 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast }) {
                   <a key={r.id} href={r.url} target="_blank" rel="noopener noreferrer"
                      style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, textDecoration: 'none', color: 'var(--ink)', transition: 'all 0.15s' }}
                      onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--brand)'}
-                     onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                     onMouseLeave={e => e.currentTarget.style.borderColor = 'var('}>
                     <span className="mono" style={{ fontSize: 9.5, padding: '2px 6px', borderRadius: 4, background: r.kind === 'paper' ? 'oklch(0.74 0.18 295 / 0.18)' : r.kind === 'video' ? 'oklch(0.74 0.18 25 / 0.18)' : r.kind === 'docs' ? 'oklch(0.74 0.18 200 / 0.18)' : 'oklch(0.74 0.18 155 / 0.18)', color: r.kind === 'paper' ? 'oklch(0.74 0.18 295)' : r.kind === 'video' ? 'oklch(0.74 0.18 25)' : r.kind === 'docs' ? 'oklch(0.74 0.18 200)' : 'oklch(0.74 0.18 155)', textTransform: 'uppercase', fontWeight: 600, flexShrink: 0, marginTop: 1 }}>
                       {r.kind}
                     </span>
@@ -570,5 +617,58 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast }) {
         </div>
       </div>
     </Card>
+  );
+}
+
+// F-09: Add node modal
+function AddNodeModal({ roadmapId, nodes, onAdded, onCancel }) {
+  const [title, setTitle] = React.useState('');
+  const [objective, setObjective] = React.useState('');
+  const [objectives, setObjectives] = React.useState([]);
+  const [submitting, setSubmitting] = React.useState(false);
+  const inp = { width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13 };
+  const addObj = () => { if (objective.trim()) { setObjectives(o => [...o, objective.trim()]); setObjective(''); } };
+  const removeObj = (i) => setObjectives(o => o.filter((_, idx) => idx !== i));
+  const submit = async () => {
+    if (!title.trim()) return;
+    setSubmitting(true);
+    try {
+      await API.createRoadmapNode(roadmapId, { title: title.trim(), objectives });
+      onAdded();
+    } catch { /* parent shows toast */ }
+    finally { setSubmitting(false); }
+  };
+  return (
+    <div style={{ minWidth: 440 }}>
+      <h3 className="display" style={{ fontSize: 22, marginBottom: 6 }}>Add module</h3>
+      <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>Add a new module to this roadmap. It will be placed at the end of the path.</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div>
+          <label className="cap" style={{ display: 'block', marginBottom: 4 }}>Module title</label>
+          <input autoFocus value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Attention mechanisms" style={inp} onKeyDown={e => { if (e.key === 'Enter') submit(); }} />
+        </div>
+        <div>
+          <label className="cap" style={{ display: 'block', marginBottom: 4 }}>Learning objectives (optional)</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input value={objective} onChange={e => setObjective(e.target.value)} placeholder="e.g. Understand self-attention" style={{ ...inp, flex: 1 }} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addObj(); } }} />
+            <Btn variant="outline" size="sm" onClick={addObj}>Add</Btn>
+          </div>
+          {objectives.length > 0 && (
+            <ul style={{ marginTop: 8, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {objectives.map((o, i) => (
+                <li key={i} style={{ fontSize: 12.5, color: 'var(--ink-2)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {o}
+                  <button onClick={() => removeObj(i)} style={{ background: 'none', border: 0, color: 'var(--muted)', cursor: 'pointer', padding: 0, fontSize: 14 }}>×</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+          <Btn variant="outline" onClick={onCancel}>Cancel</Btn>
+          <Btn variant="primary" disabled={!title.trim() || submitting} onClick={submit}>{submitting ? 'Adding…' : 'Add module'}</Btn>
+        </div>
+      </div>
+    </div>
   );
 }

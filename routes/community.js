@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import db, { logActivity } from '../db/database.js';
+import { isPublicUrl } from '../middleware/url-safety.js';
 
 const router = Router();
 
@@ -49,8 +50,14 @@ router.get('/threads/:id', (req, res) => {
 router.post('/threads', (req, res) => {
   const { title, body, tag, image_url, ref_type, ref_id, ref_label } = req.body;
   if (!title) return res.status(400).json({ error: true, message: 'title required' });
-  // Only allow image URLs (basic guard against arbitrary/script URLs).
-  const safeImage = (typeof image_url === 'string' && /^https?:\/\//i.test(image_url)) ? image_url : null;
+  // S-07: SSRF guard — image URL must be a public http(s) URL.
+  let safeImage = null;
+  if (image_url) {
+    if (!isPublicUrl(image_url)) {
+      return res.status(400).json({ error: true, code: 'UNSAFE_URL', message: 'image_url must be a public http(s) URL' });
+    }
+    safeImage = image_url;
+  }
   const safeRefType = ['course', 'roadmap'].includes(ref_type) ? ref_type : null;
   const id = `t-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
   db.prepare('INSERT INTO community_threads (id, user_id, title, body, tag, image_url, ref_type, ref_id, ref_label) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')

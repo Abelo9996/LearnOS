@@ -48,9 +48,9 @@ const ToastContext = React.createContext(null);
 
 function ToastProvider({ children }) {
   const [toasts, setToasts] = React.useState([]);
-  const add = (msg, type = 'info') => {
+  const add = (msg, type = 'info', action = null) => {
     const id = Date.now() + Math.random();
-    setToasts((t) => [...t, { id, msg, type }]);
+    setToasts((t) => [...t, { id, msg, type, action }]);
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3500);
   };
   const remove = (id) => setToasts((t) => t.filter((x) => x.id !== id));
@@ -70,6 +70,18 @@ function ToastProvider({ children }) {
           }}>
             <span>{t.type === 'success' ? '✓' : t.type === 'error' ? '✕' : 'ℹ'}</span>
             <span style={{ flex: 1 }}>{t.msg}</span>
+            {t.action && (
+              <button
+                onClick={() => { t.action.onClick(); remove(t.id); }}
+                style={{
+                  padding: '4px 10px', fontSize: 11.5, fontWeight: 600,
+                  background: 'var(--brand)', color: 'oklch(0.16 0.02 270)',
+                  border: 0, borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
+              >
+                {t.action.label}
+              </button>
+            )}
             <button onClick={() => remove(t.id)} style={{ background: 'none', border: 0, color: 'var(--muted)', cursor: 'pointer', padding: 0 }}>✕</button>
           </div>
         ))}
@@ -223,6 +235,10 @@ function AppLoader() {
 export default AppRoot;
 
 // ── Main authenticated app ────────────────────────────────────────────────────
+// Outer `App` only mounts providers. The shell that *consumes* the contexts
+// must live below the providers in the tree (you cannot read a context in the
+// same component that renders its Provider — useContext returns the default
+// null and destructuring `{ add }` throws).
 function App({ onLogout }) {
   const [me, setMe] = React.useState(null);
 
@@ -242,6 +258,19 @@ function App({ onLogout }) {
       });
     }).catch(() => {});
   }, []);
+
+  if (!me) return <AppLoader />;
+
+  return (
+    <UserProvider user={me}>
+      <ToastProvider><ModalProvider>
+        <AppShell onLogout={onLogout} />
+      </ModalProvider></ToastProvider>
+    </UserProvider>
+  );
+}
+
+function AppShell({ onLogout }) {
   const [screen, setScreen]               = React.useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const [density, setDensity]             = React.useState('regular');
@@ -288,7 +317,8 @@ function App({ onLogout }) {
           const dest = screenMap[ev.event_type] || 'schedule';
           toast(
             `⏰ "${ev.title}" starts soon${ev.start_hour ? ` at ${String(Math.floor(ev.start_hour)).padStart(2, '0')}:${String(Math.round((ev.start_hour % 1) * 60)).padStart(2, '0')}` : ''}`,
-            'info'
+            'info',
+            { label: 'Start now →', onClick: () => setScreen(dest) }
           );
         }
       } catch {}
@@ -302,7 +332,8 @@ function App({ onLogout }) {
   const go = (s) => setScreen(s);
   const toggleSidebar = () => setSidebarCollapsed((c) => !c);
 
-  const sw = sidebarCollapsed ? 64 : 240;
+  const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
+  const sw = isMobile ? 0 : (sidebarCollapsed ? 64 : 240);
   const tk = ACCENT_TOKENS['#7c3aed'];
 
   React.useEffect(() => {
@@ -315,28 +346,21 @@ function App({ onLogout }) {
     document.documentElement.style.setProperty('--sidebar-w',  `${sw}px`);
   }, [density, sw, tk.accent, tk.soft, tk.line, tk.grad]);
 
-  if (!me) return <AppLoader />;
-
   return (
-    <UserProvider user={me}>
-      <ToastProvider><ModalProvider>
-        <div style={{ display: 'flex', minHeight: '100vh', minWidth: 1280, width: 'max-content' }}>
-          <Sidebar screen={screen} setScreen={go} collapsed={sidebarCollapsed} onToggle={toggleSidebar} onLogout={onLogout} counts={navCounts} />
-          <main style={{
-            flex: 1,
-            width: `calc(100vw - ${sw}px)`,
-            minWidth: `calc(1280px - ${sw}px)`,
-            display: 'flex', flexDirection: 'column', minHeight: '100vh',
-            transition: 'width var(--dur-normal) var(--ease-smooth), min-width var(--dur-normal) var(--ease-smooth)',
-          }}>
-            <TopBar setScreen={go} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} onLogout={onLogout} />
-            <div style={{ flex: 1, minHeight: 0 }}>
-              <ScreenRouter screen={screen} setScreen={go} onLogout={onLogout} />
-            </div>
-          </main>
+    <div style={{ display: 'flex', minHeight: '100vh' }}>
+      {!isMobile && <Sidebar screen={screen} setScreen={go} collapsed={sidebarCollapsed} onToggle={toggleSidebar} onLogout={onLogout} counts={navCounts} />}
+      <main style={{
+        flex: 1,
+        width: isMobile ? '100vw' : `calc(100vw - ${sw}px)`,
+        display: 'flex', flexDirection: 'column', minHeight: '100vh',
+        transition: 'width var(--dur-normal) var(--ease-smooth)',
+      }}>
+        <TopBar setScreen={go} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} onLogout={onLogout} />
+        <div style={{ flex: 1, minHeight: 0 }}>
+          <ScreenRouter screen={screen} setScreen={go} onLogout={onLogout} />
         </div>
-      </ModalProvider></ToastProvider>
-    </UserProvider>
+      </main>
+    </div>
   );
 }
 

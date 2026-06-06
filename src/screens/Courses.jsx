@@ -1,7 +1,6 @@
 import React from 'react';
 import { I } from '../components/Icons';
 import { Card, Btn, ProgressBar, Tag, Avatar, Kbd, PageScroll, SectionHead } from '../components/UI';
-import { COURSE_VERSIONS } from '../data/data';
 import { useUser } from '../UserContext.jsx';
 import API from '../api.js';
 import { useToast, useModal } from '../App';
@@ -513,42 +512,6 @@ function CoverViz({ kind }) {
   </svg>);
 }
 
-function ForkBanner() {
-  const { open: openModal } = useModal();
-  return (
-    <Card style={{ position: 'relative', overflow: 'hidden' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 14, alignItems: 'center' }}>
-        <div>
-          <div className="display" style={{ fontSize: 16 }}>Fork. Learn. Contribute.</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>Every course is open-source. Fork it, improve it, and help others learn better.</div>
-        </div>
-        <span style={{ width: 64, height: 64, color: 'var(--brand)', opacity: 0.8 }}>
-          <svg viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M32 8 50 18v22L32 50 14 40V18z"/><path d="M14 18l18 10 18-10M32 28v22"/>
-          </svg>
-        </span>
-      </div>
-      <Btn variant="primary" size="md" full iconRight={I.arrowR} style={{ marginTop: 14 }} onClick={() => openModal(
-        <div>
-          <h3 className="display" style={{ fontSize: 22, marginBottom: 12 }}>How Forking Works</h3>
-          <div style={{ fontSize: 14, color: 'var(--ink-2)', lineHeight: 1.7 }}>
-            <p style={{ marginBottom: 12 }}>Every course on LearnOS is open-source. When you fork a course, you create your own copy that you can modify, extend, and share.</p>
-            <ol style={{ paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <li><strong>Browse</strong> the course catalog and find a course you want to improve</li>
-              <li><strong>Fork</strong> it — this creates your personal copy</li>
-              <li><strong>Edit</strong> the content, add examples, fix issues</li>
-              <li><strong>Submit</strong> your improvements back as a pull request</li>
-              <li><strong>Earn</strong> contributor XP and badges for your work</li>
-            </ol>
-            <p style={{ marginTop: 12 }}>Forking is the core of how LearnOS stays community-driven. Every improvement you make helps thousands of other learners.</p>
-          </div>
-          <Btn variant="primary" full style={{ marginTop: 16 }} onClick={() => window.dispatchEvent(new CustomEvent('navigate', { detail: 'community' }))}>Visit Community</Btn>
-        </div>
-      )}>How Forking Works</Btn>
-    </Card>
-  );
-}
-
 function FeaturedThisWeek({ courses = [], onSelect }) {
   // Real "featured" = the top-rated courses in the catalog.
   const featured = [...courses].sort((a, b) => (b.rating || 0) - (a.rating || 0)).slice(0, 4);
@@ -568,35 +531,6 @@ function FeaturedThisWeek({ courses = [], onSelect }) {
                 {c.verified && <span style={{ fontSize: 10.5, color: 'var(--brand-3)', display: 'inline-flex', alignItems: 'center', gap: 2 }}>{React.cloneElement(I.check, { size: 10 })} Verified</span>}
               </div>
             </div>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-function VersionForking() {
-  const [showAll, setShowAll] = React.useState(false);
-  const displayed = showAll ? COURSE_VERSIONS : COURSE_VERSIONS.slice(0, 3);
-  return (
-    <Card pad={false} style={{ padding: 16 }}>
-      <SectionHead title="Version & Forking" action={<a href="#" onClick={(e) => { e.preventDefault(); setShowAll(!showAll); }} style={{ color: 'var(--brand)', fontSize: 12, fontWeight: 600, textDecoration: 'none' }}>{showAll ? 'Show less' : 'View all →'}</a>} />
-      <div style={{ position: 'relative', paddingLeft: 14 }}>
-        <span style={{ position: 'absolute', left: 4, top: 4, bottom: 4, width: 1, background: 'var(--border)' }} />
-        {displayed.map((v, i) => (
-          <div key={v.v} style={{ position: 'relative', paddingBottom: i === COURSE_VERSIONS.length - 1 ? 0 : 14 }}>
-            <span style={{ position: 'absolute', left: -14, top: 4, width: 9, height: 9, borderRadius: 999, background: i === 0 ? 'var(--brand)' : 'var(--surface-3)', boxShadow: i === 0 ? '0 0 0 3px var(--accent-soft)' : 'none' }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)' }}>Version {v.v.replace('v', '')}</span>
-              {v.label && <Tag tone="accent">{v.label}</Tag>}
-              <span style={{ flex: 1 }} />
-              <span className="mono" style={{ fontSize: 10.5, color: 'var(--muted)' }}>{v.when}</span>
-            </div>
-            {i === 0 && (
-              <ul style={{ margin: '6px 0 0', padding: 0, listStyle: 'none' }}>
-                {v.notes.map((n) => (<li key={n} style={{ fontSize: 11.5, color: 'var(--muted)', padding: '2px 0', display: 'flex', gap: 6 }}><span style={{ color: 'var(--brand-3)' }}>+</span>{n}</li>))}
-              </ul>
-            )}
           </div>
         ))}
       </div>
