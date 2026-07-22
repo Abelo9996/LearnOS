@@ -9,31 +9,62 @@ const router = Router();
 
 // ── Profile ──────────────────────────────────────────────────────────────
 
+const USER_PROFILE_COLUMNS = 'id, name, email, role, avatar_hue, avatar_url, bio, links_json, level, xp, xp_to_next, streak, best_streak, plan, created_at, updated_at, last_activity_date';
+
 router.get('/profile', (req, res) => {
-  const user = db.prepare('SELECT id, name, email, role, avatar_hue, level, xp, xp_to_next, streak, best_streak, plan, created_at, updated_at, last_activity_date FROM users WHERE id = ?').get(req.userId);
+  const user = db.prepare(`SELECT ${USER_PROFILE_COLUMNS} FROM users WHERE id = ?`).get(req.userId);
   const settings = db.prepare('SELECT * FROM user_settings WHERE user_id = ?').get(req.userId);
   const keys = db.prepare('SELECT id, provider, model, is_active FROM api_keys WHERE user_id = ?').all(req.userId);
   const routing = db.prepare('SELECT agent_code, model FROM agent_routing WHERE user_id = ?').all(req.userId);
-  res.json({ user, settings, apiKeys: keys, agentRouting: routing });
+  // Flatten the user object so the frontend can read `name`/`email`/`bio`/etc. directly off the profile.
+  res.json({ ...user, user, settings, apiKeys: keys, agentRouting: routing });
 });
 
 router.patch('/profile', (req, res) => {
-  const { name, email, level, xp, streak, best_streak, plan } = req.body;
+  const { name, email, level, xp, streak, best_streak, plan, avatar_url, bio, links_json } = req.body;
   const fields = [];
   const vals = [];
-  if (name !== undefined)       { fields.push('name = ?');        vals.push(name); }
-  if (email !== undefined)      { fields.push('email = ?');       vals.push(email); }
-  if (level !== undefined)      { fields.push('level = ?');       vals.push(level); }
-  if (xp !== undefined)         { fields.push('xp = ?');          vals.push(xp); }
-  if (streak !== undefined)     { fields.push('streak = ?');      vals.push(streak); }
-  if (best_streak !== undefined){ fields.push('best_streak = ?');  vals.push(best_streak); }
-  if (plan !== undefined)       { fields.push('plan = ?');        vals.push(plan); }
+  if (name !== undefined)        { fields.push('name = ?');         vals.push(String(name).slice(0, 80)); }
+  if (email !== undefined)       { fields.push('email = ?');        vals.push(email); }
+  if (level !== undefined)       { fields.push('level = ?');        vals.push(level); }
+  if (xp !== undefined)          { fields.push('xp = ?');           vals.push(xp); }
+  if (streak !== undefined)      { fields.push('streak = ?');       vals.push(streak); }
+  if (best_streak !== undefined) { fields.push('best_streak = ?');  vals.push(best_streak); }
+  if (plan !== undefined)        { fields.push('plan = ?');         vals.push(plan); }
+  if (avatar_url !== undefined)  {
+    // Only allow same-origin /uploads/* paths or http(s) URLs; reject everything else.
+    const v = avatar_url == null ? null : String(avatar_url);
+    if (v && !(v.startsWith('/uploads/') || /^https?:\/\//i.test(v))) {
+      return res.status(400).json({ error: true, message: 'avatar_url must be an uploaded path or http(s) URL' });
+    }
+    fields.push('avatar_url = ?'); vals.push(v);
+  }
+  if (bio !== undefined) {
+    fields.push('bio = ?'); vals.push(bio == null ? null : String(bio).slice(0, 500));
+  }
+  if (links_json !== undefined) {
+    // Validate JSON shape: array of {label, url}, max 6
+    let parsed = links_json;
+    try {
+      if (typeof links_json === 'string') parsed = JSON.parse(links_json);
+    } catch {
+      return res.status(400).json({ error: true, message: 'links_json must be valid JSON' });
+    }
+    if (parsed !== null && !Array.isArray(parsed)) {
+      return res.status(400).json({ error: true, message: 'links_json must be an array' });
+    }
+    if (Array.isArray(parsed)) {
+      parsed = parsed.slice(0, 6).filter(l => l && typeof l.url === 'string' && /^https?:\/\//i.test(l.url))
+        .map(l => ({ label: String(l.label || '').slice(0, 40), url: String(l.url).slice(0, 300) }));
+    }
+    fields.push('links_json = ?'); vals.push(parsed == null ? null : JSON.stringify(parsed));
+  }
   if (fields.length === 0) return res.status(400).json({ error: true, message: 'No fields to update' });
 
   fields.push('updated_at = CURRENT_TIMESTAMP');
   vals.push(req.userId);
   db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...vals);
-  res.json({ ok: true, user: db.prepare('SELECT id, name, email, role, avatar_hue, level, xp, xp_to_next, streak, best_streak, plan, created_at, updated_at, last_activity_date FROM users WHERE id = ?').get(req.userId) });
+  res.json({ ok: true, user: db.prepare(`SELECT ${USER_PROFILE_COLUMNS} FROM users WHERE id = ?`).get(req.userId) });
 });
 
 // ── Settings ─────────────────────────────────────────────────────────────
