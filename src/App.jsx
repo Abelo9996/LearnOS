@@ -154,10 +154,16 @@ function AppRoot() {
     const token = API.getToken();
     if (!token) { setPhase('landing'); return; }
     setPhase('loading');
-    API.getMe()
-      .then(user => hydrate(user))
-      .then(() => checkOnboarding() || setPhase('app'))
-      .catch(() => { API.clearToken(); setPhase('landing'); });
+    (async () => {
+      try {
+        await API.getMe();
+        const needsOnboarding = await checkOnboarding();
+        if (!needsOnboarding) setPhase('app');
+      } catch {
+        API.clearToken();
+        setPhase('landing');
+      }
+    })();
   }, []);
 
   async function handleEnterApp() {

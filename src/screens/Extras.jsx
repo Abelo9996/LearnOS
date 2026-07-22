@@ -1349,19 +1349,56 @@ export function Settings({ onLogout }) {
   };
 
   const handleSaveAccount = async () => {
-    const nameInput = document.getElementById('settings-name');
-    const name = nameInput?.value?.trim() || profileData?.name || '';
+    const nameInput   = document.getElementById('settings-name');
+    const bioInput    = document.getElementById('settings-bio');
+    const avatarInput = document.getElementById('settings-avatar');
+    const linksInput  = document.getElementById('settings-links');
+    const name       = nameInput?.value?.trim()   ?? '';
+    const bio        = bioInput?.value           ?? '';
+    const avatar_url = avatarInput?.value?.trim() || null;
+    let links_json = [];
+    const raw = (linksInput?.value || '').trim();
+    if (raw) {
+      links_json = raw.split('\n').map(line => {
+        const [label, url] = line.split('|').map(s => (s || '').trim());
+        if (!url) return null;
+        return { label: label || url, url };
+      }).filter(Boolean);
+    }
     try {
-      await API.patchUserProfile({ name });
+      await API.patchUserProfile({ name, bio, avatar_url, links_json });
       toast('Account settings saved!', 'success');
-    } catch {
-      toast('Failed to save changes', 'error');
+    } catch (e) {
+      toast(e.message || 'Failed to save changes', 'error');
+    }
+  };
+
+  const handleAvatarUpload = async (file) => {
+    if (!file) return;
+    try {
+      const r = await API.uploadFile(file);
+      if (r && r.url) {
+        const input = document.getElementById('settings-avatar');
+        if (input) input.value = r.url;
+        await API.patchUserProfile({ avatar_url: r.url });
+        toast('Avatar uploaded!', 'success');
+      } else {
+        toast('Upload failed', 'error');
+      }
+    } catch (e) {
+      toast(e.message || 'Upload failed', 'error');
     }
   };
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'account':
+      case 'account': {
+        const linksDefault = (() => {
+          try {
+            const arr = profileData?.links_json ? (typeof profileData.links_json === 'string' ? JSON.parse(profileData.links_json) : profileData.links_json) : [];
+            return Array.isArray(arr) ? arr.map(l => `${l.label || ''} | ${l.url || ''}`).join('\n') : '';
+          } catch { return ''; }
+        })();
         return (
           <Card style={{ padding: 18 }}>
             <SectionHead title="Account Information" />
@@ -1369,12 +1406,34 @@ export function Settings({ onLogout }) {
               <div><label className="cap" style={{ display: 'block', marginBottom: 6 }}>Display Name</label><input id="settings-name" defaultValue={profileData?.name || ''} style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13 }} /></div>
               <div><label className="cap" style={{ display: 'block', marginBottom: 6 }}>Email</label><input defaultValue={profileData?.email || ''} disabled style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--muted)', fontSize: 13 }} /></div>
             </div>
+            <div style={{ marginTop: 16 }}>
+              <label className="cap" style={{ display: 'block', marginBottom: 6 }}>Avatar</label>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                {profileData?.avatar_url && (
+                  <img src={profileData.avatar_url} alt="avatar" style={{ width: 48, height: 48, borderRadius: 999, objectFit: 'cover', border: '1px solid var(--border)' }} />
+                )}
+                <input id="settings-avatar" defaultValue={profileData?.avatar_url || ''} placeholder="https://… or /uploads/…" style={{ flex: 1, padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13 }} />
+                <label style={{ padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12, cursor: 'pointer', color: 'var(--ink-2)' }}>
+                  Upload
+                  <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => handleAvatarUpload(e.target.files?.[0])} />
+                </label>
+              </div>
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <label className="cap" style={{ display: 'block', marginBottom: 6 }}>Bio</label>
+              <textarea id="settings-bio" defaultValue={profileData?.bio || ''} maxLength={500} rows={3} placeholder="A short bio shown on your profile (max 500 chars)" style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13, resize: 'vertical', fontFamily: 'inherit' }} />
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <label className="cap" style={{ display: 'block', marginBottom: 6 }}>Links <span style={{ textTransform: 'none', color: 'var(--muted)', fontWeight: 400 }}>(one per line: <code>Label | https://url</code>)</span></label>
+              <textarea id="settings-links" defaultValue={linksDefault} rows={3} placeholder={'GitHub | https://github.com/you\nTwitter | https://x.com/you'} style={{ width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13, resize: 'vertical', fontFamily: 'var(--font-mono)' }} />
+            </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
               <Btn variant="primary" size="md" onClick={handleSaveAccount}>Save Changes</Btn>
               {onLogout && <Btn variant="outline" onClick={onLogout}>Sign out</Btn>}
             </div>
           </Card>
         );
+      }
       case 'api':
         return (
           <Card style={{ padding: 18 }}>
