@@ -1,51 +1,30 @@
-import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
 import db from '../db/database.js';
 
-// S-01: In production, LEARNOS_JWT_SECRET must be set (server.js exits if missing).
-// In dev, we fall back to a per-boot random secret (sessions don't survive restarts).
-const SECRET = process.env.JWT_SECRET || (() => {
-  if (process.env.NODE_ENV === 'production') {
-    console.error('FATAL: LEARNOS_JWT_SECRET is not set');
-    process.exit(1);
-  }
-  const devSecret = crypto.randomBytes(32).toString('hex');
-  console.warn('⚠️  LEARNOS_JWT_SECRET not set — using per-boot random secret (dev only). Tokens won\'t survive restarts.');
-  return devSecret;
-})();
+/**
+ * LearnOS is a single-user, self-hosted tool — there is no login or registration.
+ * Every request runs as one implicit local user. `requireAuth` used to enforce a
+ * JWT; it now simply resolves that local user and attaches it to the request, so
+ * every existing `WHERE user_id = ?` query keeps working unchanged.
+ */
+const LOCAL_USER_ID = process.env.LEARNOS_LOCAL_USER || 'user-1';
 
-export function requireAuth(req, res, next) {
-  const header = req.headers.authorization;
-  if (!header?.startsWith('Bearer ')) {
-    return res.status(401).json({ error: true, message: 'Missing token' });
+// Ensure the local user (and its settings row) exists once at boot. The seed
+// normally creates `user-1`; this covers a fresh DB started without seed data.
+function ensureLocalUser() {
+  const exists = db.prepare('SELECT id FROM users WHERE id = ?').get(LOCAL_USER_ID);
+  if (!exists) {
+    db.prepare(
+      "INSERT INTO users (id, name, email, role, level, xp, xp_to_next, streak, best_streak) VALUES (?, 'You', 'you@localhost', 'user', 1, 0, 500, 0, 0)"
+    ).run(LOCAL_USER_ID);
   }
-
-  let payload;
-  try {
-    payload = jwt.verify(header.slice(7), SECRET);
-  } catch {
-    return res.status(401).json({ error: true, message: 'Invalid or expired token' });
-  }
-
-  const revoked = db.prepare('SELECT jti FROM revoked_tokens WHERE jti = ?').get(payload.jti);
-  if (revoked) {
-    return res.status(401).json({ error: true, message: 'Token revoked' });
-  }
-
-  const user = db.prepare('SELECT id, role, plan FROM users WHERE id = ?').get(payload.sub);
-  if (!user) {
-    return res.status(401).json({ error: true, message: 'User not found' });
-  }
-
-  req.userId = user.id;
-  req.userRole = user.role;
-  req.jti = payload.jti;
-  req.tokenExp = payload.exp;
-  next();
+  db.prepare(
+    "INSERT OR IGNORE INTO user_settings (user_id, theme, density, font_size, local_only) VALUES (?, 'dark', 'regular', 14, 0)"
+  ).run(LOCAL_USER_ID);
 }
+ensureLocalUser();
 
-export function signToken(userId) {
-  const jti = crypto.randomUUID();
-  const token = jwt.sign({ sub: userId, jti }, SECRET, { expiresIn: '7d' });
-  return { token, jti };
+export function requireAuth(req, _res, next) {
+  req.userId = LOCAL_USER_ID;
+  req.userRole = 'user';
+  next();
 }

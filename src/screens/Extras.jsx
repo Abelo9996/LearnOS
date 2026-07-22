@@ -382,7 +382,7 @@ export function Assignments() {
                 estimated_minutes: pick.minutes, description: pick.description, tasks: pick.tasks,
                 due_date: new Date(Date.now() + 86400000 * (pick.kind === 'project' ? 14 : 7)).toISOString().split('T')[0],
               });
-              toast(`From practice bank: "${pick.title}" — add an Anthropic key for AI-generated`, 'info');
+              toast(`From practice bank: "${pick.title}" — add an OpenRouter key for AI-generated`, 'info');
               reload();
             } catch { toast('Could not generate assignment', 'error'); }
           }
@@ -1300,7 +1300,7 @@ function CoverVizSmall({ kind }) {
 /* ═══════════════════════════════════════════════════════════════════════════
    SETTINGS
    ═══════════════════════════════════════════════════════════════════════════ */
-export function Settings({ onLogout }) {
+export function Settings() {
   const { add: toast } = useToast();
   const [activeTab, setActiveTab] = React.useState(() => localStorage.getItem('settings_tab') || 'api');
   React.useEffect(() => { localStorage.removeItem('settings_tab'); }, []);
@@ -1312,7 +1312,7 @@ export function Settings({ onLogout }) {
 
   const [showAddKey, setShowAddKey] = React.useState(null);
   const [newKey, setNewKey]         = React.useState('');
-  const [newModel, setNewModel]     = React.useState('claude-haiku-4-5');
+  const [newModel, setNewModel]     = React.useState('anthropic/claude-haiku-4.5');
   const [theme, setTheme]           = React.useState('dark');
   const [density, setDensity]       = React.useState('regular');
   const [fontSize, setFontSize]     = React.useState(14);
@@ -1331,13 +1331,12 @@ export function Settings({ onLogout }) {
     { id: 'agents',   label: 'Agents',     icon: I.spark },
     { id: 'theme',    label: 'Appearance', icon: I.bolt },
     { id: 'data',     label: 'Data',       icon: I.layers },
-    { id: 'billing',  label: 'Billing',    icon: I.card },
   ];
 
   const handleAddKey = async (provider) => {
     if (!newKey.trim()) { toast('Please enter an API key', 'error'); return; }
     await API.createApiKey({ provider, encrypted_key: newKey, model: newModel, is_active: 1 }).catch(() => {});
-    setNewKey(''); setNewModel('claude-haiku-4-5'); setShowAddKey(null);
+    setNewKey(''); setNewModel('anthropic/claude-haiku-4.5'); setShowAddKey(null);
     toast(`${provider} API key added`, 'success');
     reloadKeys();
   };
@@ -1429,7 +1428,6 @@ export function Settings({ onLogout }) {
             </div>
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
               <Btn variant="primary" size="md" onClick={handleSaveAccount}>Save Changes</Btn>
-              {onLogout && <Btn variant="outline" onClick={onLogout}>Sign out</Btn>}
             </div>
           </Card>
         );
@@ -1437,13 +1435,13 @@ export function Settings({ onLogout }) {
       case 'api':
         return (
           <Card style={{ padding: 18 }}>
-            <SectionHead title="LLM provider keys" subtitle="Stored encrypted server-side, used only during AI sessions." />
+            <SectionHead title="OpenRouter API key" subtitle="LearnOS uses OpenRouter — one key unlocks every model. Stored encrypted, used only for AI calls." />
             {loadingKeys ? (
               <div style={{ padding: 24, color: 'var(--muted)' }}>Loading keys…</div>
             ) : (
               <>
                 {(apiKeysData || []).map(k => (
-                  <div key={k.id} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 120px 100px', gap: 14, padding: '12px 0', alignItems: 'center', borderTop: '1px solid var(--border)' }}>
+                  <div key={k.id} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 1fr 100px', gap: 14, padding: '12px 0', alignItems: 'center', borderTop: '1px solid var(--border)' }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{k.provider}</div>
                     <div className="mono" style={{ fontSize: 11.5, color: 'var(--ink-2)' }}>{k.encrypted_key}</div>
                     <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)' }}>{k.model}</div>
@@ -1456,32 +1454,27 @@ export function Settings({ onLogout }) {
                 {/* Add new key inline */}
                 {showAddKey ? (
                   <div style={{ marginTop: 14, padding: 14, background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                    <div className="cap" style={{ marginBottom: 8 }}>Add API Key</div>
+                    <div className="cap" style={{ marginBottom: 8 }}>Add OpenRouter key</div>
                     <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                      <select value={showAddKey} onChange={e => setShowAddKey(e.target.value)} style={{ padding: '8px 10px', background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13 }}>
-                        {['anthropic', 'openai', 'gemini', 'mistral'].map(p => <option key={p} value={p}>{p}</option>)}
-                      </select>
-                      <select value={newModel} onChange={e => setNewModel(e.target.value)} style={{ flex: 1, padding: '8px 10px', background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13 }}>
-                        <option value="claude-haiku-4-5">claude-haiku-4-5</option>
-                        <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
-                        <option value="gpt-4o">gpt-4o</option>
-                        <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-                      </select>
+                      <input value={newModel} onChange={e => setNewModel(e.target.value)} placeholder="default model slug, e.g. anthropic/claude-haiku-4.5" style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13, fontFamily: 'var(--font-mono)' }} />
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
-                      <input value={newKey} onChange={e => setNewKey(e.target.value)} placeholder="Enter your API key…" style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13 }} />
-                      <Btn variant="primary" size="sm" onClick={() => handleAddKey(showAddKey)}>Save</Btn>
+                      <input value={newKey} onChange={e => setNewKey(e.target.value)} placeholder="sk-or-v1-…" style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13 }} />
+                      <Btn variant="primary" size="sm" onClick={() => handleAddKey('openrouter')}>Save</Btn>
                       <Btn variant="ghost" size="sm" onClick={() => { setShowAddKey(null); setNewKey(''); }}>Cancel</Btn>
+                    </div>
+                    <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 8 }}>
+                      Get a key at <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" style={{ color: 'var(--brand)' }}>openrouter.ai/keys</a> · browse models at <a href="https://openrouter.ai/models" target="_blank" rel="noreferrer" style={{ color: 'var(--brand)' }}>openrouter.ai/models</a>
                     </div>
                   </div>
                 ) : (
-                  <Btn variant="outline" size="md" style={{ marginTop: 14 }} onClick={() => setShowAddKey('anthropic')}>Add API key</Btn>
+                  <Btn variant="outline" size="md" style={{ marginTop: 14 }} onClick={() => setShowAddKey('openrouter')}>Add OpenRouter key</Btn>
                 )}
               </>
             )}
             <div style={{ marginTop: 14, padding: 12, background: 'oklch(0.78 0.16 75 / 0.10)', borderRadius: 8, border: '1px solid oklch(0.78 0.16 75 / 0.3)', display: 'flex', gap: 10 }}>
               <span style={{ color: 'var(--warn)' }}>{I.shield}</span>
-              <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 }}>Keys are stored encrypted in the database and used only for AI session calls.</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 }}>Keys are stored encrypted in the database and used only for AI calls. You can also set <code>OPENROUTER_API_KEY</code> on the server instead.</div>
             </div>
           </Card>
         );
@@ -1498,14 +1491,16 @@ export function Settings({ onLogout }) {
                     <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 500 }}>{a.name}</span>
                   </div>
                   <div className="mono" style={{ fontSize: 11.5, color: 'var(--muted)' }}>{a.short}</div>
-                  <select defaultValue={route?.model || 'claude-haiku-4-5'} onChange={async e => {
+                  <select defaultValue={route?.model || 'anthropic/claude-haiku-4.5'} onChange={async e => {
                     await API.patchAgentRouting(code, { model: e.target.value }).catch(() => {});
                     toast(`${a.name} → ${e.target.value}`, 'success');
                   }} style={{ appearance: 'none', height: 30, padding: '0 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--ink)', fontSize: 11.5 }}>
-                    <option value="claude-haiku-4-5">claude-haiku-4-5</option>
-                    <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
-                    <option value="gpt-4o">gpt-4o</option>
-                    <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                    <option value="anthropic/claude-haiku-4.5">anthropic/claude-haiku-4.5</option>
+                    <option value="anthropic/claude-sonnet-4.6">anthropic/claude-sonnet-4.6</option>
+                    <option value="openai/gpt-4o-mini">openai/gpt-4o-mini</option>
+                    <option value="openai/gpt-4o">openai/gpt-4o</option>
+                    <option value="google/gemini-2.5-flash">google/gemini-2.5-flash</option>
+                    <option value="meta-llama/llama-3.3-70b-instruct">meta-llama/llama-3.3-70b-instruct</option>
                   </select>
                 </div>
               );
@@ -1564,30 +1559,7 @@ export function Settings({ onLogout }) {
                   } catch { toast('Export failed', 'error'); }
                 }}>Export</Btn>
               </div>
-              {onLogout && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderTop: '1px solid var(--border)' }}>
-                  <div><div style={{ fontSize: 13, fontWeight: 600, color: 'var(--bad)' }}>Sign out</div><div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>Sign out of your account</div></div>
-                  <Btn variant="outline" onClick={onLogout}>Sign out</Btn>
-                </div>
-              )}
             </div>
-          </Card>
-        );
-      case 'billing':
-        return (
-          <Card style={{ padding: 18 }}>
-            <SectionHead title="Billing & Plan" />
-            <div style={{ padding: 16, background: 'linear-gradient(135deg, oklch(0.18 0.03 295), oklch(0.15 0.025 270))', borderRadius: 12, border: '1px solid var(--accent-line)', marginBottom: 16 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <div className="cap" style={{ color: 'oklch(0.82 0.18 295)' }}>Current Plan</div>
-                  <div className="display" style={{ fontSize: 24, color: 'var(--ink)', marginTop: 4 }}>Pro</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>Free forever · Open-source</div>
-                </div>
-                <Tag tone="good">Active</Tag>
-              </div>
-            </div>
-            <Btn variant="primary" full iconRight={I.arrowR} onClick={() => toast('You\'re on the free plan — all features included!', 'info')}>Current Plan: Free (All Features)</Btn>
           </Card>
         );
       default:

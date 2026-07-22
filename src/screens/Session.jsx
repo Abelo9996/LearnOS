@@ -147,14 +147,14 @@ export default function Session({ setScreen }) {
           const lines = resources.slice(0, 5).map(r => `• [${r.title}](${r.url}) — *${r.source || r.kind}*`).join('\n');
           replyBody = `Verified resources for **${topic}**:\n\n${lines}`;
         } else {
-          replyBody = `I don't have verified sources for **${topic}** yet. Add an Anthropic key in Settings to let the Research agent propose and verify resources for this module.`;
+          replyBody = `I don't have verified sources for **${topic}** yet. Add an OpenRouter key in Settings to let the Research agent propose and verify resources for this module.`;
         }
       } else if (lower.includes('example') || lower.includes('real') || lower.includes('show')) {
-        replyBody = `For a real example of **${topic}**, I'd normally walk you through a concrete case. To generate one tailored to *${course}* at the *${level}* level, add an Anthropic key in Settings — I'll then produce a worked example, not a canned one.`;
+        replyBody = `For a real example of **${topic}**, I'd normally walk you through a concrete case. To generate one tailored to *${course}* at the *${level}* level, add an OpenRouter key in Settings — I'll then produce a worked example, not a canned one.`;
       } else if (lower.includes('summary') || lower.includes('recap')) {
-        replyBody = `Here's a recap framework for **${topic}**:\n\n1. The core idea this module covers\n2. Why it matters in *${course}*\n3. The pitfalls people commonly run into\n4. How it connects to what comes next\n\nFor a personalized recap drawn from our conversation, configure your Anthropic key in Settings.`;
+        replyBody = `Here's a recap framework for **${topic}**:\n\n1. The core idea this module covers\n2. Why it matters in *${course}*\n3. The pitfalls people commonly run into\n4. How it connects to what comes next\n\nFor a personalized recap drawn from our conversation, configure your OpenRouter key in Settings.`;
       } else {
-        replyBody = `I can help you explore **${topic}** at the *${level}* level. Try asking for an example, a quiz, a recap, or sources — or configure your Anthropic key in Settings for full conversational tutoring.`;
+        replyBody = `I can help you explore **${topic}** at the *${level}* level. Try asking for an example, a quiz, a recap, or sources — or configure your OpenRouter key in Settings for full conversational tutoring.`;
       }
       // Show the no-key banner once per session.
       if (!localStorage.getItem('learnos_nokey_banner_dismissed')) {
@@ -377,7 +377,7 @@ function ChatColumn({ scrollerRef, messages, thinking, input, setInput, submit, 
     <Card pad={false} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
       {noKeyBanner && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: 'oklch(0.74 0.18 80 / 0.12)', borderBottom: '1px solid oklch(0.74 0.18 80 / 0.3)', color: 'var(--ink-2)', fontSize: 12.5 }}>
-          <span style={{ flex: 1 }}>Offline mode — replies are generic. Add an Anthropic key in Settings for real conversational tutoring.</span>
+          <span style={{ flex: 1 }}>Offline mode — replies are generic. Add an OpenRouter key in Settings for real conversational tutoring.</span>
           <button onClick={() => setScreen && (localStorage.setItem('settings_tab', 'keys'), setScreen('settings'))} style={{ padding: '4px 10px', fontSize: 11.5, fontWeight: 600, background: 'var(--brand)', color: 'oklch(0.16 0.02 270)', border: 0, borderRadius: 6, cursor: 'pointer' }}>Add key</button>
           <button onClick={dismissBanner} title="Dismiss" style={{ padding: '4px 8px', background: 'transparent', color: 'var(--muted)', border: 0, cursor: 'pointer', fontSize: 14 }}>×</button>
         </div>

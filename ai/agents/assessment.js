@@ -190,7 +190,7 @@ Grade this submission. Return overall_grade (0-100), per_criterion scores, and f
     const pct = taskCount > 0 ? Math.round((checkedCount / taskCount) * 40 + 60) : Math.min(100, 60 + Math.floor(bodyLen / 100));
     const fallbackGrade = Math.min(100, Math.max(0, pct));
     db.prepare('UPDATE assignment_submissions SET grade = ?, feedback_md = ?, rubric_json = ? WHERE id = ?')
-      .run(fallbackGrade, `**Auto-graded (no AI key):** ${fallbackGrade}%\n\nYour submission was evaluated heuristically. Add an Anthropic key in Settings for detailed AI feedback.`, JSON.stringify([{ criterion: 'Overall', score: fallbackGrade, why: 'Heuristic grading — add an AI key for detailed feedback' }]), submissionId);
+      .run(fallbackGrade, `**Auto-graded (no AI key):** ${fallbackGrade}%\n\nYour submission was evaluated heuristically. Add an OpenRouter key in Settings for detailed AI feedback.`, JSON.stringify([{ criterion: 'Overall', score: fallbackGrade, why: 'Heuristic grading — add an AI key for detailed feedback' }]), submissionId);
     return { ok: true, fallback: true, grade: fallbackGrade };
   }
 

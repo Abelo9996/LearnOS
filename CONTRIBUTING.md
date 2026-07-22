@@ -50,7 +50,7 @@ npm test         # run the Vitest suite before opening a PR
 ```
 server.js     → Express 5 entry point (API + serves the built SPA)
 routes/       → REST endpoints
-middleware/   → auth (JWT), logging, url-safety (SSRF guard)
+middleware/   → local-user resolver, logging, url-safety (SSRF guard)
 ai/           → LLM layer + agents (Claude)
 db/           → better-sqlite3 (schema.sql, seed.sql)
 src/          → React 18 frontend (Vite)

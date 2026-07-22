@@ -7,7 +7,7 @@
 
 ## 1. Current stack (keep)
 - **Frontend:** React 18 + Vite SPA, no router lib (`switch` in `App.jsx`), inline styles + `theme.css`.
-- **Backend:** Express 5, `routes/*.js` mounted in `server.js`, JWT auth (`middleware/auth.js`).
+- **Backend:** Express 5, `routes/*.js` mounted in `server.js`, single local user resolved in `middleware/auth.js` (no login — self-hosted).
 - **DB:** SQLite via better-sqlite3 (synchronous), WAL, schema in `db/schema.sql`, helpers in `db/database.js`.
 - **Gamification engine:** `awardXP` / `updateStreak` + session-completion cascade (`routes/sessions.js`). **Keep — it's real.**
 
@@ -63,7 +63,7 @@ Resolution order for the key/model:
 2. Else use the **managed platform key** (env `LEARNOS_<PROVIDER>_KEY`) → **meter usage** against the user's tier.
 3. `model` chosen by `agent_routing[userId][agentCode]` or the managed default.
 
-- **Providers:** Anthropic first (latest Claude models). OpenAI/Gemini behind the same interface later.
+- **Providers:** OpenRouter (OpenAI-compatible) — one key, any model by slug (Claude, GPT, Gemini, Llama, …).
 - **Prompt caching:** mark agent system prompts as cacheable (they're stable, large). See the `claude-api` skill.
 - **Metering:** every managed call writes tokens+cost to `agent_runs`; a daily/monthly cap per user is enforced
   pre-call. Over cap → 402-style "add your own key or wait" response the UI handles gracefully.

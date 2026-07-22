@@ -1,31 +1,27 @@
 -- LearnOS Seed Data
 -- A fully populated example user "Alex Learner" with realistic learning data.
 
--- User
-INSERT INTO users (id, name, email, password_hash, role, level, xp, xp_to_next, streak, best_streak, plan)
-VALUES ('user-1', 'Alex Learner', 'alex@learnos.dev',
-  '$2b$10$Jg3eobdQ0Ns4u17rds.pyeW9elY7GdnTmdOhpTjGgWm79S/Keseqq',
-  'user', 4, 2350, 3000, 12, 18, 'Pro');
+-- The single local user (no login — this is "you" on your own machine).
+INSERT INTO users (id, name, email, role, level, xp, xp_to_next, streak, best_streak)
+VALUES ('user-1', 'Alex Learner', 'you@localhost',
+  'user', 4, 2350, 3000, 12, 18);
 
 -- Settings
 INSERT INTO user_settings (user_id, theme, density, font_size, local_only)
 VALUES ('user-1', 'dark', 'regular', 14, 0);
 
--- API Keys (masked placeholders — real keys would be encrypted)
-INSERT INTO api_keys (id, user_id, provider, encrypted_key, model, is_active)
- VALUES ('ak-1', 'user-1', 'anthropic', 'sk-ant-…7Z2', 'claude-haiku-4-5', 1);
-INSERT INTO api_keys (id, user_id, provider, encrypted_key, model, is_active)
- VALUES ('ak-2', 'user-1', 'openai', 'sk-…q1Pa', 'gpt-4o', 1);
+-- API keys are added in Settings → API Keys (OpenRouter), or via the
+-- OPENROUTER_API_KEY env var. No key is seeded — add your own to go live.
 
--- Agent routing defaults
+-- Agent routing defaults (OpenRouter model slugs — change any of these in Settings)
 INSERT INTO agent_routing (user_id, agent_code, model) VALUES
-  ('user-1', 'TU', 'claude-sonnet-4-5'),
-  ('user-1', 'PR', 'claude-haiku-4-5'),
-  ('user-1', 'CR', 'claude-haiku-4-5'),
-  ('user-1', 'AS', 'claude-haiku-4-5'),
-  ('user-1', 'RE', 'claude-haiku-4-5'),
-  ('user-1', 'AN', 'claude-haiku-4-5'),
-  ('user-1', 'CE', 'claude-haiku-4-5');
+  ('user-1', 'TU', 'anthropic/claude-sonnet-4.6'),
+  ('user-1', 'PR', 'anthropic/claude-haiku-4.5'),
+  ('user-1', 'CR', 'anthropic/claude-haiku-4.5'),
+  ('user-1', 'AS', 'anthropic/claude-haiku-4.5'),
+  ('user-1', 'RE', 'anthropic/claude-haiku-4.5'),
+  ('user-1', 'AN', 'anthropic/claude-haiku-4.5'),
+  ('user-1', 'CE', 'anthropic/claude-haiku-4.5');
 
 -- Agent status
 INSERT INTO agent_status (agent_code, display_name, short_desc, color, icon, status_text, is_active) VALUES

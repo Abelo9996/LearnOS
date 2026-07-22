@@ -10,7 +10,6 @@ import { dirname, join } from 'path';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 
-import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import roadmapRoutes from './routes/roadmaps.js';
 import nodeRoutes from './routes/nodes.js';
@@ -39,13 +38,6 @@ const PORT = process.env.PORT || 3001;
 const distPath = join(__dirname, 'dist');
 const isProd = process.env.NODE_ENV === 'production';
 
-// ── S-01: JWT secret enforcement ──────────────────────────────────────────────
-const JWT_SECRET = process.env.JWT_SECRET;
-if (isProd && !JWT_SECRET) {
-  console.error('FATAL: LEARNOS_JWT_SECRET is required in production. Set it and re-start.');
-  process.exit(1);
-}
-
 const app = express();
 
 // ── S-06: Helmet / CSP ────────────────────────────────────────────────────────
@@ -57,7 +49,7 @@ app.use(helmet({
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      connectSrc: ["'self'", "https://api.anthropic.com"],
+      connectSrc: ["'self'"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       objectSrc: ["'none'"],
       frameSrc: ["'none'"],
@@ -99,18 +91,6 @@ const generalLimiter = rateLimit({
 });
 app.use('/api/', generalLimiter);
 
-// Auth rate limit: 5 req / 15 min / IP (login, register, forgot)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: true, code: 'RATE_LIMITED', message: 'Too many auth attempts, please try again in 15 minutes' },
-});
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
-app.use('/api/auth/forgot', authLimiter);
-
 // AI endpoints rate limit: 30 req / 1 min / user
 const aiLimiter = rateLimit({
   windowMs: 60 * 1000,
@@ -144,10 +124,18 @@ app.use('/uploads', express.static(uploadsPath, { maxAge: '7d' }));
 // ── Public routes (no auth) ───────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 app.get('/api/info',   (_req, res) => res.json({ name: 'LearnOS', version: '1.0.0', status: 'running' }));
-app.use('/api/auth', authRoutes);
 
-// ── Auth middleware — all routes below require a valid JWT ────────────────────
+// ── Local-user middleware — resolves the single implicit user (no login) ──────
 app.use('/api', requireAuth);
+
+// Current user (single local user — replaces the old /api/auth/me).
+app.get('/api/me', (req, res) => {
+  const u = db.prepare(
+    'SELECT id, name, email, role, avatar_hue, avatar_url, bio, links_json, level, xp, xp_to_next, streak, best_streak FROM users WHERE id = ?'
+  ).get(req.userId);
+  if (!u) return res.status(404).json({ error: true, message: 'Local user not found' });
+  res.json(u);
+});
 
 // ── Uploads (§3.3) ────────────────────────────────────────────────────────────
 app.use('/api/uploads', uploadRoutes);
@@ -252,5 +240,8 @@ app.use(notFound);
 app.listen(PORT, '0.0.0.0', () => {
   resumeJobs();
   console.log('\n  ✅ LearnOS running at http://localhost:' + PORT);
-  console.log('  Dev login: alex@learnos.dev / learnos123\n');
+  const keyed = !!(process.env.OPENROUTER_API_KEY || process.env.LEARNOS_OPENROUTER_KEY);
+  console.log(keyed
+    ? '  OpenRouter key detected — AI features are live.\n'
+    : '  Tip: set OPENROUTER_API_KEY (or add one in Settings → API Keys) to enable AI features.\n');
 });

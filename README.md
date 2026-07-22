@@ -24,9 +24,9 @@
 
 ---
 
-> **Coursera charges $49/course. Degrees cost $15,000+. Education shouldn't have a paywall.**
+> **Education shouldn't be locked behind logins, paywalls, or a single vendor.**
 >
-> LearnOS is building the world's first **agentic AI university** — where AI agents teach, adapt, and certify. Community-driven. Open-source. Free to learn.
+> LearnOS is an **agentic AI university** you run yourself — where AI agents teach, adapt, and certify. Clone it, drop in an OpenRouter key, and go. No accounts, no paywall, no lock-in. Open-source and community-driven.
 
 ---
 
@@ -65,7 +65,7 @@ LearnOS is an **AI-native university platform** where:
 | Traditional Platforms | LearnOS |
 |---|---|
 | Pre-recorded video lectures | AI agents that teach in real-time, adapting to *you* |
-| Pay per course ($49-$99) | Bring your own API key — pay only for tokens |
+| Locked to one vendor's models | One OpenRouter key — pick any model, pay only for tokens |
 | Static content that ages | Living courses generated on demand |
 | Learn alone, drop out alone | Cohort-based learning with AI + human communities |
 | Certificates that nobody trusts | Mastery-verified certificates backed by AI assessment |
@@ -86,7 +86,7 @@ LearnOS isn't "a platform with an AI chatbot." It's a **system of specialized AI
 | 📊 **Analytics Agent** | Tracks learning patterns and surfaces habit insights |
 | 🎯 **Profiling Agent** | Models your level, style, and goals during onboarding |
 
-All agents run through a single provider-agnostic LLM layer ([`ai/llm.js`](ai/llm.js)) with per-agent model routing, usage metering, and cost caps. **Claude-powered** today; the interface is built to add other providers later.
+All agents run through a single LLM layer ([`ai/llm.js`](ai/llm.js)) that talks to **[OpenRouter](https://openrouter.ai)** — one key unlocks every major model (Claude, GPT, Gemini, Llama, and more) with per-agent model routing and usage metering. Pick whatever balance of quality and cost you want, per agent.
 
 ## ✨ Features (What Works Today)
 
@@ -99,8 +99,8 @@ All agents run through a single provider-agnostic LLM layer ([`ai/llm.js`](ai/ll
 - 📅 **Study Schedule** — Plan and track your learning cadence
 - 📊 **Learning Analytics** — Daily stats, streaks, XP, and activity history
 - 🎯 **Learner Profiling** — Onboarding that tailors the experience to your level and style
-- 👤 **Accounts & Profiles** — Email/password auth (JWT + bcrypt), avatars, bio, and links
-- 🔑 **Bring Your Own Key** — Use your own Anthropic key, or a managed key with usage caps
+- 👤 **Local Profile** — Your name, avatar, bio, and links — no account, no login
+- 🔑 **One OpenRouter Key** — A single key unlocks every model; set it in-app or via env
 - 💾 **Persistent Progress** — SQLite storage, your data survives restarts
 
 ## 🛣️ Roadmap
@@ -108,9 +108,9 @@ All agents run through a single provider-agnostic LLM layer ([`ai/llm.js`](ai/ll
 | Phase | Status | Description |
 |---|---|---|
 | **Foundation** | ✅ Done | Roadmaps, tutor, assignments, flashcards, analytics, profiling |
-| **Accounts & Community** | ✅ Done | Auth, profiles, courses, starring, community, certificates, badges |
-| **Hardening** | ✅ Done | JWT enforcement, SSRF guard, upload validation, rate limiting, CI |
-| **Scale** | 🔨 Building | Cohort learning, richer marketplace, additional LLM providers |
+| **Community** | ✅ Done | Profiles, courses, starring, community, certificates, badges |
+| **Hardening** | ✅ Done | SSRF guard, upload validation, rate limiting, CI |
+| **Scale** | 🔨 Building | Cohort learning, richer course library, streaming responses |
 | **Reach** | 🔮 Vision | Multi-language, mobile, accreditation & employer verification |
 
 **Currently focused on:** STEM (CS, Math, Data Science, Engineering) → expanding outward.
@@ -120,7 +120,7 @@ All agents run through a single provider-agnostic LLM layer ([`ai/llm.js`](ai/ll
 ### Prerequisites
 
 - **Node.js 18+**
-- An **Anthropic API key** (optional for the UI; required for AI features — you can also add it in-app under Settings → API Keys)
+- An **[OpenRouter API key](https://openrouter.ai/keys)** (optional for the UI; required for AI features — you can also add it in-app under Settings → API Keys)
 
 ### 1. Install
 
@@ -142,18 +142,11 @@ npm start
 npm run dev
 ```
 
-Open **http://localhost:3000** and sign in with the seeded demo account:
-
-```
-Email:    alex@learnos.dev
-Password: learnos123
-```
-
-No `.env` is required for local dev — the JWT secret falls back to a per-boot value and the database auto-seeds. See [`.env.example`](.env.example) for all configurable options.
+Open **http://localhost:3000** — there's no login. LearnOS runs as a single local user (it's *your* machine), and the database auto-seeds with example data on first boot. No `.env` is required for local dev; see [`.env.example`](.env.example) for all configurable options.
 
 ### 3. Start Learning
 
-1. Go to **⚙️ Settings → API Keys** and add your Anthropic key (or set `ANTHROPIC_API_KEY` for the server)
+1. Go to **⚙️ Settings → API Keys** and add your [OpenRouter key](https://openrouter.ai/keys) (or set `OPENROUTER_API_KEY` for the server)
 2. **Create a course / roadmap** → describe what you want to learn
 3. Work through milestones, start tutor sessions, take assignments, and track your progress
 
@@ -161,7 +154,7 @@ No `.env` is required for local dev — the JWT secret falls back to a per-boot 
 
 ```bash
 npm run build      # builds the React app into dist/
-NODE_ENV=production LEARNOS_JWT_SECRET=$(openssl rand -hex 32) npm start
+NODE_ENV=production OPENROUTER_API_KEY=sk-or-... npm start
 ```
 
 In production the Express server serves the built frontend from `dist/` and the API from the same origin. See [DEPLOYMENT.md](DEPLOYMENT.md).
@@ -173,8 +166,8 @@ Single Node service: Express serves both the REST API and the built React SPA.
 ```
 LearnOS/
 ├── server.js             # Express 5 entry point — API + static SPA
-├── routes/               # REST endpoints (auth, courses, roadmaps, sessions, …)
-├── middleware/           # auth (JWT), logger, url-safety (SSRF guard)
+├── routes/               # REST endpoints (courses, roadmaps, sessions, …)
+├── middleware/           # local-user resolver, logger, url-safety (SSRF guard)
 ├── db/                   # better-sqlite3 — schema.sql, seed.sql, database.js
 ├── ai/
 │   ├── llm.js            # provider-agnostic LLM layer (Claude) + metering
@@ -193,7 +186,7 @@ Frontend talks to the backend via a `/api` proxy in dev ([`vite.config.js`](vite
 
 ## 🔒 Security
 
-LearnOS ships with real hardening — JWT-enforced auth, bcrypt password hashing, an SSRF guard on outbound fetches, magic-byte validation on uploads, Helmet headers, CORS locked to `APP_URL` in production, and rate limiting. See [SECURITY.md](SECURITY.md) to report a vulnerability.
+LearnOS is meant to be self-hosted for your own use, so it ships without accounts by design. It still keeps real hardening — an SSRF guard on outbound fetches, magic-byte validation on uploads, Helmet headers, encrypted-at-rest API keys, CORS locked to `APP_URL` in production, and rate limiting. See [SECURITY.md](SECURITY.md) to report a vulnerability.
 
 ## 🤝 Contributing
 

@@ -589,7 +589,7 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast }) {
               </div>
             ) : resources.length === 0 ? (
               <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5 }}>
-                No verified resources yet. Click <em>Propose more</em> to ask the Research agent — you'll need an Anthropic key configured in Settings.
+                No verified resources yet. Click <em>Propose more</em> to ask the Research agent — you'll need an OpenRouter key configured in Settings.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

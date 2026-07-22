@@ -104,7 +104,7 @@ router.post('/apikeys', (req, res) => {
   const id = `ak-${Date.now()}`;
   // Encrypt at rest (PLAT-04). `encrypted_key` here is the raw key from the client.
   db.prepare('INSERT INTO api_keys (id, user_id, provider, encrypted_key, model, is_active) VALUES (?, ?, ?, ?, ?, 1)')
-    .run(id, req.userId, provider, encryptSecret(encrypted_key), model || 'claude-haiku-4-5');
+    .run(id, req.userId, provider, encryptSecret(encrypted_key), model || 'anthropic/claude-haiku-4.5');
   const k = db.prepare('SELECT id, provider, model, is_active FROM api_keys WHERE id = ?').get(id);
   res.json({ ok: true, key: { ...k, encrypted_key: maskSecret(encrypted_key) } });
 });

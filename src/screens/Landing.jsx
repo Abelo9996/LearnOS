@@ -251,7 +251,7 @@ function DashboardPreview() {
           </div>
         ))}
         <div style={{ marginTop: 18, padding: 12, borderRadius: 10, background: 'linear-gradient(135deg, oklch(0.22 0.05 295), oklch(0.17 0.04 250))', border: '1px solid var(--accent-line)' }}>
-          <div className="cap" style={{ color: 'oklch(0.82 0.18 295)', fontSize: 9.5 }}>Pro plan</div>
+          <div className="cap" style={{ color: 'oklch(0.82 0.18 295)', fontSize: 9.5 }}>Progress</div>
           <div className="display" style={{ fontSize: 15, color: 'var(--ink)', marginTop: 4 }}>Level 4</div>
           <div style={{ height: 4, borderRadius: 999, background: 'oklch(0.3 0.03 270)', marginTop: 8, overflow: 'hidden' }}>
             <div style={{ width: '68%', height: '100%', background: 'var(--brand-grad)' }} />
@@ -393,8 +393,8 @@ function SpotlightCards() {
       </GlowCard>
       <GlowCard glow="tr" tone="cyan" bright interactive pad={32} style={{ display: 'flex', flexDirection: 'column' }}>
         <Eyebrow>Open by design</Eyebrow>
-        <h3 className="display" style={{ fontSize: 28, margin: '18px 0 10px', letterSpacing: '-0.03em', color: 'var(--ink)' }}>Bring your own model</h3>
-        <p style={{ fontSize: 14.5, color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 22px', maxWidth: 400 }}>Plug in any provider with your own API key. Your keys, your data, your choice — no lock-in, ever.</p>
+        <h3 className="display" style={{ fontSize: 28, margin: '18px 0 10px', letterSpacing: '-0.03em', color: 'var(--ink)' }}>One key, every model</h3>
+        <p style={{ fontSize: 14.5, color: 'var(--muted)', lineHeight: 1.6, margin: '0 0 22px', maxWidth: 400 }}>Add a single OpenRouter key and switch freely between Claude, GPT, Gemini, Llama and more. Your key, your data, your costs — no lock-in, ever.</p>
         <div style={{ marginTop: 'auto' }}><ModelPicker /></div>
       </GlowCard>
     </section>
@@ -437,10 +437,10 @@ function AgentRoster() {
 
 function ModelPicker() {
   const providers = [
-    { id: 'anthropic', name: 'Anthropic', model: 'claude-sonnet-4', mono: 'CL', hue: 25 },
-    { id: 'openai', name: 'OpenAI', model: 'gpt-4o', mono: 'AI', hue: 160 },
-    { id: 'google', name: 'Google', model: 'gemini-2.0-pro', mono: 'GM', hue: 250 },
-    { id: 'mistral', name: 'Mistral', model: 'mistral-large', mono: 'MS', hue: 295 },
+    { id: 'anthropic', name: 'Claude Sonnet 4.6', model: 'anthropic/claude-sonnet-4.6', mono: 'CL', hue: 25 },
+    { id: 'openai', name: 'GPT-4o', model: 'openai/gpt-4o', mono: 'AI', hue: 160 },
+    { id: 'google', name: 'Gemini 2.5 Flash', model: 'google/gemini-2.5-flash', mono: 'GM', hue: 250 },
+    { id: 'meta', name: 'Llama 3.3 70B', model: 'meta-llama/llama-3.3-70b-instruct', mono: 'LL', hue: 295 },
   ];
   const [sel, setSel] = React.useState('anthropic');
   const cur = providers.find((p) => p.id === sel);
@@ -479,7 +479,7 @@ function ModelPicker() {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', borderRadius: 11, background: 'oklch(0.135 0.02 270)', border: '1px solid var(--border)' }}>
         <span style={{ color: 'var(--muted)' }}>{React.cloneElement(I.api, { size: 16 })}</span>
-        <span className="mono" style={{ flex: 1, fontSize: 12, color: 'var(--ink-2)', letterSpacing: 0 }}>{cur.id}-key-••••••3f2</span>
+        <span className="mono" style={{ flex: 1, fontSize: 12, color: 'var(--ink-2)', letterSpacing: 0 }}>sk-or-v1-••••••3f2</span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: 'var(--good)' }}>
           <span style={{ width: 7, height: 7, borderRadius: 999, background: 'var(--good)', boxShadow: '0 0 8px var(--good)' }} />
           Connected
@@ -493,7 +493,7 @@ function FeatureGrid() {
   const items = [
     { i: 'cap', t: 'AI Agents as Teachers', b: 'Specialized agents teach, quiz, review, and guide you one-on-one — never a pre-recorded lecture.', tone: 'brand' },
     { i: 'check', t: 'Mastery-Based Learning', b: 'Progress only when you have truly understood. Spaced review keeps it locked in for good.', tone: 'cyan' },
-    { i: 'api', t: 'Bring Your Own API Key', b: 'Use any LLM provider you prefer. You own your keys, your data, and your costs.', tone: 'rose' },
+    { i: 'api', t: 'One OpenRouter Key', b: 'A single key unlocks every model — Claude, GPT, Gemini, Llama and more. You own your key, your data, and your costs.', tone: 'rose' },
     { i: 'fork', t: 'GitHub for Courses', b: 'Version your learning. Fork, PR, and contribute to a living library of community courses.', tone: 'brand' },
     { i: 'shield', t: 'Local-First & Private', b: 'Your data stays on your device. Works offline, always in sync, nothing to leak.', tone: 'cyan' },
     { i: 'ribbon', t: 'Verifiable Certificates', b: 'Earn signed, shareable certificates that prove mastery — not just attendance.', tone: 'rose' },
@@ -598,7 +598,7 @@ function ScreenShowcase({ onEnterApp }) {
   ];
   return (
     <section style={{ ...SECT, opacity: 1 }}>
-      <SectionHeading eyebrow="See it in action" title="One workspace for the whole journey" sub="Every screen is built around your mastery — explore the product before you sign in." />
+      <SectionHeading eyebrow="See it in action" title="One workspace for the whole journey" sub="Every screen is built around your mastery — no sign-up, just clone and go." />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginTop: 52 }}>
         {tiles.map((t) => (
           <GlowCard key={t.t} glow="tl" tone={t.tone} interactive pad={0} radius={18} style={{ cursor: 'pointer' }} onClick={onEnterApp}>
@@ -723,7 +723,7 @@ function LandingCTA({ onEnterApp }) {
 
 function LandingFooter() {
   const cols = [
-    { h: 'Product', links: ['Features', 'Agents', 'Roadmaps', 'Certificates', 'Pricing'] },
+    { h: 'Product', links: ['Features', 'Agents', 'Roadmaps', 'Certificates'] },
     { h: 'Learn', links: ['Courses', 'Community', 'Docs', 'Changelog', 'Blog'] },
     { h: 'Open source', links: ['GitHub', 'Contribute', 'License (MIT)', 'Self-host', 'Status'] },
   ];
@@ -783,8 +783,8 @@ function LandingNav({ onEnterApp }) {
   const links = [
     { label: 'Features', target: 'features' },
     { label: 'Agents', target: 'spotlight' },
+    { label: 'How it works', target: 'features' },
     { label: 'Courses', target: 'screens' },
-    { label: 'Pricing', target: 'cta' },
   ];
   return (
     <div style={{ position: 'sticky', top: 18, zIndex: 60, padding: '0 24px' }}>
