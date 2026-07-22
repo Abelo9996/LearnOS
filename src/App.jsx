@@ -3,7 +3,6 @@ import { I } from './components/Icons';
 import { Btn, Avatar } from './components/UI';
 import API, { timeAgo } from './api.js';
 import { UserProvider, useUser } from './UserContext.jsx';
-import Auth from './screens/Auth.jsx';
 import Landing from './screens/Landing';
 import Dashboard from './screens/Dashboard';
 import Session from './screens/Session';
@@ -128,12 +127,14 @@ function ModalProvider({ children }) {
 function useToast() { return React.useContext(ToastContext); }
 function useModal() { return React.useContext(ModalContext); }
 
-// ── Auth gate ─────────────────────────────────────────────────────────────────
+// ── App entry ───────────────────────────────────────────────────────────────
+// No login: a cleaned-up Landing is the front door, then straight into the app.
+// (First run with an empty library drops into onboarding.)
 function AppRoot() {
-  const [phase, setPhase] = React.useState('checking');
+  const [phase, setPhase] = React.useState('landing');
   const [version, setVersion] = React.useState(0);
 
-  // Check whether the user needs onboarding (no roadmaps + no onboarded_at)
+  // Does this user still need onboarding? (no roadmaps + never onboarded)
   const checkOnboarding = async () => {
     try {
       const [roadmaps, settings] = await Promise.all([
@@ -150,42 +151,8 @@ function AppRoot() {
     return false;
   };
 
-  React.useEffect(() => {
-    const token = API.getToken();
-    if (!token) { setPhase('landing'); return; }
-    setPhase('loading');
-    (async () => {
-      try {
-        await API.getMe();
-        const needsOnboarding = await checkOnboarding();
-        if (!needsOnboarding) setPhase('app');
-      } catch {
-        API.clearToken();
-        setPhase('landing');
-      }
-    })();
-  }, []);
-
   async function handleEnterApp() {
-    const token = API.getToken();
-    if (token) {
-      setPhase('loading');
-      try {
-        const user = await API.getMe();
-        const needsOnboarding = await checkOnboarding();
-        if (!needsOnboarding) {
-          setVersion(v => v + 1);
-          setPhase('app');
-        }
-        return;
-      } catch {
-        API.clearToken();
-      }
-    }
-    setPhase('auth');
-  }
-
-  async function handleAuthSuccess(user) {
+    setPhase('loading');
     const needsOnboarding = await checkOnboarding();
     if (!needsOnboarding) {
       setVersion(v => v + 1);
@@ -193,21 +160,15 @@ function AppRoot() {
     }
   }
 
-  function handleLogout() {
-    API.logout();
-    setPhase('landing');
-  }
-
   function handleOnboardingComplete() {
     setVersion(v => v + 1);
     setPhase('app');
   }
 
-  if (phase === 'checking' || phase === 'loading') return <AppLoader />;
+  if (phase === 'loading') return <AppLoader />;
   if (phase === 'landing') return <Landing onEnterApp={handleEnterApp} />;
-  if (phase === 'auth')    return <Auth onSuccess={handleAuthSuccess} />;
   if (phase === 'onboarding') return <Onboarding onComplete={handleOnboardingComplete} />;
-  return <App key={version} onLogout={handleLogout} />;
+  return <App key={version} />;
 }
 
 function AppLoader() {
@@ -245,7 +206,7 @@ export default AppRoot;
 // must live below the providers in the tree (you cannot read a context in the
 // same component that renders its Provider — useContext returns the default
 // null and destructuring `{ add }` throws).
-function App({ onLogout }) {
+function App() {
   const [me, setMe] = React.useState(null);
 
   React.useEffect(() => {
@@ -258,7 +219,6 @@ function App({ onLogout }) {
         xpToNext:   u.xpToNext ?? u.xp_to_next ?? 500,
         streak:     u.streak || 0,
         bestStreak: u.bestStreak ?? u.best_streak ?? 0,
-        plan:       u.plan || 'Free',
         role:       u.role || 'user',
         avatar_url: u.avatar_url || null,
       });
@@ -270,13 +230,13 @@ function App({ onLogout }) {
   return (
     <UserProvider user={me}>
       <ToastProvider><ModalProvider>
-        <AppShell onLogout={onLogout} />
+        <AppShell />
       </ModalProvider></ToastProvider>
     </UserProvider>
   );
 }
 
-function AppShell({ onLogout }) {
+function AppShell() {
   const [screen, setScreen]               = React.useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const [density, setDensity]             = React.useState('regular');
@@ -354,23 +314,23 @@ function AppShell({ onLogout }) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
-      {!isMobile && <Sidebar screen={screen} setScreen={go} collapsed={sidebarCollapsed} onToggle={toggleSidebar} onLogout={onLogout} counts={navCounts} />}
+      {!isMobile && <Sidebar screen={screen} setScreen={go} collapsed={sidebarCollapsed} onToggle={toggleSidebar} counts={navCounts} />}
       <main style={{
         flex: 1,
         width: isMobile ? '100vw' : `calc(100vw - ${sw}px)`,
         display: 'flex', flexDirection: 'column', minHeight: '100vh',
         transition: 'width var(--dur-normal) var(--ease-smooth)',
       }}>
-        <TopBar setScreen={go} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} onLogout={onLogout} />
+        <TopBar setScreen={go} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} />
         <div style={{ flex: 1, minHeight: 0 }}>
-          <ScreenRouter screen={screen} setScreen={go} onLogout={onLogout} />
+          <ScreenRouter screen={screen} setScreen={go} />
         </div>
       </main>
     </div>
   );
 }
 
-function ScreenRouter({ screen, setScreen, onLogout }) {
+function ScreenRouter({ screen, setScreen }) {
   // height:100% is required for the Session screen's flex layout
   const wrap = (el) => <div key={screen} className="page-enter" style={{ height: '100%' }}>{el}</div>;
   switch (screen) {
@@ -386,7 +346,7 @@ function ScreenRouter({ screen, setScreen, onLogout }) {
     case 'feed':         return wrap(<Feed />);
     case 'starred':      return wrap(<Starred />);
     case 'agents':       return wrap(<AgentsPage setScreen={setScreen} />);
-    case 'settings':     return wrap(<Settings onLogout={onLogout} />);
+    case 'settings':     return wrap(<Settings />);
     default:             return wrap(<Dashboard onOpenSession={() => setScreen('session')} onOpenRoadmap={() => setScreen('roadmaps')} onOpenCourses={() => setScreen('courses')} onOpenCards={() => setScreen('cards')} setScreen={setScreen} />);
   }
 }
@@ -472,7 +432,7 @@ function ProgressPopup({ onClose }) {
 }
 
 /* ── Sidebar ──────────────────────────────────────────────────────────────── */
-function Sidebar({ screen, setScreen, collapsed, onToggle, onLogout, counts = {} }) {
+function Sidebar({ screen, setScreen, collapsed, onToggle, counts = {} }) {
   const { open: openModal, close: closeModal } = useModal();
   const user = useUser();
   const w = collapsed ? 64 : 240;
@@ -539,7 +499,7 @@ function Sidebar({ screen, setScreen, collapsed, onToggle, onLogout, counts = {}
         ))}
       </div>
 
-      {/* Plan card */}
+      {/* Progress card */}
       {!collapsed && (
         <div className="sidebar-plan-card" style={{
           margin: '6px 12px 10px', padding: 12,
@@ -550,12 +510,12 @@ function Sidebar({ screen, setScreen, collapsed, onToggle, onLogout, counts = {}
           animation: 'labelFadeIn var(--dur-normal) var(--ease-smooth) both',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <span className="cap" style={{ color: 'oklch(0.82 0.18 295)' }}>Current Plan</span>
-            <span style={{ color: 'var(--muted)' }}>ⓘ</span>
+            <span className="cap" style={{ color: 'oklch(0.82 0.18 295)' }}>Progress</span>
+            <span className="mono" style={{ fontSize: 10.5, color: 'var(--muted)' }}>{(user.xp || 0).toLocaleString()} XP</span>
           </div>
-          <div className="display" style={{ fontSize: 16, color: 'var(--ink)' }}>{user.plan || 'Free'}</div>
+          <div className="display" style={{ fontSize: 16, color: 'var(--ink)' }}>Level {user.level}</div>
           <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', margin: '6px 0' }}>
-            Level {user.level} · {Math.round(((user.xp || 0) / (user.xpToNext || 500)) * 100)}% to Level {(user.level || 1) + 1}
+            {Math.round(((user.xp || 0) / (user.xpToNext || 500)) * 100)}% to Level {(user.level || 1) + 1}
           </div>
           <div style={{ background: 'var(--surface-3)', height: 3, borderRadius: 999, overflow: 'hidden' }}>
             <div style={{ width: `${Math.round(((user.xp || 0) / (user.xpToNext || 500)) * 100)}%`, height: '100%', background: 'var(--brand-grad)', borderRadius: 999, transition: 'width var(--dur-slow) var(--ease-out)' }} />
@@ -578,24 +538,6 @@ function Sidebar({ screen, setScreen, collapsed, onToggle, onLogout, counts = {}
             <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)' }}>{user.name}</div>
             <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>
           </div>
-        )}
-        {!collapsed && (
-          <button
-            onClick={onLogout}
-            title="Sign out"
-            style={{ background: 'none', border: 0, color: 'var(--muted)', cursor: 'pointer', padding: 4, transition: 'color 120ms', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--bad)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; }}
-          >{React.cloneElement(I.logout, { size: 15 })}</button>
-        )}
-        {collapsed && (
-          <button
-            onClick={onLogout}
-            title="Sign out"
-            style={{ background: 'none', border: 0, color: 'var(--muted)', cursor: 'pointer', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', transition: 'color 120ms' }}
-            onMouseEnter={e => { e.currentTarget.style.color = 'var(--bad)'; }}
-            onMouseLeave={e => { e.currentTarget.style.color = 'var(--muted)'; }}
-          >{React.cloneElement(I.logout, { size: 15 })}</button>
         )}
       </div>
     </aside>
@@ -765,7 +707,7 @@ function TopBarSearch({ setScreen }) {
 }
 
 /* ── TopBar ───────────────────────────────────────────────────────────────── */
-function TopBar({ setScreen, onToggleSidebar, collapsed, onLogout }) {
+function TopBar({ setScreen, onToggleSidebar, collapsed }) {
   const user = useUser();
   const [showUserMenu, setShowUserMenu]           = React.useState(false);
   const [showNotifs, setShowNotifs]               = React.useState(false);
@@ -890,8 +832,6 @@ function TopBar({ setScreen, onToggleSidebar, collapsed, onLogout }) {
         {showUserMenu && (
           <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 1000, background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 10, padding: 4, minWidth: 160, boxShadow: 'var(--shadow-md)', animation: 'pageEnter var(--dur-fast) var(--ease-out)' }}>
             <MenuBtn icon={I.cog}    label="Settings"  onClick={() => { setScreen('settings'); setShowUserMenu(false); }} />
-            <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
-            <MenuBtn icon={I.logout} label="Sign out" danger onClick={() => { onLogout(); setShowUserMenu(false); }} />
           </div>
         )}
       </div>

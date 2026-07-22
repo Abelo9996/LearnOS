@@ -10,7 +10,7 @@ Not "Coursera + ChatGPT." A fundamentally new paradigm where **AI agents ARE the
 
 ### Online education is broken
 
-- 💸 **Expensive** — $49/course, $15K+ degrees, certificates behind paywalls
+- 💸 **Expensive** — per-course fees, five-figure degrees, certificates behind paywalls
 - 📹 **Static** — Pre-recorded in 2019, taught in 2026
 - 🧱 **One-size-fits-all** — Same lecture for a beginner and an expert
 - 🏝️ **Isolated** — 5-15% completion rates. You learn alone, drop out alone
@@ -21,7 +21,7 @@ Not "Coursera + ChatGPT." A fundamentally new paradigm where **AI agents ARE the
 | What Exists | What LearnOS Builds |
 |---|---|
 | Watch videos, take quizzes | AI agents that teach via Socratic dialogue |
-| Pay per course | One subscription, unlimited learning |
+| Pay a platform per course | Self-hosted and free — bring one OpenRouter key, pay only for tokens |
 | Content ages | Living courses powered by real-time web knowledge |
 | Learn alone | Cohorts, communities, study groups |
 | Certificates = completion | Certificates = verified mastery |
@@ -60,7 +60,7 @@ Agents share memory. They collaborate. Together they deliver a university experi
 Personal AI learning with roadmaps, tutoring, assignments, analytics, profiling
 
 ### Layer 2: University 🔨 (Building)
-Auth, multi-user, course marketplace, cohort learning, certificates, communities
+Course library, cohort learning, certificates, and communities — all self-hosted, no accounts required
 
 ### Layer 3: Platform 📋 (Planned)
 Multi-language, mobile, offline mode, enterprise instances, API ecosystem
@@ -68,14 +68,14 @@ Multi-language, mobile, offline mode, enterprise instances, API ecosystem
 ### Layer 4: Revolution 🔮 (Vision)
 AI research mentorship, portfolio generation, job placement, accreditation pathways, spaced repetition, knowledge graph networking
 
-## Go-To-Market
+## How It Grows
 
 1. **STEM first** — CS, Math, Data Science, Engineering
-2. **GitHub as distribution** — the repo IS the product demo
-3. **Community-driven growth** — contributors become evangelists
-4. **Open-source moat** — trust, customization, longevity
+2. **GitHub as home** — clone it, run it, contribute back
+3. **Community-driven** — contributors become maintainers
+4. **Open-source by default** — trust, customization, longevity
 5. **Expand outward** — humanities, business, creative arts, professional development
-6. **Institutional adoption** — universities and companies run their own instances
+6. **Run your own** — anyone can self-host their own instance for a class, team, or community
 
 ## The North Star
 

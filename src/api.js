@@ -1,14 +1,8 @@
-const TOKEN_KEY = 'learnos_token';
-
+// LearnOS is single-user and self-hosted — there is no login, so requests carry
+// no auth token. The server resolves the one local user on every request.
 const API = {
-  getToken:   () => localStorage.getItem(TOKEN_KEY),
-  setToken:   (t) => localStorage.setItem(TOKEN_KEY, t),
-  clearToken: () => localStorage.removeItem(TOKEN_KEY),
-
   async request(method, path, body) {
     const headers = { 'Content-Type': 'application/json' };
-    const token = this.getToken();
-    if (token) headers['Authorization'] = `Bearer ${token}`;
     let res;
     try {
       res = await fetch(`/api${path}`, {
@@ -35,22 +29,8 @@ const API = {
   patch: (path, body) => API.request('PATCH',  path, body),
   del:   (path)       => API.request('DELETE', path),
 
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  async login(email, password) {
-    const data = await this.post('/auth/login', { email, password });
-    this.setToken(data.token);
-    return data;
-  },
-  async register(name, email, password) {
-    const data = await this.post('/auth/register', { name, email, password });
-    this.setToken(data.token);
-    return data;
-  },
-  async logout() {
-    try { await this.post('/auth/logout'); } catch {}
-    this.clearToken();
-  },
-  getMe: () => API.get('/auth/me'),
+  // ── Current user (single local user — no login) ────────────────────────────
+  getMe: () => API.get('/me'),
 
   // ── Stats / Dashboard ──────────────────────────────────────────────────────
   getStats:       () => API.get('/stats'),
@@ -158,10 +138,7 @@ const API = {
   uploadFile:   (file) => {
     const fd = new FormData();
     fd.append('file', file);
-    const token = API.getToken();
-    const headers = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-    return fetch('/api/uploads', { method: 'POST', body: fd, headers }).then(r => r.json());
+    return fetch('/api/uploads', { method: 'POST', body: fd }).then(r => r.json());
   },
 
   // ── Course modules & lessons (§3.2) ────────────────────────────────────────
@@ -195,12 +172,6 @@ const API = {
   // ── Roadmap node creation (§3.11) ──────────────────────────────────────────
   createRoadmapNode:    (rid, data) => API.post(`/roadmaps/${rid}/nodes`, data),
   deleteRoadmapNode:    (rid, nid) => API.del(`/roadmaps/${rid}/nodes/${nid}`),
-
-  // ── Password reset + email verification (§3.13) ────────────────────────────
-  forgotPassword:       (email) => API.post('/auth/forgot', { email }),
-  resetPassword:        (token, new_password) => API.post('/auth/reset', { token, new_password }),
-  verifyEmail:          (token) => API.get(`/auth/verify?token=${encodeURIComponent(token)}`),
-  resendVerification:   () => API.post('/auth/resend-verification'),
 };
 
 export default API;

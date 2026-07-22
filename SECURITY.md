@@ -25,14 +25,13 @@ We take security seriously. If you discover a vulnerability in LearnOS, please r
 
 LearnOS ships with hardening built in:
 
-### Authentication
-- Passwords are hashed with **bcrypt** — plaintext passwords are never stored.
-- Sessions use **JWT**. In production, `LEARNOS_JWT_SECRET` **must** be set or the server refuses to start; in dev it falls back to a per-boot random secret (tokens don't survive restarts).
-- Auth is enforced via middleware on protected routes.
+### Accounts
+- LearnOS is **single-user and self-hosted** — there is no login, registration, or password storage by design. It's meant to run on your own machine or a private instance you control, so exposure of an authentication surface is avoided entirely.
+- If you expose an instance to a network, put it behind your own access control (reverse-proxy auth, VPN, or firewall).
 
 ### API Keys
-- Anthropic API keys are stored **server-side only** and never exposed to the frontend.
-- All AI calls are proxied through the backend LLM layer (`ai/llm.js`), which also meters usage and enforces per-user cost/token caps for managed keys.
+- Your **OpenRouter** API key is stored **server-side only** (encrypted at rest via `ai/crypto.js`) and never exposed to the frontend.
+- All AI calls are proxied through the backend LLM layer (`ai/llm.js`), which meters usage (tokens + cost) for observability.
 
 ### Network & Transport
 - **Helmet** sets secure HTTP headers.
@@ -56,4 +55,4 @@ LearnOS ships with hardening built in:
 
 ## Scope
 
-This policy covers the LearnOS repository at [github.com/Abelo9996/LearnOS](https://github.com/Abelo9996/LearnOS). Third-party services (e.g. Anthropic) are governed by their own security policies.
+This policy covers the LearnOS repository at [github.com/Abelo9996/LearnOS](https://github.com/Abelo9996/LearnOS). Third-party services (e.g. OpenRouter) are governed by their own security policies.

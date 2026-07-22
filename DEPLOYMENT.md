@@ -26,7 +26,7 @@ npm run build
 
 ## 2. Configure
 
-Copy `.env.example` to `.env` and set at least the production essentials:
+LearnOS runs with zero config, but for a hosted instance copy `.env.example` to `.env` and set:
 
 ```bash
 cp .env.example .env
@@ -34,18 +34,16 @@ cp .env.example .env
 
 ```env
 NODE_ENV=production
-LEARNOS_JWT_SECRET=<openssl rand -hex 32>   # REQUIRED — server refuses to start without it in prod
 APP_URL=https://learnos.example.com         # CORS is locked to this origin in prod
 PORT=3001
 
-# Optional: a managed Anthropic key so users don't have to bring their own
-ANTHROPIC_API_KEY=
-LEARNOS_DEFAULT_MODEL=claude-haiku-4-5
-MANAGED_MONTHLY_TOKEN_CAP=500000
-MANAGED_MONTHLY_COST_CAP=50
+# LLM provider: OpenRouter (one key, every model). Set it here, or add it in-app
+# under Settings → API Keys.
+OPENROUTER_API_KEY=sk-or-...
+LEARNOS_DEFAULT_MODEL=anthropic/claude-haiku-4.5
 ```
 
-If you don't set a managed key, users add their own under **Settings → API Keys**.
+LearnOS is single-user and self-hosted — there is no login. If you don't set `OPENROUTER_API_KEY`, add a key in-app under **Settings → API Keys**.
 
 ## 3. Run
 
@@ -89,17 +87,12 @@ curl https://learnos.example.com/api/health
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `NODE_ENV` | Prod | `development` | Set to `production` to enable prod behavior (CORS lock, static serving) |
-| `LEARNOS_JWT_SECRET` | **Prod** | *(per-boot random in dev)* | JWT signing secret — server exits if unset in production |
-| `APP_URL` | Prod | `http://localhost:3001` | Allowed CORS origin and base URL for email links |
+| `APP_URL` | Prod | `http://localhost:3001` | Allowed CORS origin and outbound request attribution |
 | `PORT` | No | `3001` | Port the server listens on |
-| `ANTHROPIC_API_KEY` | Optional | *(empty)* | Managed Anthropic key (users can otherwise bring their own) |
-| `LEARNOS_ANTHROPIC_KEY` | Optional | *(empty)* | Alias, checked before `ANTHROPIC_API_KEY` |
-| `LEARNOS_DEFAULT_MODEL` | Optional | `claude-haiku-4-5` | Default model when no per-agent routing is set |
-| `MANAGED_MONTHLY_TOKEN_CAP` | Optional | `500000` | Per-user monthly token cap on the managed key (0 = unlimited) |
-| `MANAGED_MONTHLY_COST_CAP` | Optional | `50` | Per-user monthly USD cap on the managed key (0 = unlimited) |
-| `RESEND_API_KEY` | Optional | *(empty)* | Enables password-reset / verification email (else those endpoints 503 in prod) |
-| `EMAIL_FROM` | Optional | `LearnOS <noreply@learnos.dev>` | From address for outbound email |
-| `LEARNOS_SEED` | Optional | *(unset)* | Set to `1` to seed a demo user on first boot — leave unset in production |
+| `OPENROUTER_API_KEY` | Optional | *(empty)* | Server-wide OpenRouter key (users can otherwise add one in-app) |
+| `LEARNOS_DEFAULT_MODEL` | Optional | `anthropic/claude-haiku-4.5` | Default OpenRouter model slug when no per-agent routing is set |
+| `LEARNOS_ENC_KEY` | Optional | *(derived)* | 32-byte base64/hex key to encrypt in-app API keys at rest |
+| `LEARNOS_SEED` | Optional | *(unset)* | Set to `1` to seed example roadmaps/courses on first boot |
 
 ## Data & Persistence
 

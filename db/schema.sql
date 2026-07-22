@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS api_keys (
 CREATE TABLE IF NOT EXISTS agent_routing (
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   agent_code TEXT NOT NULL,
-  model TEXT NOT NULL DEFAULT 'claude-haiku-4-5',
+  model TEXT NOT NULL DEFAULT 'anthropic/claude-haiku-4.5',
   PRIMARY KEY (user_id, agent_code)
 );
 

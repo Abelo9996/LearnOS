@@ -1,33 +1,27 @@
 /**
- * LearnOS LLM provider abstraction (PLAT-01/02/03/05).
+ * LearnOS LLM provider abstraction.
  * Single entry point `complete()` for every agent call:
- *   - resolves managed Anthropic key (env) vs per-user BYOK key
- *   - resolves model from agent_routing (or a managed default)
- *   - prompt-caches the stable agent system prompt
+ *   - resolves the OpenRouter API key: per-user BYOK key (Settings → API Keys)
+ *     first, else the OPENROUTER_API_KEY env key
+ *   - resolves the model from agent_routing (or a default)
  *   - returns { text, json, usage, cost } and logs every run to agent_runs
- * Anthropic-only for v1; OpenAI/Gemini stubbed behind this interface later.
+ *
+ * Provider = OpenRouter (https://openrouter.ai), an OpenAI-compatible gateway.
+ * One key unlocks every major model (Anthropic, OpenAI, Google, Meta, …) by
+ * slug, so users pick whatever balance of quality/cost they want.
  */
-import Anthropic from '@anthropic-ai/sdk';
 import db, { logAgentRun, bumpUsage } from '../db/database.js';
 import { decryptSecret } from './crypto.js';
 
-// Pricing per 1M tokens (USD) — keep in sync with the model catalog.
-const PRICING = {
-  'claude-opus-4-8':   { in: 5, out: 25 },
-  'claude-opus-4-7':   { in: 5, out: 25 },
-  'claude-opus-4-6':   { in: 5, out: 25 },
-  'claude-sonnet-4-6': { in: 3, out: 15 },
-  'claude-haiku-4-5':  { in: 1, out: 5 },
-};
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Adaptive thinking + effort are supported on Opus 4.x and Sonnet 4.6 only
-// (they 400 on Haiku 4.5), so gate those request fields by model.
-const THINKING_MODELS = new Set([
-  'claude-opus-4-8', 'claude-opus-4-7', 'claude-opus-4-6', 'claude-sonnet-4-6',
-]);
+// Model slug used when no per-agent routing is configured. Any OpenRouter slug
+// works — see https://openrouter.ai/models. Cheap + capable by default.
+const DEFAULT_MODEL = process.env.LEARNOS_DEFAULT_MODEL || 'anthropic/claude-haiku-4.5';
 
-const DEFAULT_MODEL = process.env.LEARNOS_DEFAULT_MODEL || 'claude-haiku-4-5';
-const MANAGED_KEY = process.env.LEARNOS_ANTHROPIC_KEY || process.env.ANTHROPIC_API_KEY || null;
+// Optional env-provided key so a self-hoster can drop one key in and go without
+// touching the UI. A per-user key added in Settings always takes precedence.
+const ENV_KEY = process.env.OPENROUTER_API_KEY || process.env.LEARNOS_OPENROUTER_KEY || null;
 
 export function resolveModel(userId, agentCode, explicit) {
   if (explicit) return explicit;
@@ -38,141 +32,144 @@ export function resolveModel(userId, agentCode, explicit) {
   return DEFAULT_MODEL;
 }
 
-// A usable key is `sk-` + plausible length of printable ASCII. This rejects the
-// fake seed placeholders (e.g. "sk-ant-…7Z2") so we never hand a malformed key
-// to the SDK — those fall through to the managed key or a clean NO_KEY error.
+// A usable key is a non-empty token that isn't an obvious seed placeholder.
+// OpenRouter keys look like `sk-or-v1-…`; we stay lenient so any real key works.
 function looksUsable(key) {
-  return typeof key === 'string' && /^sk-[\x21-\x7e]{20,}$/.test(key);
+  return typeof key === 'string' && key.length >= 16 && !/REPLACE|PLACEHOLDER|xxxx/i.test(key);
 }
 
-// BYOK (active anthropic key) takes precedence; else the managed platform key.
+// BYOK (an active OpenRouter key from Settings) takes precedence; else the env key.
 function resolveKey(userId) {
   if (userId) {
     const row = db.prepare(
-      "SELECT encrypted_key FROM api_keys WHERE user_id = ? AND provider = 'anthropic' AND is_active = 1 ORDER BY created_at DESC LIMIT 1"
+      "SELECT encrypted_key FROM api_keys WHERE user_id = ? AND provider = 'openrouter' AND is_active = 1 ORDER BY created_at DESC LIMIT 1"
     ).get(userId);
     if (row?.encrypted_key) {
       const key = decryptSecret(row.encrypted_key);
       if (looksUsable(key)) return { apiKey: key, managed: false };
     }
   }
-  if (MANAGED_KEY) return { apiKey: MANAGED_KEY, managed: true };
+  if (ENV_KEY && looksUsable(ENV_KEY)) return { apiKey: ENV_KEY, managed: true };
   return null;
 }
 
-function priceFor(model, usage) {
-  const p = PRICING[model] || PRICING[DEFAULT_MODEL] || { in: 1, out: 5 };
-  const inTok = usage?.input_tokens || 0;
-  const outTok = usage?.output_tokens || 0;
-  const cacheRead = usage?.cache_read_input_tokens || 0;   // ~0.1x input
-  const cacheWrite = usage?.cache_creation_input_tokens || 0; // ~1.25x input (5m TTL)
-  return (inTok * p.in + cacheWrite * p.in * 1.25 + cacheRead * p.in * 0.1 + outTok * p.out) / 1_000_000;
+// Pull a JSON object out of a model response that may be wrapped in prose or
+// ```json fences — different models format structured output differently.
+function parseJson(text) {
+  if (!text) return null;
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1] : text;
+  try { return JSON.parse(candidate.trim()); } catch { /* fall through */ }
+  const start = candidate.indexOf('{');
+  const end = candidate.lastIndexOf('}');
+  if (start !== -1 && end > start) {
+    try { return JSON.parse(candidate.slice(start, end + 1)); } catch { /* ignore */ }
+  }
+  return null;
 }
 
 /**
  * complete — the one call every agent goes through.
  * @param {object} opts
  *   userId, agentCode — for key/model resolution + logging
- *   system            — stable system prompt (prompt-cached)
- *   messages          — string or Anthropic message array
- *   model             — explicit model override
+ *   system            — stable system prompt
+ *   messages          — string or OpenAI-style message array
+ *   model             — explicit model override (OpenRouter slug)
  *   schema            — JSON schema → structured output (returns .json)
- *   maxTokens, thinking(bool), effort('low'|'medium'|'high'|'max')
+ *   maxTokens
  * @returns {Promise<{text, json, usage, model, managed, cost, runId, stopReason}>}
  */
 export async function complete(opts = {}) {
   const {
     userId = null, agentCode = null, system, messages,
-    model: explicitModel, schema = null,
-    maxTokens = 8192, thinking = false, effort = null,
+    model: explicitModel, schema = null, maxTokens = 8192,
   } = opts;
 
   const model = resolveModel(userId, agentCode, explicitModel);
   const creds = resolveKey(userId);
   if (!creds) {
-    const err = new Error('No Anthropic API key available. Add one in Settings, or set LEARNOS_ANTHROPIC_KEY for the managed default.');
+    const err = new Error('No OpenRouter API key available. Add one in Settings → API Keys, or set OPENROUTER_API_KEY for the server.');
     err.code = 'NO_KEY';
     throw err;
   }
 
-  // S-03: Enforce managed-key usage caps for non-BYOK users
-  if (creds.managed && userId) {
-    const capTokens = parseInt(process.env.MANAGED_MONTHLY_TOKEN_CAP || '0') || Infinity;
-    const capCost = parseFloat(process.env.MANAGED_MONTHLY_COST_CAP || '0') || Infinity;
-    if (capTokens < Infinity || capCost < Infinity) {
-      const period = new Date().toISOString().slice(0, 7); // YYYY-MM
-      const usage = db.prepare('SELECT tokens, cost_usd FROM usage_counters WHERE user_id = ? AND period = ?').get(userId, period);
-      const usedTokens = usage?.tokens || 0;
-      const usedCost = usage?.cost_usd || 0;
-      if (usedTokens >= capTokens || usedCost >= capCost) {
-        const err = new Error('Monthly managed-key usage cap exceeded. Add your own Anthropic key in Settings → API Keys to continue.');
-        err.code = 'USAGE_CAP_EXCEEDED';
-        err.status = 402;
-        throw err;
-      }
-    }
-  }
-
-  const client = new Anthropic({ apiKey: creds.apiKey });
-
-  const req = {
-    model,
-    max_tokens: maxTokens,
-    messages: Array.isArray(messages)
-      ? messages
-      : [{ role: 'user', content: String(messages ?? '') }],
-  };
-  if (system) {
-    // Stable system prompt → cache it (prefix match; min ~2-4K tokens to actually cache).
-    req.system = [{ type: 'text', text: String(system), cache_control: { type: 'ephemeral' } }];
-  }
+  // Build OpenAI-compatible chat messages: system prompt first, then the turns.
+  const chat = [];
+  let systemText = system ? String(system) : '';
   if (schema) {
-    req.output_config = { format: { type: 'json_schema', schema } };
+    // Belt-and-suspenders across models: ask for raw JSON in-prompt AND send a
+    // response_format below. Models with native structured output honor the
+    // latter; others still return clean JSON thanks to the instruction.
+    systemText += `${systemText ? '\n\n' : ''}Respond with ONLY a single valid JSON object matching this JSON schema. No markdown, no code fences, no commentary:\n${JSON.stringify(schema)}`;
   }
-  if (thinking && THINKING_MODELS.has(model)) {
-    req.thinking = { type: 'adaptive' };
+  if (systemText) chat.push({ role: 'system', content: systemText });
+  if (Array.isArray(messages)) {
+    for (const m of messages) chat.push({ role: m.role || 'user', content: String(m.content ?? '') });
+  } else {
+    chat.push({ role: 'user', content: String(messages ?? '') });
   }
-  if (effort && THINKING_MODELS.has(model)) {
-    req.output_config = { ...(req.output_config || {}), effort };
+
+  const body = {
+    model,
+    messages: chat,
+    max_tokens: maxTokens,
+    usage: { include: true }, // ask OpenRouter to return real USD cost + token counts
+  };
+  if (schema) {
+    body.response_format = { type: 'json_schema', json_schema: { name: 'result', strict: false, schema } };
   }
 
   const started = Date.now();
   const runId = `run-${started}-${Math.random().toString(36).slice(2, 8)}`;
-  let resp;
+  let data;
   try {
-    resp = await client.messages.create(req);
+    const resp = await fetch(OPENROUTER_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${creds.apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.APP_URL || 'http://localhost:3001',
+        'X-Title': 'LearnOS',
+      },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      const detail = await resp.text().catch(() => '');
+      throw new Error(`OpenRouter ${resp.status}: ${detail.slice(0, 500)}`);
+    }
+    data = await resp.json();
+    if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
   } catch (e) {
     record({ runId, userId, agentCode, model, managed: creds.managed, usage: null, latency: Date.now() - started, status: 'error', error: e?.message || String(e), cost: 0 });
     throw e;
   }
 
   const latency = Date.now() - started;
-  const usage = resp.usage || {};
-  const cost = priceFor(model, usage);
-
-  let text = '';
-  for (const block of resp.content || []) if (block.type === 'text') text += block.text;
-  let json = null;
-  if (schema) { try { json = JSON.parse(text); } catch { json = null; } }
+  const choice = data.choices?.[0] || {};
+  const text = choice.message?.content || '';
+  const usage = data.usage || {};
+  const cost = typeof usage.cost === 'number' ? usage.cost : 0;
+  const json = schema ? parseJson(text) : null;
 
   record({ runId, userId, agentCode, model, managed: creds.managed, usage, latency, status: 'ok', error: null, cost });
-  return { text, json, usage, model, managed: creds.managed, cost, runId, stopReason: resp.stop_reason };
+  return { text, json, usage, model, managed: creds.managed, cost, runId, stopReason: choice.finish_reason };
 }
 
 function record(r) {
   try {
+    const inTok = r.usage?.prompt_tokens || 0;
+    const outTok = r.usage?.completion_tokens || 0;
+    const cacheRead = r.usage?.prompt_tokens_details?.cached_tokens || 0;
     logAgentRun({
       id: r.runId, user_id: r.userId, agent_code: r.agentCode, model: r.model,
-      provider: 'anthropic', managed: r.managed ? 1 : 0,
-      input_tokens: r.usage?.input_tokens || 0, output_tokens: r.usage?.output_tokens || 0,
-      cache_read_tokens: r.usage?.cache_read_input_tokens || 0,
-      cache_write_tokens: r.usage?.cache_creation_input_tokens || 0,
+      provider: 'openrouter', managed: r.managed ? 1 : 0,
+      input_tokens: inTok, output_tokens: outTok,
+      cache_read_tokens: cacheRead, cache_write_tokens: 0,
       cost_usd: r.cost || 0, latency_ms: r.latency || 0, status: r.status, error: r.error,
     });
-    if (r.managed && r.userId) {
-      bumpUsage(r.userId, (r.usage?.input_tokens || 0) + (r.usage?.output_tokens || 0), r.cost || 0);
-    }
+    if (r.userId) bumpUsage(r.userId, inTok + outTok, r.cost || 0);
   } catch { /* never let logging break a call */ }
 }
 
-export function hasManagedKey() { return !!MANAGED_KEY; }
+// True when a server-wide OpenRouter key is configured via env.
+export function hasManagedKey() { return !!(ENV_KEY && looksUsable(ENV_KEY)); }

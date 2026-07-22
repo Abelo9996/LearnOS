@@ -9,10 +9,10 @@ import { generateAssignment, generateQuiz } from '../ai/agents/assessment.js';
 
 const router = Router();
 
-// Is the AI layer usable for this user? (managed default and/or their BYOK)
+// Is the AI layer usable? (an env OpenRouter key and/or a key added in Settings)
 router.get('/status', (req, res) => {
   const byok = db.prepare(
-    "SELECT COUNT(*) AS c FROM api_keys WHERE user_id = ? AND provider = 'anthropic' AND is_active = 1"
+    "SELECT COUNT(*) AS c FROM api_keys WHERE user_id = ? AND provider = 'openrouter' AND is_active = 1"
   ).get(req.userId).c;
   res.json({ managed: hasManagedKey(), byok: byok > 0, ready: hasManagedKey() || byok > 0 });
 });
