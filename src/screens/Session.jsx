@@ -4,12 +4,14 @@ import { Card, Btn, ProgressBar, Tag, Avatar, AgentChip } from '../components/UI
 import { AGENTS } from '../data/data';
 import API from '../api';
 // LLM calls go through /api/ai/chat
-import { useToast } from '../App';
+import { useToast, useModal } from '../App';
 import { useUser } from '../UserContext.jsx';
 import MarkdownText from '../components/Markdown';
+import QuizModal from '../components/QuizModal.jsx';
 
 export default function Session({ setScreen }) {
   const { add: toast } = useToast();
+  const { open: openModal, close: closeModal } = useModal();
   const user = useUser();
   const [messages, setMessages] = React.useState([]);
   const [input, setInput] = React.useState('');
@@ -264,7 +266,7 @@ export default function Session({ setScreen }) {
       document.querySelector('.chat-composer-input')?.focus();
       toast('Type your follow-up question below', 'info');
     } else if (label === 'Generate quiz') {
-      submit('Can you quiz me on this?');
+      openModal(<QuizModal nodeId={session?.roadmap_node_id || null} title={session?.title || 'Session quiz'} onClose={closeModal} />);
     } else if (label === 'Explain simpler') {
       submit('Can you rephrase your last response at a beginner level, with a simple analogy?');
     } else if (label === 'Show examples') {
