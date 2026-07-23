@@ -17,6 +17,41 @@ router.get('/status', (req, res) => {
   res.json({ managed: hasManagedKey(), byok: byok > 0, ready: hasManagedKey() || byok > 0 });
 });
 
+// Full OpenRouter model catalog (cached ~1h) so the user can route any agent to
+// any available model. The list endpoint is public — no key required.
+let _modelCache = { at: 0, data: null };
+const FALLBACK_MODELS = [
+  { id: 'anthropic/claude-haiku-4.5', name: 'Claude Haiku 4.5' },
+  { id: 'anthropic/claude-sonnet-4.6', name: 'Claude Sonnet 4.6' },
+  { id: 'openai/gpt-4o-mini', name: 'GPT-4o mini' },
+  { id: 'openai/gpt-4o', name: 'GPT-4o' },
+  { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+  { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B' },
+];
+router.get('/models', async (_req, res) => {
+  const now = Date.now();
+  if (_modelCache.data && (now - _modelCache.at) < 3_600_000) return res.json(_modelCache.data);
+  try {
+    const r = await fetch('https://openrouter.ai/api/v1/models', { headers: { Accept: 'application/json' } });
+    if (!r.ok) throw new Error('openrouter ' + r.status);
+    const j = await r.json();
+    const models = (j.data || [])
+      .map(m => ({
+        id: m.id,
+        name: m.name || m.id,
+        context: m.context_length || m.top_provider?.context_length || null,
+        promptPrice: m.pricing?.prompt != null ? Number(m.pricing.prompt) : null,
+        completionPrice: m.pricing?.completion != null ? Number(m.pricing.completion) : null,
+      }))
+      .filter(m => m.id)
+      .sort((a, b) => a.id.localeCompare(b.id));
+    _modelCache = { at: now, data: models };
+    res.json(models);
+  } catch {
+    res.json(_modelCache.data || FALLBACK_MODELS);
+  }
+});
+
 // Smoke-test the full provider chain end to end.
 router.post('/ping', async (req, res) => {
   try {

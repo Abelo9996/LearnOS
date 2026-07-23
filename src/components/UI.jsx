@@ -28,10 +28,11 @@ export function AgentChip({ code, size = 28, showLabel = false, sub, glow = true
 }
 
 /* ── Card ─────────────────────────────────────────────────────────────────── */
-export function Card({ children, style, pad = true, surface = 'window', glow = false, hover = false, onClick, ...rest }) {
+export function Card({ children, style, pad = true, surface = 'window', glow = false, hover = false, onClick, className = '', ...rest }) {
   const bg = surface === 'surface' ? 'var(--surface)' : 'var(--bg-window)';
+  const interactive = hover || !!onClick;
   return (
-    <div {...rest} onClick={onClick} style={{
+    <div {...rest} onClick={onClick} className={`${interactive ? 'hover-card ' : ''}${className}`.trim() || undefined} style={{
       background: bg,
       border: '1px solid var(--border)',
       borderRadius: 'var(--radius-lg)',
@@ -71,7 +72,7 @@ export function StatCard({ icon, label, value, unit, sub, trend, accent, chart }
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
-export function Btn({ children, variant = 'ghost', size = 'sm', icon, iconRight, onClick, style, title, full }) {
+export function Btn({ children, variant = 'ghost', size = 'sm', icon, iconRight, onClick, style, title, full, disabled, className = '' }) {
   const h = size === 'lg' ? 40 : size === 'md' ? 34 : 28;
   const px = size === 'lg' ? 16 : size === 'md' ? 12 : 10;
   const base = {
@@ -96,7 +97,9 @@ export function Btn({ children, variant = 'ghost', size = 'sm', icon, iconRight,
     danger:  { background: 'transparent', color: 'var(--bad)', borderColor: 'oklch(0.7 0.2 25 / 0.5)' },
   };
   return (
-    <button title={title} onClick={onClick} style={{ ...base, ...variants[variant], ...style }}>
+    <button title={title} onClick={onClick} disabled={disabled}
+      className={`ui-btn ui-btn-${variant} ${className}`.trim()}
+      style={{ ...base, ...variants[variant], ...style }}>
       {icon}{children}{iconRight}
     </button>
   );
