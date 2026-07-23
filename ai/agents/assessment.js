@@ -87,31 +87,44 @@ export async function generateQuiz({ userId, nodeId }) {
 
 export async function generateAssignment({ userId, nodeId, kind, difficulty }) {
   const k = ASSIGNMENT_KINDS.includes(kind) ? kind : 'homework';
-  const d = DIFFICULTIES.includes(difficulty) ? difficulty : 'medium';
 
-  // Pull node + objectives + roadmap title for context.
-  let node = null, objectives = [], course = 'General';
+  // Pull node + objectives + roadmap title + the learner's current mastery +
+  // the module's verified online resources, so the assignment is grounded in
+  // real sources AND calibrated to where the learner actually is.
+  let node = null, objectives = [], course = 'General', mastery = null, resources = [];
   if (nodeId) {
-    node = db.prepare('SELECT id, title, roadmap_id FROM roadmap_nodes WHERE id = ?').get(nodeId);
+    node = db.prepare('SELECT id, title, roadmap_id, mastery FROM roadmap_nodes WHERE id = ?').get(nodeId);
     if (node) {
+      mastery = node.mastery;
       objectives = db.prepare('SELECT text FROM node_objectives WHERE node_id = ? ORDER BY order_idx').all(node.id).map(o => o.text);
       const rm = db.prepare('SELECT title FROM roadmaps WHERE id = ?').get(node.roadmap_id);
       if (rm) course = rm.title;
+      resources = db.prepare("SELECT title, url, source, summary, kind FROM node_resources WHERE node_id = ? AND status = 'verified' ORDER BY created_at DESC LIMIT 6").all(node.id);
     }
   }
+
+  // Difficulty adapts to mastery when not explicitly forced: a learner at 20%
+  // gets a scaffolded, foundational task; a learner at 85% gets a stretch.
+  let d = DIFFICULTIES.includes(difficulty) ? difficulty : null;
+  if (!d) d = mastery == null ? 'medium' : mastery < 0.4 ? 'easy' : mastery < 0.75 ? 'medium' : 'hard';
+  const masteryNote = mastery == null ? '' :
+    `\nLearner's current mastery of this module: ${Math.round(mastery * 100)}%. Calibrate the challenge accordingly — ${mastery < 0.4 ? 'scaffold heavily, focus on fundamentals and confidence' : mastery < 0.75 ? 'reinforce and apply the core skills' : 'push toward synthesis, edge cases and independent design'}.`;
+  const resourceNote = resources.length
+    ? `\n\nGround the assignment in these vetted resources for the module — reference them where useful and have the learner apply what they cover:\n${resources.map(r => `- [${r.kind}] ${r.title} (${r.source || ''}) — ${r.summary || r.url}`).join('\n')}`
+    : '';
 
   const objText = objectives.length ? objectives.map(o => `- ${o}`).join('\n') : '(no objectives specified — infer reasonable ones from the title)';
   const out = await complete({
     userId, agentCode: 'AS',
     schema: assignmentSchema,
-    maxTokens: 1500,
+    maxTokens: 1600,
     system: SYSTEM,
     messages: `Module: ${node?.title || 'General module'}
 Course: ${course}
 Difficulty: ${d}
 Assignment kind: ${k}
 Learning objectives:
-${objText}
+${objText}${masteryNote}${resourceNote}
 
 Generate the assignment.`,
   });

@@ -83,6 +83,7 @@ const API = {
 
   // ── Certificates & Badges ─────────────────────────────────────────────────
   getCertificates: () => API.get('/certificates'),
+  getCertificate:  (id) => API.get(`/certificates/${id}`),
   getBadges:       () => API.get('/badges'),
 
   // ── Schedule ──────────────────────────────────────────────────────────────

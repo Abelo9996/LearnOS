@@ -1908,11 +1908,26 @@ function CreateCardsModal({ onCreated }) {
 
 /* ── Verification modal ────────────────────────────────────────────────────── */
 function VerificationModal({ cert }) {
+  // Actually verify against the server (GET /certificates/:id) rather than just
+  // re-displaying the in-memory row — the credential is "valid" only if the
+  // record still exists server-side and matches.
+  const [check, setCheck] = React.useState({ status: 'checking' });
+  React.useEffect(() => {
+    let alive = true;
+    API.getCertificate(cert.id)
+      .then(row => { if (alive) setCheck({ status: 'valid', row }); })
+      .catch(() => { if (alive) setCheck({ status: 'notfound' }); });
+    return () => { alive = false; };
+  }, [cert.id]);
   const isVerified = cert.verified === undefined ? true : !!cert.verified;
   return (
     <div>
       <h3 className="display" style={{ fontSize: 22, marginBottom: 4 }}>Verify Certificate</h3>
-      <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>Credential verification</div>
+      <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
+        {check.status === 'checking' ? 'Checking credential against the registry…'
+          : check.status === 'valid' ? '✓ Confirmed against the LearnOS credential registry'
+          : '⚠ Not found in the registry'}
+      </div>
       <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 16 }}>
         <div style={{ display: 'grid', gridTemplateColumns: '120px 1fr', gap: 10, fontSize: 13 }}>
           <span style={{ color: 'var(--muted)' }}>ID</span><span className="mono" style={{ color: 'var(--ink)' }}>{cert.id_short || cert.id}</span>
