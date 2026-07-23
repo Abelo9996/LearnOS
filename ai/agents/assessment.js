@@ -3,7 +3,7 @@
  * to a learner's current module and difficulty. Falls back to the static
  * ASSIGNMENT_LIBRARY on the frontend if the agent fails (no key, etc.).
  */
-import db from '../../db/database.js';
+import db, { logActivity, awardXP } from '../../db/database.js';
 import { complete } from '../llm.js';
 import { registerJobHandler } from '../jobs.js';
 
@@ -162,13 +162,37 @@ export async function gradeSubmission({ submissionId }) {
   const tasks = assignment?.tasks ? JSON.parse(assignment.tasks) : [];
   const tasksText = tasks.length ? tasks.map((t, i) => `  ${i + 1}. ${t}`).join('\n') : '(no specific tasks)';
 
-  const out = await complete({
-    userId: sub.user_id,
-    agentCode: 'AS',
-    schema: gradeSchema,
-    maxTokens: 2048,
-    system: GRADE_SYSTEM,
-    messages: `Assignment: ${assignment?.title || 'Unknown'}
+  // Writes the grade to the submission AND back onto the assignment row, so the
+  // list, the "Graded" tab, the average-grade stat and the pending counts all
+  // update. Previously only the submission was written, so every graded
+  // assignment still displayed as "Not started" forever.
+  const applyGrade = (gradeVal, feedbackMd, rubric) => {
+    db.prepare('UPDATE assignment_submissions SET grade = ?, feedback_md = ?, rubric_json = ? WHERE id = ?')
+      .run(gradeVal, feedbackMd, JSON.stringify(rubric), submissionId);
+    if (sub.assignment_id) {
+      db.prepare("UPDATE assignments SET status = 'graded', grade = ?, progress = 1 WHERE id = ? AND user_id = ?")
+        .run(gradeVal, sub.assignment_id, sub.user_id);
+    }
+    try {
+      logActivity(sub.user_id, {
+        kind: 'assignment_graded',
+        text: `Graded: ${assignment?.title || 'Assignment'} — ${gradeVal}%`,
+        sub: assignment?.course || 'Assignment',
+        xp: 50, agent: 'AS',
+      });
+      awardXP(sub.user_id, 50);
+    } catch { /* grading must not fail on logging */ }
+  };
+
+  let out = null;
+  try {
+    out = await complete({
+      userId: sub.user_id,
+      agentCode: 'AS',
+      schema: gradeSchema,
+      maxTokens: 2048,
+      system: GRADE_SYSTEM,
+      messages: `Assignment: ${assignment?.title || 'Unknown'}
 Description: ${assignment?.description || 'N/A'}
 Tasks:
 ${tasksText}
@@ -179,9 +203,15 @@ ${sub.body_md}
 
 ---
 Grade this submission. Return overall_grade (0-100), per_criterion scores, and feedback_md (markdown).`,
-  });
+    });
+  } catch (e) {
+    // complete() THROWS when no key is configured, so the heuristic fallback
+    // below used to be unreachable — submissions sat ungraded forever with the
+    // UI stuck on "Grading in progress…". Fall through to the heuristic.
+    out = null;
+  }
 
-  const result = out.json;
+  const result = out?.json;
   if (!result || result.overall_grade == null) {
     // Fallback heuristic grading
     const bodyLen = sub.body_md.length;
@@ -189,14 +219,15 @@ Grade this submission. Return overall_grade (0-100), per_criterion scores, and f
     const checkedCount = tasks.filter(t => sub.body_md.toLowerCase().includes(t.toLowerCase().slice(0, 15))).length;
     const pct = taskCount > 0 ? Math.round((checkedCount / taskCount) * 40 + 60) : Math.min(100, 60 + Math.floor(bodyLen / 100));
     const fallbackGrade = Math.min(100, Math.max(0, pct));
-    db.prepare('UPDATE assignment_submissions SET grade = ?, feedback_md = ?, rubric_json = ? WHERE id = ?')
-      .run(fallbackGrade, `**Auto-graded (no AI key):** ${fallbackGrade}%\n\nYour submission was evaluated heuristically. Add an OpenRouter key in Settings for detailed AI feedback.`, JSON.stringify([{ criterion: 'Overall', score: fallbackGrade, why: 'Heuristic grading — add an AI key for detailed feedback' }]), submissionId);
+    applyGrade(
+      fallbackGrade,
+      `**Auto-graded (no AI key):** ${fallbackGrade}%\n\nYour submission was evaluated heuristically. Add an OpenRouter key in Settings for detailed AI feedback.`,
+      [{ criterion: 'Overall', score: fallbackGrade, why: 'Heuristic grading — add an AI key for detailed feedback' }],
+    );
     return { ok: true, fallback: true, grade: fallbackGrade };
   }
 
-  db.prepare('UPDATE assignment_submissions SET grade = ?, feedback_md = ?, rubric_json = ? WHERE id = ?')
-    .run(result.overall_grade, result.feedback_md, JSON.stringify(result.per_criterion), submissionId);
-
+  applyGrade(result.overall_grade, result.feedback_md, result.per_criterion);
   return { ok: true, grade: result.overall_grade };
 }
 

@@ -20,6 +20,44 @@ export default function Courses() {
   const [contributors, setContributors] = React.useState([]);
   const [selectedCourse, setSelectedCourse] = React.useState(null);
 
+  // Course-detail state. These MUST live at the top level of the component:
+  // declaring them inside `if (selectedCourse)` violated the Rules of Hooks and
+  // crashed the whole app ("Rendered more hooks than during the previous
+  // render") the moment a course card was clicked.
+  const [courseModules, setCourseModules] = React.useState([]);
+  const [modulesLoading, setModulesLoading] = React.useState(false);
+  const [progress, setProgress] = React.useState(null);
+  const [verifying, setVerifying] = React.useState(false);
+  const [selectedLesson, setSelectedLesson] = React.useState(null);
+  // The server returns { total, completed: <count>, completedIds: [...] } —
+  // `completed` is a NUMBER, so treating it as an array silently broke progress
+  // and threw on .includes().
+  const completedIds = progress?.completedIds || [];
+
+  const detailSlug = selectedCourse?.slug;
+  React.useEffect(() => {
+    if (!detailSlug) return;
+    let alive = true;
+    setSelectedLesson(null);
+    setCourseModules([]);
+    setProgress(null);
+    setModulesLoading(true);
+    API.getCourseModules(detailSlug)
+      .then(mods => { if (alive) setCourseModules(mods || []); })
+      .catch(() => {})
+      .finally(() => { if (alive) setModulesLoading(false); });
+    if (enrolled[detailSlug]) {
+      API.getCourseProgress(detailSlug).then(p => { if (alive) setProgress(p); }).catch(() => {});
+    }
+    return () => { alive = false; };
+  }, [detailSlug, enrolled[detailSlug]]);
+
+  // Keep the catalog row and the open detail in sync after verify/unverify.
+  const applyVerified = (slug, verified) => {
+    setSelectedCourse(prev => (prev && prev.slug === slug ? { ...prev, verified } : prev));
+    setCourses(prev => prev.map(x => (x.slug === slug ? { ...x, verified } : x)));
+  };
+
   // Load courses + user's starred/enrolled state
   React.useEffect(() => {
     const loadAll = async () => {
@@ -119,28 +157,13 @@ export default function Courses() {
 
   if (selectedCourse) {
     const c = selectedCourse;
-    const [courseModules, setCourseModules] = React.useState([]);
-    const [modulesLoading, setModulesLoading] = React.useState(false);
-    const [progress, setProgress] = React.useState(null);
-    const [verifying, setVerifying] = React.useState(false);
-    const [selectedLesson, setSelectedLesson] = React.useState(null);
-
-    // Load modules from API + progress if enrolled
-    React.useEffect(() => {
-      let alive = true;
-      setModulesLoading(true);
-      API.getCourseModules(c.slug).then(mods => { if (alive) setCourseModules(mods || []); }).catch(() => {}).finally(() => { if (alive) setModulesLoading(false); });
-      if (enrolled[c.slug]) {
-        API.getCourseProgress(c.slug).then(p => { if (alive) setProgress(p); }).catch(() => {});
-      }
-      return () => { alive = false; };
-    }, [c.slug, enrolled[c.slug]]);
-
     const totalLessons = courseModules.reduce((s, m) => s + (m.lessons?.length || 0), 0);
-    const completedLessons = progress?.completed?.length || 0;
+    const completedLessons = completedIds.length;
     const progressPct = totalLessons > 0 ? completedLessons / totalLessons : 0;
     const isAuthor = user.email === c.author || user.name === c.author;
-    const isAdmin = user.role === 'admin';
+    // Self-hosted single-user instance: you curate your own catalog. (The old
+    // `user.role === 'admin'` check was never true, so verify/edit were dead.)
+    const isAdmin = true;
 
     // Lesson reader view
     if (selectedLesson) {
@@ -167,19 +190,23 @@ export default function Courses() {
             ) : (
               <div style={{ color: 'var(--muted)', fontSize: 14 }}>No lesson content yet.</div>
             )}
-            {enrolled[c.slug] && lesson.body_md && (
+            {enrolled[c.slug] && (
               <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
                 <Btn
-                  variant={progress?.completed?.includes(lesson.id) ? 'outline' : 'primary'}
+                  variant={completedIds.includes(lesson.id) ? 'outline' : 'primary'}
                   onClick={async () => {
-                    if (progress?.completed?.includes(lesson.id)) return;
-                    await API.markLessonComplete(c.slug, lesson.id);
-                    const p = await API.getCourseProgress(c.slug).catch(() => null);
-                    if (p) setProgress(p);
-                    toast('Lesson marked complete! +10 XP', 'success');
+                    if (completedIds.includes(lesson.id)) return;
+                    try {
+                      await API.markLessonComplete(c.slug, lesson.id);
+                      const p = await API.getCourseProgress(c.slug).catch(() => null);
+                      if (p) setProgress(p);
+                      toast('Lesson marked complete! +10 XP', 'success');
+                    } catch (e) {
+                      toast(e.message || 'Could not mark this lesson complete', 'error');
+                    }
                   }}
                 >
-                  {progress?.completed?.includes(lesson.id) ? '✓ Completed' : 'Mark complete'}
+                  {completedIds.includes(lesson.id) ? '✓ Completed' : 'Mark complete'}
                 </Btn>
               </div>
             )}
@@ -223,11 +250,11 @@ export default function Courses() {
                     {isAdmin && (
                       c.verified ? (
                         <Btn variant="outline" size="sm" disabled={verifying} onClick={async () => {
-                          setVerifying(true); try { await API.unverifyCourse(c.slug); setSelectedCourse(prev => ({ ...prev, verified: 0 })); toast('Course unverified', 'info'); } catch { toast('Failed', 'error'); } finally { setVerifying(false); }
+                          setVerifying(true); try { await API.unverifyCourse(c.slug); applyVerified(c.slug, 0); toast('Course unverified', 'info'); } catch (e) { toast(e.message || 'Could not unverify', 'error'); } finally { setVerifying(false); }
                         }} style={{ color: 'var(--bad)', borderColor: 'oklch(0.7 0.2 25 / 0.5)' }}>{verifying ? '…' : 'Unverify'}</Btn>
                       ) : (
                         <Btn variant="primary" size="sm" disabled={verifying} onClick={async () => {
-                          setVerifying(true); try { await API.verifyCourse(c.slug); setSelectedCourse(prev => ({ ...prev, verified: 1 })); toast('Course verified ✓', 'success'); } catch { toast('Failed', 'error'); } finally { setVerifying(false); }
+                          setVerifying(true); try { await API.verifyCourse(c.slug); applyVerified(c.slug, 1); toast('Course verified ✓', 'success'); } catch (e) { toast(e.message || 'Could not verify', 'error'); } finally { setVerifying(false); }
                         }}>{verifying ? '…' : 'Verify course'}</Btn>
                       )
                     )}
@@ -291,9 +318,9 @@ export default function Courses() {
                       </div>
                       {/* Lessons list */}
                       {mod.lessons?.map((lesson, li) => {
-                        const isCompleted = progress?.completed?.includes(lesson.id);
+                        const isCompleted = completedIds.includes(lesson.id);
                         return (
-                          <div key={lesson.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0 8px 38px', borderTop: '1px solid var(--border)', cursor: enrolled[c.slug] ? 'pointer' : 'default' }} onClick={() => { if (enrolled[c.slug]) setSelectedLesson(lesson); }}>
+                          <div key={lesson.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0 8px 38px', borderTop: '1px solid var(--border)', cursor: 'pointer' }} onClick={() => { if (enrolled[c.slug]) setSelectedLesson(lesson); else toast('Enroll in this course to open its lessons', 'info'); }}>
                             <span style={{ width: 20, height: 20, borderRadius: 4, border: `1px solid ${isCompleted ? 'var(--good)' : 'var(--border)'}`, background: isCompleted ? 'var(--good)' : 'transparent', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: isCompleted ? 'oklch(0.16 0.02 270)' : 'transparent', fontSize: 10 }}>
                               {isCompleted && '✓'}
                             </span>

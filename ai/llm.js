@@ -122,9 +122,16 @@ export async function complete(opts = {}) {
   const started = Date.now();
   const runId = `run-${started}-${Math.random().toString(36).slice(2, 8)}`;
   let data;
+  // Hard timeout. The job runner drains serially behind a single `running`
+  // flag, so one hung provider request would stall EVERY queued job (roadmap
+  // generation, grading, research) indefinitely with no error surfaced.
+  const controller = new AbortController();
+  const timeoutMs = parseInt(process.env.LEARNOS_LLM_TIMEOUT_MS || '', 10) || 120_000;
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const resp = await fetch(OPENROUTER_URL, {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Authorization': `Bearer ${creds.apiKey}`,
         'Content-Type': 'application/json',
@@ -140,8 +147,14 @@ export async function complete(opts = {}) {
     data = await resp.json();
     if (data.error) throw new Error(data.error.message || JSON.stringify(data.error));
   } catch (e) {
-    record({ runId, userId, agentCode, model, managed: creds.managed, usage: null, latency: Date.now() - started, status: 'error', error: e?.message || String(e), cost: 0 });
-    throw e;
+    const aborted = e?.name === 'AbortError';
+    const err = aborted
+      ? Object.assign(new Error(`Model request timed out after ${Math.round(timeoutMs / 1000)}s (model: ${model}). Try a faster model in Settings → Agents.`), { code: 'TIMEOUT' })
+      : e;
+    record({ runId, userId, agentCode, model, managed: creds.managed, usage: null, latency: Date.now() - started, status: 'error', error: err?.message || String(err), cost: 0 });
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
 
   const latency = Date.now() - started;

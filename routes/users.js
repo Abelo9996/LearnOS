@@ -75,13 +75,17 @@ router.get('/settings', (req, res) => {
 });
 
 router.patch('/settings', (req, res) => {
-  const { theme, density, font_size, local_only } = req.body;
+  const { theme, density, font_size, local_only, onboarded_at } = req.body;
   const fields = [];
   const vals = [];
   if (theme !== undefined)    { fields.push('theme = ?');     vals.push(theme); }
   if (density !== undefined)  { fields.push('density = ?');   vals.push(density); }
   if (font_size !== undefined){ fields.push('font_size = ?'); vals.push(font_size); }
   if (local_only !== undefined){ fields.push('local_only = ?'); vals.push(local_only ? 1 : 0); }
+  // Onboarding completion — the client writes this at the end of the wizard.
+  // It was missing from the whitelist, so the PATCH 400'd and the flag never
+  // persisted, re-showing onboarding whenever the user had no roadmaps.
+  if (onboarded_at !== undefined) { fields.push('onboarded_at = ?'); vals.push(onboarded_at); }
   if (fields.length === 0) return res.status(400).json({ error: true, message: 'No fields to update' });
 
   fields.push('updated_at = CURRENT_TIMESTAMP');

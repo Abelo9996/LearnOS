@@ -83,6 +83,30 @@ try {
   db.exec("CREATE INDEX IF NOT EXISTS idx_comm_replies_thread ON community_replies(thread_id)");
 } catch (e) { console.log('Community migration:', e.message); }
 
+// Course syllabus tables must also exist before the seed, which now ships real
+// modules + lessons for the catalog courses.
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS course_modules (
+    id TEXT PRIMARY KEY,
+    course_slug TEXT NOT NULL,
+    title TEXT NOT NULL,
+    summary TEXT,
+    order_idx INTEGER DEFAULT 0,
+    estimated_minutes INTEGER DEFAULT 45,
+    created_at TEXT DEFAULT (datetime('now'))
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS module_lessons (
+    id TEXT PRIMARY KEY,
+    module_id TEXT NOT NULL REFERENCES course_modules(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    body_md TEXT NOT NULL DEFAULT '',
+    kind TEXT NOT NULL DEFAULT 'reading',
+    order_idx INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  )`);
+} catch (e) { console.log('Course module pre-migration:', e.message); }
+
 ensureAgentStatus();  // app config — always present, even in zero-seed mode
 seedIfEmpty();         // example content (roadmaps, courses, demo members, community) from seed.sql
 
@@ -462,6 +486,10 @@ try {
 
 // ── Migration: roadmap node editing columns (§3.11) ───────────────────────────
 try { db.exec("ALTER TABLE roadmap_nodes ADD COLUMN last_replanned_at TEXT"); } catch {}
+// `source` marks AN-inserted remedial nodes. The replan path INSERTed into it
+// while the column did not exist, so every re-plan threw (swallowed) and the
+// "Suggested by AN" highlight could never appear.
+try { db.exec("ALTER TABLE roadmap_nodes ADD COLUMN source TEXT"); } catch {}
 
 // ── Migration: profile customization (§3.12) ──────────────────────────────────
 try { db.exec("ALTER TABLE users ADD COLUMN bio TEXT"); } catch {}

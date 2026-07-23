@@ -221,15 +221,19 @@ export default function Session({ setScreen }) {
 
   const handleNewSession = async () => {
     try {
-      const newSess = await API.createSession({
+      const res = await API.createSession({
         title: 'New Session',
         subtitle: '',
         agent: 'TU',
       });
+      // The route replies { ok, session } — using the envelope directly left
+      // session.id undefined, so every later message/patch was misrouted to
+      // /api/sessions/undefined and the chat never persisted.
+      const newSess = res?.session || res;
       setSession(newSess);
       const welcomeMsg = { role: 'agent', agent: 'TU', kind: 'text', body: `Welcome! I'm your Tutor Agent. What would you like to explore first?` };
       setMessages([welcomeMsg]);
-      await API.postMessage(newSess.id, welcomeMsg);
+      if (newSess?.id) await API.postMessage(newSess.id, welcomeMsg);
     } catch {
       // Fallback: start an offline session
       setSession({ id: 'local', title: 'Offline Session', status: 'active' });

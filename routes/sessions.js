@@ -141,11 +141,17 @@ router.delete('/:id/whiteboard', (req, res) => {
 
 // Messages
 router.post('/:id/messages', (req, res) => {
-  const { role, agent_code, body, kind } = req.body;
-  if (!role || !body) return res.status(400).json({ error: true, message: 'role and body required' });
+  // The client sends `agent`; accept both so agent attribution is actually
+  // persisted (it was always NULL, so every reloaded message showed as "Tutor").
+  const { role, agent_code, agent, body, kind, quiz } = req.body;
+  if (!role) return res.status(400).json({ error: true, message: 'role required' });
+  // Structured turns (e.g. an AS quiz card) legitimately have no prose body —
+  // requiring one made every quiz message 400 and vanish on reload.
+  const text = body != null ? body : '';
+  if (!text && !quiz) return res.status(400).json({ error: true, message: 'body or quiz required' });
   const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   db.prepare('INSERT INTO session_messages (id, session_id, role, agent_code, body, kind) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(id, req.params.id, role, agent_code || null, body, kind || 'text');
+    .run(id, req.params.id, role, agent_code || agent || null, text, kind || 'text');
   const msg = db.prepare('SELECT * FROM session_messages WHERE id = ?').get(id);
   res.json({ ok: true, message: msg });
 });

@@ -136,10 +136,20 @@ const API = {
   getJob:       (id) => API.get(`/jobs/${id}`),
 
   // ── Uploads (§3.3) ─────────────────────────────────────────────────────────
-  uploadFile:   (file) => {
+  uploadFile:   async (file) => {
     const fd = new FormData();
     fd.append('file', file);
-    return fetch('/api/uploads', { method: 'POST', body: fd }).then(r => r.json());
+    // This is the one raw fetch in the client; without an ok-check a rejected
+    // upload resolved "successfully" with an error body, so callers reported
+    // "Uploaded!" and stored an undefined URL.
+    const res = await fetch('/api/uploads', { method: 'POST', body: fd });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || data.error) {
+      const err = new Error(data?.message || `Upload failed (${res.status})`);
+      err.status = res.status;
+      throw err;
+    }
+    return data;
   },
 
   // ── Course modules & lessons (§3.2) ────────────────────────────────────────

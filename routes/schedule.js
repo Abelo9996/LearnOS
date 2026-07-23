@@ -24,12 +24,18 @@ router.delete('/:id', (req, res) => {
 });
 
 router.patch('/:id', (req, res) => {
-  const { title, start_hour, duration_hours, reminder_sent_at } = req.body;
+  // event_type / day_of_week / agent were missing from this whitelist while the
+  // create route accepted them, so editing a block's type, day or agent was a
+  // silent no-op that still toasted "updated".
+  const { title, start_hour, duration_hours, reminder_sent_at, event_type, day_of_week, agent } = req.body;
   const fields = []; const vals = [];
   if (title !== undefined)         { fields.push('title = ?');          vals.push(title); }
   if (start_hour !== undefined)    { fields.push('start_hour = ?');    vals.push(start_hour); }
   if (duration_hours !== undefined){ fields.push('duration_hours = ?'); vals.push(duration_hours); }
   if (reminder_sent_at !== undefined) { fields.push('reminder_sent_at = ?'); vals.push(reminder_sent_at); }
+  if (event_type !== undefined)    { fields.push('event_type = ?');     vals.push(event_type); }
+  if (day_of_week !== undefined)   { fields.push('day_of_week = ?');    vals.push(day_of_week); }
+  if (agent !== undefined)         { fields.push('agent = ?');          vals.push(agent); }
   if (fields.length === 0) return res.status(400).json({ error: true, message: 'No fields to update' });
   vals.push(req.params.id, req.userId);
   db.prepare(`UPDATE schedule_events SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`).run(...vals);
