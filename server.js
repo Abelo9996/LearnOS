@@ -81,10 +81,12 @@ app.use((req, res, next) => {
 });
 
 // ── S-02: Rate limiting ───────────────────────────────────────────────────────
-// General API rate limit: 100 req / 15 min / IP
+// General API rate limit. LearnOS is a single-user, self-hosted app and a single
+// screen can legitimately fire a dozen calls, so this is a runaway-loop backstop
+// rather than a tight quota — 100/15min throttled normal navigation.
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: true, code: 'RATE_LIMITED', message: 'Too many requests, please try again later' },
