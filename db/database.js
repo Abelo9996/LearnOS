@@ -31,8 +31,34 @@ function initSchema() {
   db.exec(schema);
 }
 
-// Seed if tables are empty
+// Example content (roadmaps, courses, community, …) seeds by default so a fresh
+// clone shows a populated workspace. Set LEARNOS_SEED=0 for a true zero-seed run:
+// an empty database that boots into honest cold-start empty states with no
+// founder-supplied example data.
+const SEED_ENABLED = !['0', 'false', 'no', 'off'].includes(String(process.env.LEARNOS_SEED ?? '').toLowerCase());
+
+// Agent registry = app CONFIG, not example content — the 7 agents must exist for
+// the Agents page and routing to work even in zero-seed mode. Idempotent, always
+// run. status_text is intentionally empty: real per-agent status isn't tracked,
+// so we never fabricate a live telemetry string here. is_active reflects which
+// agents are actually wired to a code path (CE/Certification has none yet).
+function ensureAgentStatus() {
+  const AGENTS = [
+    ['TU', 'Tutor',         'Teaches concepts, answers questions, explains deeply.', '--agent-tu', 'cap',    1],
+    ['PR', 'Profiling',     'Understands you — your goals, pace, background.',        '--agent-pr', 'user',   1],
+    ['CR', 'Curriculum',    'Creates personalized roadmaps and learning paths.',     '--agent-cr', 'graph',  1],
+    ['AS', 'Assessment',    'Generates quizzes and evaluates mastery.',              '--agent-as', 'check',  1],
+    ['RE', 'Research',      'Finds, summarizes, and cites the best resources.',      '--agent-re', 'search', 1],
+    ['AN', 'Analytics',     'Tracks progress and surfaces insights.',                '--agent-an', 'chart',  1],
+    ['CE', 'Certification', 'Issues verifiable certificates and badges.',            '--agent-ce', 'ribbon', 0],
+  ];
+  const stmt = db.prepare("INSERT OR IGNORE INTO agent_status (agent_code, display_name, short_desc, color, icon, status_text, is_active) VALUES (?, ?, ?, ?, ?, '', ?)");
+  for (const [code, name, desc, color, icon, active] of AGENTS) stmt.run(code, name, desc, color, icon, active);
+}
+
+// Seed example content if tables are empty (and seeding is enabled).
 function seedIfEmpty() {
+  if (!SEED_ENABLED) return;
   const count = db.prepare('SELECT COUNT(*) as c FROM users').get();
   if (count.c === 0) {
     const seed = fs.readFileSync(SEED_PATH, 'utf-8');
@@ -47,14 +73,8 @@ try { db.exec("ALTER TABLE users ADD COLUMN password_hash TEXT"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'"); } catch {}
 try { db.exec("CREATE TABLE IF NOT EXISTS revoked_tokens (jti TEXT PRIMARY KEY, expires_at TEXT NOT NULL)"); } catch {}
 
+ensureAgentStatus();  // app config — always present, even in zero-seed mode
 seedIfEmpty();
-
-// Backfill password_hash for the dev seed user if it was seeded before auth was added
-db.prepare(`
-  UPDATE users
-  SET password_hash = '$2b$10$Jg3eobdQ0Ns4u17rds.pyeW9elY7GdnTmdOhpTjGgWm79S/Keseqq'
-  WHERE id = 'user-1' AND password_hash IS NULL
-`).run();
 
 // ── Migration: Community tables ─────────────────────────────────────────────
 try {
@@ -75,7 +95,7 @@ const DEMO_MEMBERS = [
   { id: 'demo-sam',   name: 'Sam Okafor',   email: 'sam@community.learnos.dev',   level: 4, xp: 1800, hue: 155 },
 ];
 try {
-  for (const m of DEMO_MEMBERS) {
+  if (SEED_ENABLED) for (const m of DEMO_MEMBERS) {
     db.prepare("INSERT OR IGNORE INTO users (id, name, email, role, avatar_hue, level, xp) VALUES (?, ?, ?, 'user', ?, ?, ?)")
       .run(m.id, m.name, m.email, m.hue, m.level, m.xp);
   }
@@ -84,7 +104,7 @@ try {
 // Seed community threads if none exist
 try {
   const tc = db.prepare('SELECT COUNT(*) as c FROM community_threads').get();
-  if (tc.c === 0) {
+  if (SEED_ENABLED && tc.c === 0) {
     const now = new Date().toISOString();
     const threads = [
       { id: 't-1', author: 'demo-priya', title: 'Best way to build intuition for backprop?', body: 'I struggle with understanding backprop beyond the chain rule. Any tips?', tag: 'question', votes: 86, replies: 23 },
