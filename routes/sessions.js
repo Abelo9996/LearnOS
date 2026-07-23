@@ -24,6 +24,12 @@ router.post('/', (req, res) => {
   const total = db.prepare('SELECT COUNT(*) as c FROM sessions WHERE user_id = ? AND roadmap_id = ?').get(req.userId, roadmap_id || '')?.c || 0;
   db.prepare("INSERT INTO sessions (id, user_id, roadmap_id, roadmap_node_id, title, subtitle, agent, course, level, session_index, total_sessions, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')")
     .run(id, req.userId, roadmap_id || null, roadmap_node_id || null, title, subtitle || '', agent || 'TU', course, level, total + 1, 12);
+  // Starting a session on a not-yet-done node makes it the active module — this
+  // is the only thing that restores 'active' status, so the roadmap's active
+  // ring/state was otherwise unreachable after the first completion.
+  if (roadmap_node_id) {
+    db.prepare("UPDATE roadmap_nodes SET status = 'active' WHERE id = ? AND status IN ('next','locked')").run(roadmap_node_id);
+  }
   res.json({ ok: true, session: db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) });
 });
 
@@ -48,12 +54,30 @@ router.patch('/:id', (req, res) => {
     try { enqueueJob(req.userId, 'analyze-session', { sessionId: req.params.id }); } catch {}
     const sess = db.prepare('SELECT roadmap_id, roadmap_node_id FROM sessions WHERE id = ?').get(req.params.id);
     if (sess && sess.roadmap_node_id) {
-      db.prepare("UPDATE roadmap_nodes SET status = 'done', mastery = 1.0 WHERE id = ? AND roadmap_id = ?").run(sess.roadmap_node_id, sess.roadmap_id);
+      // Mastery is NOT hardcoded to 100% (that let one message = full mastery).
+      // Completing a session earns an engagement baseline; the Analytics agent
+      // (analyze-session, enqueued above) then writes the real computed mastery
+      // back, and quizzes push it higher. Never lower an existing higher score.
+      const cur = db.prepare('SELECT mastery FROM roadmap_nodes WHERE id = ?').get(sess.roadmap_node_id);
+      const provided = (typeof mastery_score === 'number' && mastery_score >= 0 && mastery_score < 1) ? mastery_score : null;
+      const newMastery = Math.max(cur?.mastery || 0, provided != null ? provided : 0.65);
+      db.prepare("UPDATE roadmap_nodes SET status = 'done', mastery = ? WHERE id = ? AND roadmap_id = ?").run(newMastery, sess.roadmap_node_id, sess.roadmap_id);
+
+      // Prerequisite-aware unlocking (was: unlock an arbitrary node in the next
+      // column, ignoring the DAG). A locked node becomes 'next' once ALL of its
+      // prerequisite nodes (roadmap_edges → this node) are 'done'.
+      const locked = db.prepare("SELECT id FROM roadmap_nodes WHERE roadmap_id = ? AND status = 'locked'").all(sess.roadmap_id);
+      for (const cand of locked) {
+        const prereqs = db.prepare('SELECT from_node FROM roadmap_edges WHERE roadmap_id = ? AND to_node = ?').all(sess.roadmap_id, cand.id);
+        const allDone = prereqs.length === 0 || prereqs.every(p => {
+          const pn = db.prepare('SELECT status FROM roadmap_nodes WHERE id = ?').get(p.from_node);
+          return pn && pn.status === 'done';
+        });
+        if (allDone) db.prepare("UPDATE roadmap_nodes SET status = 'next' WHERE id = ?").run(cand.id);
+      }
+
       const node = db.prepare('SELECT col, row_idx, title FROM roadmap_nodes WHERE id = ?').get(sess.roadmap_node_id);
       if (node) {
-        const next = db.prepare("SELECT id FROM roadmap_nodes WHERE roadmap_id = ? AND col = ? AND status = 'locked' LIMIT 1").get(sess.roadmap_id, node.col + 1);
-        if (next) db.prepare("UPDATE roadmap_nodes SET status = 'next' WHERE id = ?").run(next.id);
-
         // Feed spaced review (#17): turn this module's objectives into due cards.
         const objectives = db.prepare('SELECT text FROM node_objectives WHERE node_id = ? ORDER BY order_idx').all(sess.roadmap_node_id);
         for (const o of objectives.slice(0, 4)) {
@@ -69,28 +93,26 @@ router.patch('/:id', (req, res) => {
       const avg = db.prepare('SELECT AVG(mastery) as m FROM roadmap_nodes WHERE roadmap_id = ?').get(sess.roadmap_id);
       const done = db.prepare("SELECT COUNT(*) as c FROM roadmap_nodes WHERE roadmap_id = ? AND status = 'done'").get(sess.roadmap_id).c;
       const total = db.prepare('SELECT COUNT(*) as c FROM roadmap_nodes WHERE roadmap_id = ?').get(sess.roadmap_id).c;
-      db.prepare('UPDATE roadmaps SET mastery = ?, completed_modules = ? WHERE id = ?').run(avg.m, done, sess.roadmap_id);
+      // Keep next_module / modules_left honest (they were frozen at generation,
+      // so the Dashboard forever showed the first node and the full count).
+      const upNext = db.prepare("SELECT title FROM roadmap_nodes WHERE roadmap_id = ? AND status IN ('active','next') ORDER BY col, row_idx LIMIT 1").get(sess.roadmap_id);
+      db.prepare('UPDATE roadmaps SET mastery = ?, completed_modules = ?, next_module = ?, modules_left = ? WHERE id = ?')
+        .run(avg.m, done, upNext?.title || 'Roadmap complete', Math.max(0, total - done), sess.roadmap_id);
       if (done === total && total > 0) {
-        const rm = db.prepare('SELECT title, course_slug FROM roadmaps WHERE id = ?').get(sess.roadmap_id);
+        const rm = db.prepare('SELECT title FROM roadmaps WHERE id = ?').get(sess.roadmap_id);
         db.prepare('UPDATE roadmaps SET status = ? WHERE id = ?').run('completed', sess.roadmap_id);
-        // #21 — A verifiable certificate is only issued for LearnOS-verified courses.
-        // A roadmap qualifies when it's tied to a course with verified = 1.
-        const course = rm.course_slug
-          ? db.prepare('SELECT slug, verified FROM courses WHERE slug = ?').get(rm.course_slug)
-          : null;
-        const isVerified = !!(course && course.verified);
+        // Completing every module of a roadmap earns a certificate. On a
+        // self-hosted single-user instance, finishing the path IS the credential.
+        // (Previously gated on a verified course_slug that nothing ever set, so a
+        // certificate could never be issued by any code path.)
         const has = db.prepare('SELECT COUNT(*) as c FROM certificates WHERE user_id = ? AND title = ?').get(req.userId, rm.title).c;
-        if (isVerified && !has) {
+        if (!has) {
           const cid = 'ce-' + Date.now();
-          db.prepare('INSERT INTO certificates (id, user_id, title, mastery, verified, course_slug, id_short) VALUES (?, ?, ?, ?, 1, ?, ?)')
-            .run(cid, req.userId, rm.title, avg.m, course.slug,
-              'LOS-' + sess.roadmap_id.slice(-3).toUpperCase() + '-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random()*9999)).padStart(4,'0'));
-          logActivity(req.userId, { kind: 'cert', text: `Earned certificate: ${rm.title}`, sub: 'Verified credential', xp: 200, agent: 'CE' });
+          db.prepare('INSERT INTO certificates (id, user_id, title, mastery, verified, id_short) VALUES (?, ?, ?, ?, 1, ?)')
+            .run(cid, req.userId, rm.title, avg.m,
+              'LOS-' + sess.roadmap_id.slice(-3).toUpperCase() + '-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9999)).padStart(4, '0'));
+          logActivity(req.userId, { kind: 'cert', text: `Earned certificate: ${rm.title}`, sub: 'Roadmap completed', xp: 200, agent: 'CE' });
           awardXP(req.userId, 200, { silent: true });
-        } else if (!isVerified) {
-          // Completion of an unverified/personal roadmap — recorded, but not a formal certificate.
-          logActivity(req.userId, { kind: 'session', text: `Completed roadmap: ${rm.title}`, sub: 'Completion record (course not LearnOS-verified)', xp: 100, agent: 'CR' });
-          awardXP(req.userId, 100, { silent: true });
         }
       }
     }

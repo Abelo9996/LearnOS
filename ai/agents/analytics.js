@@ -44,7 +44,7 @@ Write a 3-5 sentence summary of what the learner accomplished and what to revisi
 Return only the structured object.`;
 
 export async function analyzeSession({ userId, sessionId }) {
-  const sess = db.prepare('SELECT id, title, roadmap_node_id, course FROM sessions WHERE id = ? AND user_id = ?').get(sessionId, userId);
+  const sess = db.prepare('SELECT id, title, roadmap_id, roadmap_node_id, course FROM sessions WHERE id = ? AND user_id = ?').get(sessionId, userId);
   if (!sess) return { ok: false, reason: 'session_not_found' };
 
   const messages = db.prepare('SELECT role, body FROM session_messages WHERE session_id = ? ORDER BY created_at').all(sess.id);
@@ -85,8 +85,21 @@ export async function analyzeSession({ userId, sessionId }) {
   }
 
   // Side effects:
-  // 1. Persist objective mastery (we already store node mastery on the node;
-  //    this is the per-objective view we'd surface in dashboards later).
+  // 1. Write the REAL computed mastery back to the node. This is the honest
+  //    signal (session completion only sets an engagement baseline). Blend with
+  //    the existing value so a strong quiz score isn't wiped, and never drop
+  //    below the baseline the completion already set.
+  if (sess.roadmap_node_id && Array.isArray(analysis.objectives) && analysis.objectives.length) {
+    const computed = analysis.objectives.reduce((s, o) => s + (o.mastery || 0), 0) / analysis.objectives.length;
+    const cur = db.prepare('SELECT mastery FROM roadmap_nodes WHERE id = ?').get(sess.roadmap_node_id);
+    const blended = Math.round(Math.max(cur?.mastery || 0, ((cur?.mastery || 0) * 0.4 + computed * 0.6)) * 100) / 100;
+    db.prepare('UPDATE roadmap_nodes SET mastery = ? WHERE id = ?').run(blended, sess.roadmap_node_id);
+    // Roll the roadmap average up too so the Dashboard/roadmap header reflect it.
+    if (sess.roadmap_id) {
+      const avg = db.prepare('SELECT AVG(mastery) as m FROM roadmap_nodes WHERE roadmap_id = ?').get(sess.roadmap_id);
+      db.prepare('UPDATE roadmaps SET mastery = ? WHERE id = ?').run(avg.m, sess.roadmap_id);
+    }
+  }
   // 2. Seed extra flashcards for weak areas.
   for (const w of analysis.weak_areas.slice(0, 3)) {
     const dupe = db.prepare('SELECT 1 FROM flashcards WHERE user_id = ? AND deck = ? AND back = ?').get(userId, sess.title, w);
