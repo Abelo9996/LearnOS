@@ -3,7 +3,7 @@
  * Mounted under /api/ai (auth-protected).
  */
 import { Router } from 'express';
-import db, { awardXP, logActivity } from '../db/database.js';
+import db, { awardXP, logActivity, awardBadge } from '../db/database.js';
 import { complete, hasManagedKey } from '../ai/llm.js';
 import { generateAssignment, generateQuiz } from '../ai/agents/assessment.js';
 
@@ -156,6 +156,10 @@ router.post('/quiz/submit', (req, res) => {
   try {
     awardXP(req.userId, xp);
     logActivity(req.userId, { kind: 'quiz', text: `Quiz: ${title || 'Module quiz'} — ${score}%`, sub: `${correct}/${total} correct`, xp, agent: 'AS' });
+    // Real badge for a perfect score (was seeded-only, never earned).
+    if (correct === total && total >= 3 && awardBadge(req.userId, 'First quiz 100%', 'check')) {
+      logActivity(req.userId, { kind: 'cert', text: 'Earned badge: First quiz 100%', sub: 'Perfect quiz', xp: 0, agent: 'CE' });
+    }
     // Blend the quiz score into node mastery (never lowers an existing higher score).
     if (node_id) {
       const node = db.prepare('SELECT mastery FROM roadmap_nodes WHERE id = ?').get(node_id);

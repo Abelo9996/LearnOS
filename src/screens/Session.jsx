@@ -181,7 +181,7 @@ export default function Session({ setScreen }) {
     setSessionEnded(true);
     if (session && session.id && session.id !== 'local') {
       try {
-        await API.patchSession(session.id, { status: 'completed', mastery_score: 1 });
+        await API.patchSession(session.id, { status: 'completed' });
         const placeholder = { role: 'agent', agent: 'AN', kind: 'text', body: `**Session Summary — ${session.title || 'Module'}**\n\n_The Analytics agent is reviewing your session…_` };
         setMessages(m => [...m, placeholder]);
         toast('Session completed · mastery updated · +25 XP', 'success');
@@ -215,6 +215,10 @@ export default function Session({ setScreen }) {
           summaryBody = `**Session Summary — ${session.title || 'Module'}**\n\n- Exchanged ${userQs.length} question${userQs.length === 1 ? '' : 's'} with the Tutor.\n- Module marked complete — mastery updated and next module unlocked.\n- Try a spaced-review session in a few days to lock it in.`;
         }
         setMessages(m => m.map(x => x === placeholder ? { ...x, body: summaryBody } : x));
+        // Persist the summary so it survives a reload (it was local-state only).
+        if (session.id && session.id !== 'local') {
+          try { await API.postMessage(session.id, { role: 'agent', agent: 'AN', kind: 'text', body: summaryBody }); } catch {}
+        }
       } catch { toast('Session ended', 'info'); }
     } else {
       toast('Session ended', 'info');

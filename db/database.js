@@ -665,6 +665,16 @@ export function updateStreak(userId) {
   }
 }
 
+// Award a badge once per (user, label). Returns true if newly awarded so callers
+// can toast/log. Badges were previously seeded-only and never earned.
+export function awardBadge(userId, label, glyph = 'star') {
+  const has = db.prepare('SELECT 1 FROM badges WHERE user_id = ? AND label = ?').get(userId, label);
+  if (has) return false;
+  db.prepare('INSERT INTO badges (id, user_id, label, glyph) VALUES (?, ?, ?, ?)')
+    .run(`b-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, userId, label, glyph);
+  return true;
+}
+
 // ── AI platform: agent-run logging + managed-tier usage metering ─────────────
 export function logAgentRun(r) {
   db.prepare(`INSERT INTO agent_runs

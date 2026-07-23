@@ -439,7 +439,7 @@ export function Assignments() {
                 )}
               </div>
               <div className="mono" style={{ fontSize: 11.5, color: a.due === 'Yesterday' ? 'var(--bad)' : 'var(--ink-2)' }}>Due {a.due}</div>
-              <div style={{ textAlign: 'right' }}>
+              <div style={{ textAlign: 'right', display: 'flex', gap: 4, justifyContent: 'flex-end', alignItems: 'center' }}>
                 {a.status === 'graded' ? (
                   <Btn variant="ghost" iconRight={React.cloneElement(I.arrowR, { size: 13 })} onClick={(e) => { e.stopPropagation(); openModal(<AssignmentWorkModal a={a} reload={reload} />); }}>Review</Btn>
                 ) : (
@@ -448,6 +448,9 @@ export function Assignments() {
                     {a.status === 'in-progress' ? 'Continue' : 'Open'}
                   </Btn>
                 )}
+                <Btn variant="ghost" size="sm" title="Delete assignment"
+                  onClick={async (e) => { e.stopPropagation(); try { await API.deleteAssignment(a.id); reload(); toast('Assignment deleted', 'info'); } catch { toast('Could not delete assignment', 'error'); } }}
+                  style={{ color: 'var(--muted)' }}>{React.cloneElement(I.x, { size: 14 })}</Btn>
               </div>
             </div>
             {expandedId === a.id && (
@@ -728,9 +731,24 @@ export function Flashcards() {
             </div>
           ) : (
             <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
                 <Tag tone="cyan">{card.deck}</Tag>
-                <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>card {idx + 1} of {total} · interval {card.interval}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>card {idx + 1} of {total} · interval {card.interval}</span>
+                  <button title="Delete this card" onClick={async () => {
+                    try {
+                      await API.deleteFlashcard(card.id);
+                      toast('Card deleted', 'info');
+                      setFlipped(false);
+                      const remaining = total - 1;
+                      if (remaining <= 0) setSessionComplete(true);
+                      else if (idx >= remaining) setIdx(remaining - 1);
+                      reload();
+                    } catch { toast('Could not delete card', 'error'); }
+                  }} className="ui-btn" style={{ background: 'none', border: 0, color: 'var(--muted)', display: 'inline-flex', alignItems: 'center', cursor: 'pointer', padding: 4 }}>
+                    {React.cloneElement(I.x, { size: 14 })}
+                  </button>
+                </div>
               </div>
               <div onClick={() => setFlipped(f => !f)} style={{ cursor: 'pointer', minHeight: 240, borderRadius: 14, background: 'linear-gradient(135deg, oklch(0.22 0.05 295), oklch(0.18 0.04 250))', border: '1px solid var(--accent-line)', padding: 30, display: 'flex', flexDirection: 'column', justifyContent: 'center', position: 'relative', boxShadow: 'var(--shadow-glow)' }}>
                 <div className="cap" style={{ position: 'absolute', top: 14, left: 18, color: 'oklch(0.85 0.1 295)' }}>{flipped ? 'Answer' : 'Question'}</div>
@@ -790,8 +808,15 @@ export function Certificates() {
           a.href = url; a.download = 'learnos-certificates.txt'; a.click(); URL.revokeObjectURL(url);
           toast('Certificates exported', 'success');
         }}>Export</Btn><Btn variant="primary" size="md" icon={I.upload} onClick={async () => {
-          const url = window.location.origin + '/certificates';
-          try { await navigator.clipboard.writeText(url); toast('Link copied to clipboard!', 'success'); } catch { toast('Could not copy link', 'error'); }
+          // Copy verifiable credential text — there is no client router, so the
+          // old `origin + '/certificates'` link just dumped anyone on the
+          // Dashboard. Share the credential details + verification IDs instead.
+          if (certs.length === 0) { toast('No certificates to share yet — complete a roadmap first', 'info'); return; }
+          const text = 'My LearnOS credentials:\n\n' + certs.map(c =>
+            `🎓 ${c.title} — ${Math.round((c.mastery || 0) * 100)}% mastery\n   Verification ID: ${c.id_short || c.id}${c.issued_at ? ` · issued ${fmtDate(c.issued_at)}` : ''}`
+          ).join('\n\n');
+          try { await navigator.clipboard.writeText(text); toast(`Copied ${certs.length} credential${certs.length === 1 ? '' : 's'} to clipboard`, 'success'); }
+          catch { toast('Could not copy to clipboard', 'error'); }
         }}>Share</Btn></>} />
       <SectionHead title="Earned certificates" />
       {loadingCerts ? (

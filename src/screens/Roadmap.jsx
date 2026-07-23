@@ -249,7 +249,7 @@ export default function Roadmap({ onOpenSession }) {
           <>
             {view === 'graph'  && <RoadmapGraph  nodes={nodes} edges={r.edges || []} selected={selected} setSelected={setSelected} highlightedIds={highlightedIds} />}
             {view === 'list'   && <ModuleList    nodes={nodes} selected={selected}   setSelected={setSelected} onResume={openNodeSession} toast={toast} highlightedIds={highlightedIds} />}
-            {view === 'kanban' && <Kanban        nodes={nodes} toast={toast} />}
+            {view === 'kanban' && <Kanban        nodes={nodes} selected={selected} setSelected={setSelected} />}
           </>
         )}
       </Card>
@@ -429,11 +429,11 @@ function ModuleList({ nodes, selected, setSelected, onResume, toast, highlighted
   );
 }
 
-function Kanban({ nodes, toast }) {
+function Kanban({ nodes, selected, setSelected }) {
   const cols = [
     { id: 'done',   label: 'Done',        filter: (n) => n.status === 'done' },
     { id: 'active', label: 'In progress', filter: (n) => n.status === 'active' || n.status === 'next' },
-    { id: 'queue',  label: 'Up next',     filter: (n) => n.status === 'locked' },
+    { id: 'locked', label: 'Locked',      filter: (n) => n.status === 'locked' },
   ];
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, padding: 18 }}>
@@ -447,7 +447,7 @@ function Kanban({ nodes, toast }) {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {cards.map((n) => (
-                <div key={n.id} style={{ padding: '10px 12px', background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 8 }}>
+                <div key={n.id} onClick={() => setSelected && setSelected(n.id)} className="hover-lift" style={{ padding: '10px 12px', background: 'var(--bg-window)', border: `1px solid ${selected === n.id ? 'var(--accent-line)' : 'var(--border)'}`, borderRadius: 8, cursor: 'pointer' }}>
                   <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)' }}>{n.title}</div>
                   <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div style={{ flex: 1 }}><ProgressBar value={n.mastery || 0} height={3} /></div>

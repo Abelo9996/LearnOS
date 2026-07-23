@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import db, { awardXP, logActivity } from '../db/database.js';
+import db, { awardXP, logActivity, awardBadge, updateStreak } from '../db/database.js';
 import { enqueueJob } from '../ai/jobs.js';
 import '../ai/agents/analytics.js'; // registers 'analyze-session' handler
 
@@ -50,6 +50,9 @@ router.patch('/:id', (req, res) => {
     const sTitle = db.prepare('SELECT title FROM sessions WHERE id = ?').get(req.params.id)?.title || 'Session';
     logActivity(req.userId, { kind: 'session', text: `Completed session: "${sTitle}"`, xp: 25, agent: 'TU' });
     awardXP(req.userId, 25, { silent: true });
+    // Streak reflects LEARNING, not just visiting the Dashboard (updateStreak was
+    // only called from GET /api/stats). Completing a session counts as activity.
+    try { updateStreak(req.userId); } catch {}
     // AN agent fires autonomously on every session completion (P9).
     try { enqueueJob(req.userId, 'analyze-session', { sessionId: req.params.id }); } catch {}
     const sess = db.prepare('SELECT roadmap_id, roadmap_node_id FROM sessions WHERE id = ?').get(req.params.id);
@@ -62,6 +65,9 @@ router.patch('/:id', (req, res) => {
       const provided = (typeof mastery_score === 'number' && mastery_score >= 0 && mastery_score < 1) ? mastery_score : null;
       const newMastery = Math.max(cur?.mastery || 0, provided != null ? provided : 0.65);
       db.prepare("UPDATE roadmap_nodes SET status = 'done', mastery = ? WHERE id = ? AND roadmap_id = ?").run(newMastery, sess.roadmap_node_id, sess.roadmap_id);
+      if (newMastery >= 0.8) {
+        try { if (awardBadge(req.userId, 'Module mastered', 'star')) logActivity(req.userId, { kind: 'cert', text: 'Earned badge: Module mastered', sub: 'Reached 80% mastery', agent: 'CE' }); } catch {}
+      }
 
       // Prerequisite-aware unlocking (was: unlock an arbitrary node in the next
       // column, ignoring the DAG). A locked node becomes 'next' once ALL of its
@@ -113,6 +119,7 @@ router.patch('/:id', (req, res) => {
               'LOS-' + sess.roadmap_id.slice(-3).toUpperCase() + '-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9999)).padStart(4, '0'));
           logActivity(req.userId, { kind: 'cert', text: `Earned certificate: ${rm.title}`, sub: 'Roadmap completed', xp: 200, agent: 'CE' });
           awardXP(req.userId, 200, { silent: true });
+          try { awardBadge(req.userId, 'Roadmap complete', 'ribbon'); } catch {}
         }
       }
     }

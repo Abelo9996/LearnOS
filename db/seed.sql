@@ -79,7 +79,7 @@ INSERT INTO session_messages (id, session_id, role, agent_code, body, kind) VALU
   ('msg-2','sess-1','agent','TU','Imagine we are trying to predict house prices.' || char(10) || 'A model with high bias makes strong assumptions and tends to underfit.' || char(10) || 'A model with high variance is too flexible and tends to overfit the training data.','text'),
   ('msg-3','sess-1','user',NULL,'Can you show me an example with real data?','text'),
   ('msg-4','sess-1','agent','TU','Here is a real one: a degree-1 polynomial on housing data has high bias (misses the curve). A degree-15 polynomial has high variance (oscillates wildly). A degree-3 or 4 polynomial usually sits in the sweet spot.','text'),
-  ('msg-5','sess-1','agent','AS','Quick check — A model with very high variance is most likely to:','quiz');
+  ('msg-5','sess-1','agent','AS','Quick check: a model with very high variance is most likely to **overfit** — it fits the training noise and generalizes poorly to new data. Want to test yourself properly? Hit **Generate quiz** above for a scored quiz on this module.','text');
 
 -- Assignments
 INSERT INTO assignments (id, user_id, title, course, status, progress, grade, priority, estimated_minutes, due_date) VALUES
