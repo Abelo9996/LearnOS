@@ -797,7 +797,7 @@ function LandingFooter() {
           ))}
         </div>
         <div style={{ marginTop: 48, paddingTop: 24, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
-          <span className="mono" style={{ fontSize: 12.5, color: 'var(--faint)' }}>© 2026 LearnOS · MIT licensed · built by 4,182 contributors</span>
+          <span className="mono" style={{ fontSize: 12.5, color: 'var(--faint)' }}>© 2026 LearnOS · MIT licensed · built in the open</span>
           <div style={{ display: 'flex', gap: 22 }}>
             {['Privacy', 'Terms', 'Security'].map((l) => (
               <a key={l} href="#" style={{ fontSize: 12.5, color: 'var(--faint)', textDecoration: 'none' }}>{l}</a>
