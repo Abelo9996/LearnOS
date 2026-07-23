@@ -3,7 +3,7 @@
  * Mounted under /api/ai (auth-protected).
  */
 import { Router } from 'express';
-import db from '../db/database.js';
+import db, { awardXP, logActivity } from '../db/database.js';
 import { complete, hasManagedKey } from '../ai/llm.js';
 import { generateAssignment, generateQuiz } from '../ai/agents/assessment.js';
 
@@ -124,6 +124,49 @@ router.post('/quiz/generate', async (req, res) => {
   } catch (e) {
     res.status(e.code === 'NO_KEY' ? 400 : 502).json({ error: true, code: e.code || null, message: e.message });
   }
+});
+
+// Score + persist a completed quiz attempt. This is what makes a quiz a real,
+// graded exercise instead of a throwaway toast: it computes the score, awards
+// XP, logs the activity feed, records the attempt, and nudges node mastery.
+router.post('/quiz/submit', (req, res) => {
+  const { node_id, title, questions, answers } = req.body || {};
+  if (!Array.isArray(questions) || questions.length === 0 || !Array.isArray(answers)) {
+    return res.status(400).json({ error: true, message: 'questions and answers required' });
+  }
+  const total = questions.length;
+  let correct = 0;
+  const results = questions.map((q, i) => {
+    const chosen = answers[i];
+    const isCorrect = chosen === q.correct;
+    if (isCorrect) correct++;
+    return { chosen: chosen ?? null, correct: q.correct, isCorrect, why: q.why || '' };
+  });
+  const score = Math.round((correct / total) * 100);
+  const xp = correct * 5 + (correct === total ? 10 : 0);
+
+  const id = `qa-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  try {
+    db.prepare(`INSERT INTO quiz_attempts (id, user_id, node_id, title, total, correct, score, questions_json, answers_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, req.userId, node_id || null, title || 'Quiz', total, correct, score,
+        JSON.stringify(questions), JSON.stringify(answers));
+  } catch (e) { /* persistence is best-effort; still return the score */ }
+
+  try {
+    awardXP(req.userId, xp);
+    logActivity(req.userId, { kind: 'quiz', text: `Quiz: ${title || 'Module quiz'} — ${score}%`, sub: `${correct}/${total} correct`, xp, agent: 'AS' });
+    // Blend the quiz score into node mastery (never lowers an existing higher score).
+    if (node_id) {
+      const node = db.prepare('SELECT mastery FROM roadmap_nodes WHERE id = ?').get(node_id);
+      if (node) {
+        const blended = Math.max(node.mastery || 0, Math.round(((node.mastery || 0) * 0.5 + (score / 100) * 0.5) * 100) / 100);
+        db.prepare('UPDATE roadmap_nodes SET mastery = ? WHERE id = ?').run(blended, node_id);
+      }
+    }
+  } catch (e) { /* never fail the response on side-effects */ }
+
+  res.json({ ok: true, score, correct, total, xp, results });
 });
 
 // AS agent — real, node-aware assignment generation (G3).

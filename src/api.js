@@ -128,6 +128,7 @@ const API = {
   getModels:           () => API.get('/ai/models'),
   generateAssignment:  (data) => API.post('/ai/assignments/generate', data),
   generateQuiz:        (data) => API.post('/ai/quiz/generate', data),
+  submitQuiz:          (data) => API.post('/ai/quiz/submit', data),
 
   // ── Profile / Roadmap generation (Phase 2) ─────────────────────────────────
   getProfile:   () => API.get('/profile'),

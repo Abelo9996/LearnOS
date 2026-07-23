@@ -4,6 +4,7 @@ import { Card, Btn, ProgressBar, Ring, Tag, Avatar, AgentChip, PageScroll, PageH
 // All roadmap data loaded from API
 import API from '../api.js';
 import { useToast, useModal } from '../App';
+import QuizModal from '../components/QuizModal.jsx';
 
 export default function Roadmap({ onOpenSession }) {
   const { add: toast } = useToast();
@@ -242,7 +243,7 @@ export default function Roadmap({ onOpenSession }) {
           </>
         )}
       </Card>
-      {sel && nodes.length > 0 && <ModuleDetail node={sel} nodes={nodes} edges={r.edges || []} onOpenSession={handleResume} toast={toast} />}
+      {sel && nodes.length > 0 && <ModuleDetail node={sel} nodes={nodes} edges={r.edges || []} onOpenSession={handleResume} toast={toast} openModal={openModal} closeModal={closeModal} onMasteryChange={() => loadRoadmap(r.id)} />}
     </PageScroll>
   );
 }
@@ -452,7 +453,7 @@ function Kanban({ nodes, toast }) {
   );
 }
 
-function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast }) {
+function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, openModal, closeModal, onMasteryChange }) {
   const isActive = node.status === 'active';
   const isLocked = node.status === 'locked';
   const isDone   = node.status === 'done';
@@ -516,6 +517,12 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast }) {
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           {(isActive || isNext) && <Btn variant="primary" size="md" icon={I.play} onClick={onOpenSession}>{isActive ? 'Resume session' : 'Start session'}</Btn>}
           {isDone && <Btn variant="outline" size="md" onClick={onOpenSession}>Review</Btn>}
+          {!isLocked && openModal && (
+            <Btn variant="outline" size="md" icon={React.cloneElement(I.check, { size: 15 })}
+              onClick={() => openModal(<QuizModal nodeId={node.id} title={node.title} onClose={closeModal} onDone={() => onMasteryChange && onMasteryChange()} />)}>
+              Take quiz
+            </Btn>
+          )}
           {isLocked && <Btn variant="ghost" size="md" onClick={() => toast('Complete prerequisites to unlock this module', 'info')}>Locked</Btn>}
           {/* F-09: Delete node button (not for done/active nodes to prevent accidental data loss) */}
           {!isActive && !isDone && (

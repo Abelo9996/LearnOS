@@ -486,6 +486,22 @@ try {
 
 // ── Migration: roadmap node editing columns (§3.11) ───────────────────────────
 try { db.exec("ALTER TABLE roadmap_nodes ADD COLUMN last_replanned_at TEXT"); } catch {}
+// Quiz attempts — real, scored, persisted quiz results (feeds XP, activity, mastery).
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS quiz_attempts (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    node_id TEXT,
+    title TEXT,
+    total INTEGER NOT NULL,
+    correct INTEGER NOT NULL,
+    score INTEGER NOT NULL,
+    questions_json TEXT,
+    answers_json TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  )`);
+  db.exec("CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user ON quiz_attempts(user_id, created_at)");
+} catch (e) { console.log('quiz_attempts migration:', e.message); }
 // `source` marks AN-inserted remedial nodes. The replan path INSERTed into it
 // while the column did not exist, so every re-plan threw (swallowed) and the
 // "Suggested by AN" highlight could never appear.
