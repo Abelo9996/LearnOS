@@ -122,6 +122,7 @@ const API = {
   getLeaderboard:      () => API.get('/community/leaderboard'),
   getEnrollments:     () => API.get('/users/enrollments'),
   createCourse:       (data) => API.post('/courses', data),
+  generateCourseAI:   (data) => API.post('/courses/generate', data),
 
   // ── AI ─────────────────────────────────────────────────────────────────────
   postChat:            (data) => API.post('/ai/chat', data),

@@ -33,9 +33,14 @@ function isPublicUrl(u) {
 
 async function resolvesToPublicIp(hostname) {
   try {
-    const { address } = await dnsLookup(hostname, { all: true });
-    for (const addr of address) {
-      const a = typeof addr === 'string' ? addr : addr.address;
+    // With { all: true }, dns.lookup resolves to an ARRAY of {address, family}.
+    // This was destructured as `{ address }` (→ undefined), so the loop threw
+    // and every URL failed closed — silently rejecting ALL real resources.
+    const records = await dnsLookup(hostname, { all: true });
+    const list = Array.isArray(records) ? records : [records];
+    for (const rec of list) {
+      const a = typeof rec === 'string' ? rec : rec.address;
+      if (!a) continue;
       // RFC 1918 private
       if (/^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/.test(a)) return false;
       // RFC 4193 unique local (fc00::/7)
@@ -54,6 +59,29 @@ async function resolvesToPublicIp(hostname) {
 }
 
 const RESOURCE_KINDS = ['video', 'paper', 'book', 'blog', 'article', 'website', 'docs', 'repo'];
+
+// Standalone reachability check (SSRF-safe HEAD/GET) reused by the course
+// generator so AI-authored courses only ever link to resources that resolve.
+export async function checkUrlReachable(url, kind = 'article') {
+  if (!/^https?:\/\//i.test(url) || !isPublicUrl(url)) return false;
+  let hostname;
+  try { hostname = new URL(url).hostname; } catch { return false; }
+  if (!await resolvesToPublicIp(hostname)) return false;
+  if (kind === 'video' && !/youtube\.com|youtu\.be|vimeo\.com|ted\.com|ocw\.mit\.edu|bilibili\.com/i.test(url)) return false;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    let resp = await fetch(url, { method: 'HEAD', redirect: 'follow', signal: controller.signal, headers: { 'User-Agent': 'LearnOS-Verifier/1.0' } });
+    if (!resp.ok && (resp.status === 405 || resp.status === 403)) {
+      resp = await fetch(url, { method: 'GET', redirect: 'follow', signal: controller.signal, headers: { 'User-Agent': 'LearnOS-Verifier/1.0', 'Range': 'bytes=0-2048' } });
+    }
+    clearTimeout(timeout);
+    if (!resp || !resp.ok) return false;
+    const ct = (resp.headers.get('content-type') || '').toLowerCase();
+    if (ct.startsWith('image/') || ct.startsWith('audio/')) return false;
+    return true;
+  } catch { clearTimeout(timeout); return false; }
+}
 
 const resourceListSchema = {
   type: 'object',
