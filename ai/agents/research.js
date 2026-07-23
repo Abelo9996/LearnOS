@@ -53,7 +53,7 @@ async function resolvesToPublicIp(hostname) {
   }
 }
 
-const RESOURCE_KINDS = ['video', 'article', 'paper', 'docs', 'repo'];
+const RESOURCE_KINDS = ['video', 'paper', 'book', 'blog', 'article', 'website', 'docs', 'repo'];
 
 const resourceListSchema = {
   type: 'object',
@@ -78,16 +78,24 @@ const resourceListSchema = {
   required: ['resources'],
 };
 
-const SYSTEM = `You are the Research agent for LearnOS. Given a learning module title and its objectives,
-propose 4-6 high-quality external resources that an intermediate learner would find canonical.
+const SYSTEM = `You are the Research agent for LearnOS. Given a learning module (the learner's "topic of the day") and its objectives, propose a diverse set of high-quality external resources a motivated learner would actually use.
+
+Cover a MIX of these "kind" values wherever they exist for the topic:
+- video: recorded lectures & talks — prefer YouTube (MIT OpenCourseWare, Stanford, 3Blue1Brown, conference talks)
+- paper: scientific papers (arXiv, ACL Anthology, OpenReview, NeurIPS, Nature, journal DOIs)
+- book: canonical textbooks or free online books (author companion sites, well-known publishers, OpenLibrary)
+- blog: high-signal posts (distill.pub, respected research/engineering blogs)
+- article: explainers & tutorials from reputable sites (Wikipedia, official guides)
+- website: important hubs, tools, or interactive references for the topic
+- docs: official documentation
+- repo: canonical open-source implementations (GitHub)
 
 Strict rules:
-- Only return resources you are HIGHLY confident exist at the URL given. Cite canonical, long-stable URLs
-  (arXiv, Wikipedia, official docs, well-known YouTube channels, foundational textbook companion sites).
-- Do NOT invent URLs. If you cannot confidently provide a URL, omit the resource.
-- Diversify the "kind" field across video/article/paper/docs/repo where natural for the topic.
-- "source" is the human-readable site name (e.g. "arXiv", "YouTube", "docs.anthropic.com").
-- "summary" is one sentence (max ~120 chars) on what the learner will get from it.
+- Only return resources you are HIGHLY confident exist at a canonical, long-stable URL. Do NOT invent URLs — omit anything you are unsure of. A verifier fetches every URL and drops dead links, so precision matters.
+- Prefer authoritative, evergreen sources over ephemeral ones.
+- Aim for 6-8 resources spanning at least 3 different kinds (always include at least one lecture video and one paper or book when the topic allows).
+- "source" is the human-readable site name (e.g. "arXiv", "YouTube", "MIT OCW", "distill.pub").
+- "summary" is one sentence (max ~120 chars) on what the learner gets from it.
 Return only the structured object.`;
 
 export async function proposeResources({ userId, nodeId, roadmapId, title, objectives, kind }) {
@@ -97,9 +105,9 @@ export async function proposeResources({ userId, nodeId, roadmapId, title, objec
   const out = await complete({
     userId, agentCode: 'RE',
     schema: resourceListSchema,
-    maxTokens: 1500,
+    maxTokens: 2200,
     system: SYSTEM,
-    messages: `Module: ${title}\nObjectives:\n${objText}${kindFilter}\nPropose 4-6 resources.`,
+    messages: `Topic: ${title}\nObjectives:\n${objText}${kindFilter}\nPropose 6-8 resources spanning several kinds (include lecture videos, papers/books, and articles/blogs where relevant).`,
   });
 
   const items = (out.json && Array.isArray(out.json.resources)) ? out.json.resources : [];
@@ -169,7 +177,7 @@ export async function verifyResource({ resourceId }) {
 
   const ct = (resp.headers.get('content-type') || '').toLowerCase();
   // Kind-vs-content sanity checks.
-  if (r.kind === 'video' && /youtube\.com|youtu\.be|vimeo/i.test(r.url) === false) {
+  if (r.kind === 'video' && /youtube\.com|youtu\.be|vimeo\.com|ted\.com|ocw\.mit\.edu|bilibili\.com/i.test(r.url) === false) {
     return reject('not_a_known_video_host');
   }
   if (r.kind === 'paper' && /arxiv\.org|aclanthology|openreview|acm\.org|ieee\.org|nature\.com|science\.org|nips|neurips|pdf/i.test(r.url) === false) {

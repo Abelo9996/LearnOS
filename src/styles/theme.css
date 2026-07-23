@@ -165,6 +165,37 @@ a { color: inherit; }
 
 @media (prefers-reduced-motion: reduce) {
   .lp-marquee-track, [class*="lp-anim"] { animation: none !important; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── buttons (shared <Btn>) ── */
+.ui-btn:hover  { transform: translateY(-1px); filter: brightness(1.06); }
+.ui-btn:active { transform: translateY(0) scale(0.97); transition-duration: 90ms; }
+.ui-btn:disabled { opacity: 0.55; cursor: not-allowed; transform: none; filter: none; }
+.ui-btn-ghost:hover   { background: var(--surface-2) !important; color: var(--ink) !important; }
+.ui-btn-outline:hover { background: var(--surface) !important; border-color: var(--border-strong) !important; }
+.ui-btn-soft:hover    { background: var(--surface-3) !important; }
+.ui-btn-danger:hover  { background: oklch(0.7 0.2 25 / 0.12) !important; }
+
+/* ── clickable cards ── */
+.hover-card:hover  { transform: translateY(-3px); box-shadow: var(--shadow-md) !important; border-color: var(--border-strong) !important; }
+.hover-card:active { transform: translateY(-1px) scale(0.995); transition-duration: var(--dur-fast); }
+
+/* ── links + form controls ── */
+a { transition: color var(--dur-fast) var(--ease-smooth); }
+input, textarea, select { transition: border-color var(--dur-normal) var(--ease-smooth), box-shadow var(--dur-normal) var(--ease-smooth), background var(--dur-normal); }
+input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* ── keyboard focus (accessibility) ── */
+:where(button, a, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+  border-radius: var(--radius);
 }
 
 /* ── page transitions ── */

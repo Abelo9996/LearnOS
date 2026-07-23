@@ -1300,6 +1300,58 @@ function CoverVizSmall({ kind }) {
 /* ═══════════════════════════════════════════════════════════════════════════
    SETTINGS
    ═══════════════════════════════════════════════════════════════════════════ */
+// Searchable picker over the full OpenRouter model catalog. Lets the user filter
+// by id/name and pick any model, or type a custom slug that isn't listed.
+function ModelSelect({ value, onChange, models, placeholder = 'model slug…' }) {
+  const [open, setOpen] = React.useState(false);
+  const [q, setQ] = React.useState('');
+  const ref = React.useRef(null);
+  React.useEffect(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+  const list = React.useMemo(() => {
+    const arr = models || [];
+    const ql = q.trim().toLowerCase();
+    if (!ql) return arr.slice(0, 80);
+    return arr.filter(m => m.id.toLowerCase().includes(ql) || (m.name || '').toLowerCase().includes(ql)).slice(0, 80);
+  }, [q, models]);
+  const price = (m) => m.promptPrice != null ? ` · $${(m.promptPrice * 1e6).toFixed(2)}/M in` : '';
+  return (
+    <div ref={ref} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+      <input
+        value={open ? q : value}
+        placeholder={placeholder}
+        onFocus={() => { setOpen(true); setQ(''); }}
+        onChange={e => { setQ(e.target.value); setOpen(true); }}
+        style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 12.5, fontFamily: 'var(--font-mono)' }}
+      />
+      {open && (
+        <div className="scroll" style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50, maxHeight: 280, overflowY: 'auto', background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: 'var(--shadow-md)' }}>
+          {(!models) && <div style={{ padding: 10, fontSize: 12, color: 'var(--muted)' }}>Loading models…</div>}
+          {models && list.length === 0 && !q.trim() && <div style={{ padding: 10, fontSize: 12, color: 'var(--muted)' }}>No models</div>}
+          {list.map(m => (
+            <button key={m.id} onClick={() => { onChange(m.id); setOpen(false); }}
+              style={{ display: 'flex', flexDirection: 'column', gap: 1, width: '100%', textAlign: 'left', padding: '7px 10px', background: m.id === value ? 'var(--accent-soft)' : 'transparent', border: 0, borderTop: '1px solid var(--border)', cursor: 'pointer' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
+              onMouseLeave={e => e.currentTarget.style.background = m.id === value ? 'var(--accent-soft)' : 'transparent'}>
+              <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink)' }}>{m.id}</span>
+              <span style={{ fontSize: 10, color: 'var(--muted)' }}>{m.name}{price(m)}</span>
+            </button>
+          ))}
+          {q.trim() && !list.some(m => m.id === q.trim()) && (
+            <button onClick={() => { onChange(q.trim()); setOpen(false); }}
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', background: 'transparent', border: 0, borderTop: '1px solid var(--border)', cursor: 'pointer', fontSize: 11.5, color: 'var(--brand)' }}>
+              Use custom slug "{q.trim()}"
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Settings() {
   const { add: toast } = useToast();
   const [activeTab, setActiveTab] = React.useState(() => localStorage.getItem('settings_tab') || 'api');
@@ -1309,10 +1361,19 @@ export function Settings() {
   const { data: profileData  } = useApi(() => API.getUserProfile());
   const { data: settingsData } = useApi(() => API.getUserSettings());
   const { data: routingData  } = useApi(() => API.getAgentRouting());
+  const { data: models       } = useApi(() => API.getModels());
 
   const [showAddKey, setShowAddKey] = React.useState(null);
   const [newKey, setNewKey]         = React.useState('');
   const [newModel, setNewModel]     = React.useState('anthropic/claude-haiku-4.5');
+  const [routeModels, setRouteModels] = React.useState({});
+  React.useEffect(() => {
+    if (routingData) {
+      const m = {};
+      for (const r of routingData) m[r.agent_code] = r.model;
+      setRouteModels(m);
+    }
+  }, [routingData]);
   const [theme, setTheme]           = React.useState('dark');
   const [density, setDensity]       = React.useState('regular');
   const [fontSize, setFontSize]     = React.useState(14);
@@ -1455,8 +1516,9 @@ export function Settings() {
                 {showAddKey ? (
                   <div style={{ marginTop: 14, padding: 14, background: 'var(--surface)', borderRadius: 8, border: '1px solid var(--border)' }}>
                     <div className="cap" style={{ marginBottom: 8 }}>Add OpenRouter key</div>
-                    <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-                      <input value={newModel} onChange={e => setNewModel(e.target.value)} placeholder="default model slug, e.g. anthropic/claude-haiku-4.5" style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13, fontFamily: 'var(--font-mono)' }} />
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
+                      <span style={{ fontSize: 11.5, color: 'var(--muted)', whiteSpace: 'nowrap' }}>Default model</span>
+                      <ModelSelect value={newModel} onChange={setNewModel} models={models} placeholder="search OpenRouter models…" />
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input value={newKey} onChange={e => setNewKey(e.target.value)} placeholder="sk-or-v1-…" style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13 }} />
@@ -1481,30 +1543,25 @@ export function Settings() {
       case 'agents':
         return (
           <Card style={{ padding: 18 }}>
-            <SectionHead title="Per-agent routing" subtitle="Pick which model each agent uses." />
-            {Object.entries(AGENTS).map(([code, a]) => {
-              const route = (routingData || []).find(r => r.agent_code === code);
-              return (
-                <div key={code} style={{ display: 'grid', gridTemplateColumns: '200px 1fr 160px', gap: 14, alignItems: 'center', padding: '10px 0', borderTop: '1px solid var(--border)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <AgentChip code={code} size={26} glow={false} />
-                    <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 500 }}>{a.name}</span>
-                  </div>
-                  <div className="mono" style={{ fontSize: 11.5, color: 'var(--muted)' }}>{a.short}</div>
-                  <select defaultValue={route?.model || 'anthropic/claude-haiku-4.5'} onChange={async e => {
-                    await API.patchAgentRouting(code, { model: e.target.value }).catch(() => {});
-                    toast(`${a.name} → ${e.target.value}`, 'success');
-                  }} style={{ appearance: 'none', height: 30, padding: '0 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--ink)', fontSize: 11.5 }}>
-                    <option value="anthropic/claude-haiku-4.5">anthropic/claude-haiku-4.5</option>
-                    <option value="anthropic/claude-sonnet-4.6">anthropic/claude-sonnet-4.6</option>
-                    <option value="openai/gpt-4o-mini">openai/gpt-4o-mini</option>
-                    <option value="openai/gpt-4o">openai/gpt-4o</option>
-                    <option value="google/gemini-2.5-flash">google/gemini-2.5-flash</option>
-                    <option value="meta-llama/llama-3.3-70b-instruct">meta-llama/llama-3.3-70b-instruct</option>
-                  </select>
+            <SectionHead title="Per-agent routing" subtitle={`Route each agent to any of ${models ? models.length.toLocaleString() : '…'} OpenRouter models. Type to search, or paste a custom slug.`} />
+            {Object.entries(AGENTS).map(([code, a]) => (
+              <div key={code} style={{ display: 'grid', gridTemplateColumns: '180px 1fr 260px', gap: 14, alignItems: 'center', padding: '10px 0', borderTop: '1px solid var(--border)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <AgentChip code={code} size={26} glow={false} />
+                  <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 500 }}>{a.name}</span>
                 </div>
-              );
-            })}
+                <div className="mono" style={{ fontSize: 11.5, color: 'var(--muted)' }}>{a.short}</div>
+                <ModelSelect
+                  value={routeModels[code] || 'anthropic/claude-haiku-4.5'}
+                  models={models}
+                  onChange={async (model) => {
+                    setRouteModels(prev => ({ ...prev, [code]: model }));
+                    await API.patchAgentRouting(code, { model }).catch(() => {});
+                    toast(`${a.name} → ${model}`, 'success');
+                  }}
+                />
+              </div>
+            ))}
           </Card>
         );
       case 'theme':

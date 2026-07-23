@@ -165,6 +165,12 @@ function AppRoot() {
     setPhase('app');
   }
 
+  React.useEffect(() => {
+    document.title = phase === 'landing' ? 'LearnOS — Open-source AI University'
+      : phase === 'onboarding' ? 'Get started · LearnOS'
+      : 'LearnOS';
+  }, [phase]);
+
   if (phase === 'loading') return <AppLoader />;
   if (phase === 'landing') return <Landing onEnterApp={handleEnterApp} />;
   if (phase === 'onboarding') return <Onboarding onComplete={handleOnboardingComplete} />;
@@ -294,6 +300,11 @@ function AppShell() {
     const interval = setInterval(tick, 60000);
     return () => { alive = false; clearInterval(interval); };
   }, [toast]);
+
+  React.useEffect(() => {
+    const label = NAV.flatMap(g => g.items).find(i => i.id === screen)?.label || 'Dashboard';
+    document.title = `${label} · LearnOS`;
+  }, [screen]);
 
   const go = (s) => setScreen(s);
   const toggleSidebar = () => setSidebarCollapsed((c) => !c);

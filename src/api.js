@@ -125,6 +125,7 @@ const API = {
   // ── AI ─────────────────────────────────────────────────────────────────────
   postChat:            (data) => API.post('/ai/chat', data),
   getAIStatus:         () => API.get('/ai/status'),
+  getModels:           () => API.get('/ai/models'),
   generateAssignment:  (data) => API.post('/ai/assignments/generate', data),
   generateQuiz:        (data) => API.post('/ai/quiz/generate', data),
 

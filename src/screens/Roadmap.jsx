@@ -593,14 +593,16 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast }) {
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {resources.slice(0, 6).map(r => (
+                {resources.slice(0, 10).map(r => (
                   <a key={r.id} href={r.url} target="_blank" rel="noopener noreferrer"
                      style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, textDecoration: 'none', color: 'var(--ink)', transition: 'all 0.15s' }}
-                     onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--brand)'}
-                     onMouseLeave={e => e.currentTarget.style.borderColor = 'var('}>
-                    <span className="mono" style={{ fontSize: 9.5, padding: '2px 6px', borderRadius: 4, background: r.kind === 'paper' ? 'oklch(0.74 0.18 295 / 0.18)' : r.kind === 'video' ? 'oklch(0.74 0.18 25 / 0.18)' : r.kind === 'docs' ? 'oklch(0.74 0.18 200 / 0.18)' : 'oklch(0.74 0.18 155 / 0.18)', color: r.kind === 'paper' ? 'oklch(0.74 0.18 295)' : r.kind === 'video' ? 'oklch(0.74 0.18 25)' : r.kind === 'docs' ? 'oklch(0.74 0.18 200)' : 'oklch(0.74 0.18 155)', textTransform: 'uppercase', fontWeight: 600, flexShrink: 0, marginTop: 1 }}>
-                      {r.kind}
-                    </span>
+                     onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand)'; e.currentTarget.style.background = 'var(--surface-3)'; }}
+                     onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--surface-2)'; }}>
+                    {(() => {
+                      const KM = { video: ['oklch(0.7 0.19 25)', 'video'], paper: ['oklch(0.72 0.18 295)', 'paper'], book: ['oklch(0.76 0.15 85)', 'book'], blog: ['oklch(0.72 0.16 330)', 'blog'], article: ['oklch(0.74 0.16 155)', 'article'], website: ['oklch(0.72 0.15 220)', 'site'], docs: ['oklch(0.74 0.16 200)', 'docs'], repo: ['oklch(0.68 0.02 270)', 'repo'] };
+                      const [c, label] = KM[r.kind] || KM.article;
+                      return <span className="mono" style={{ fontSize: 9.5, padding: '2px 6px', borderRadius: 4, background: `color-mix(in oklch, ${c} 18%, transparent)`, color: c, textTransform: 'uppercase', fontWeight: 600, flexShrink: 0, marginTop: 1, letterSpacing: '0.04em' }}>{label}</span>;
+                    })()}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.35 }}>{r.title}</div>
                       <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>
