@@ -23,15 +23,9 @@ INSERT INTO agent_routing (user_id, agent_code, model) VALUES
   ('user-1', 'AN', 'anthropic/claude-haiku-4.5'),
   ('user-1', 'CE', 'anthropic/claude-haiku-4.5');
 
--- Agent status
-INSERT INTO agent_status (agent_code, display_name, short_desc, color, icon, status_text, is_active) VALUES
-  ('TU','Tutor',        'Teaches concepts, answers questions, explains deeply.',              '--agent-tu','cap',    'Speaking · explaining bias–variance', 1),
-  ('PR','Profiling',    'Understands you — your goals, pace, background.',                  '--agent-pr','user',   'Noticed: switching to active recall',  0),
-  ('CR','Curriculum',   'Creates personalized roadmaps and learning paths.',                '--agent-cr','graph',  'Re-sequenced Cross-validation',      0),
-  ('AS','Assessment',   'Generates quizzes and evaluates mastery.',                         '--agent-as','check',  'Drafting 3 follow-up checks',         1),
-  ('RE','Research',     'Finds, summarizes, and cites the best resources.',                 '--agent-re','search', 'Pulled: Geman et al. 1992',          1),
-  ('AN','Analytics',    'Tracks progress and surfaces insights.',                          '--agent-an','chart',  'Retention holding at 92%',           1),
-  ('CE','Certification','Issues verifiable certificates and badges.',                      '--agent-ce','ribbon', 'Issued: Python for Data Science',    0);
+-- Agent status is app config, not example content — it is bootstrapped
+-- unconditionally in db/database.js (ensureAgentStatus) so the 7 agents exist
+-- even in zero-seed mode, with honest neutral status (no fabricated telemetry).
 
 -- Roadmaps
 INSERT INTO roadmaps (id, user_id, title, subtitle, authored_by, mastery, total_modules, completed_modules, status, color, icon, next_module, modules_left)
