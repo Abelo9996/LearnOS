@@ -135,19 +135,22 @@ function AppRoot() {
   const [version, setVersion] = React.useState(0);
 
   // Does this user still need onboarding? (no roadmaps + never onboarded)
+  // NOTE: the API calls intentionally do NOT swallow errors. An unreachable or
+  // throttled API must never be mistaken for "this user has no data" — that
+  // would drop an existing learner back into the onboarding wizard.
   const checkOnboarding = async () => {
     try {
       const [roadmaps, settings] = await Promise.all([
-        API.getRoadmaps().catch(() => []),
-        API.getUserSettings().catch(() => ({})),
+        API.getRoadmaps(),
+        API.getUserSettings(),
       ]);
-      const hasRoadmaps = roadmaps && roadmaps.length > 0;
+      const hasRoadmaps = Array.isArray(roadmaps) && roadmaps.length > 0;
       const hasOnboarded = settings && settings.onboarded_at;
       if (!hasRoadmaps && !hasOnboarded) {
         setPhase('onboarding');
         return true;
       }
-    } catch { /* fall through to app */ }
+    } catch { /* API failed — fall through to the app, never force onboarding */ }
     return false;
   };
 
