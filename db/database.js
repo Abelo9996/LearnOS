@@ -73,10 +73,8 @@ try { db.exec("ALTER TABLE users ADD COLUMN password_hash TEXT"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'"); } catch {}
 try { db.exec("CREATE TABLE IF NOT EXISTS revoked_tokens (jti TEXT PRIMARY KEY, expires_at TEXT NOT NULL)"); } catch {}
 
-ensureAgentStatus();  // app config — always present, even in zero-seed mode
-seedIfEmpty();
-
-// ── Migration: Community tables ─────────────────────────────────────────────
+// Community tables must exist before the example seed (which now populates them
+// from db/seed.sql) runs.
 try {
   db.exec("CREATE TABLE IF NOT EXISTS community_threads (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id), title TEXT NOT NULL, body TEXT, tag TEXT DEFAULT 'question', votes INTEGER DEFAULT 0, replies_count INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')), updated_at TEXT DEFAULT (datetime('now')))");
   db.exec("CREATE TABLE IF NOT EXISTS community_replies (id TEXT PRIMARY KEY, thread_id TEXT NOT NULL REFERENCES community_threads(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES users(id), body TEXT NOT NULL, created_at TEXT DEFAULT (datetime('now')))");
@@ -85,63 +83,11 @@ try {
   db.exec("CREATE INDEX IF NOT EXISTS idx_comm_replies_thread ON community_replies(thread_id)");
 } catch (e) { console.log('Community migration:', e.message); }
 
-// Demo community members so seed content reads as a real community (#22) —
-// authored by other people, not the signed-in user. They have no password and
-// cannot log in; they exist purely to populate the community + leaderboard.
-const DEMO_MEMBERS = [
-  { id: 'demo-priya', name: 'Priya Sharma', email: 'priya@community.learnos.dev', level: 9, xp: 6200, hue: 295 },
-  { id: 'demo-maya',  name: 'Maya Chen',    email: 'maya@community.learnos.dev',  level: 7, xp: 4100, hue: 200 },
-  { id: 'demo-devin', name: 'Devin Park',   email: 'devin@community.learnos.dev', level: 5, xp: 2600, hue: 25  },
-  { id: 'demo-sam',   name: 'Sam Okafor',   email: 'sam@community.learnos.dev',   level: 4, xp: 1800, hue: 155 },
-];
-try {
-  if (SEED_ENABLED) for (const m of DEMO_MEMBERS) {
-    db.prepare("INSERT OR IGNORE INTO users (id, name, email, role, avatar_hue, level, xp) VALUES (?, ?, ?, 'user', ?, ?, ?)")
-      .run(m.id, m.name, m.email, m.hue, m.level, m.xp);
-  }
-} catch (e) { console.log('Demo members seed:', e.message); }
+ensureAgentStatus();  // app config — always present, even in zero-seed mode
+seedIfEmpty();         // example content (roadmaps, courses, demo members, community) from seed.sql
 
-// Seed community threads if none exist
-try {
-  const tc = db.prepare('SELECT COUNT(*) as c FROM community_threads').get();
-  if (SEED_ENABLED && tc.c === 0) {
-    const now = new Date().toISOString();
-    const threads = [
-      { id: 't-1', author: 'demo-priya', title: 'Best way to build intuition for backprop?', body: 'I struggle with understanding backprop beyond the chain rule. Any tips?', tag: 'question', votes: 86, replies: 23 },
-      { id: 't-2', author: 'demo-sam',   title: 'Errata: chapter 4 has a typo on page 12', body: 'The formula in eq 4.2 has a missing subscript.', tag: 'errata', votes: 14, replies: 4 },
-      { id: 't-3', author: 'demo-devin', title: 'Just forked the LLM course — adding examples', body: 'Added 12 new worked examples covering RAG patterns.', tag: 'show', votes: 41, replies: 11 },
-      { id: 't-4', author: 'demo-maya',  title: 'Study group — Foundations of ML, Tuesdays 7pm UTC', body: 'Anyone want to join a weekly study group?', tag: 'group', votes: 142, replies: 38 },
-      { id: 't-5', author: 'demo-priya', title: 'Anyone else struggling with measure theory?', body: 'The jump from probability to measure theory is rough.', tag: 'question', votes: 33, replies: 19 },
-    ];
-    for (const t of threads) {
-      db.prepare('INSERT INTO community_threads (id, user_id, title, body, tag, votes, replies_count, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-        .run(t.id, t.author, t.title, t.body, t.tag, t.votes, t.replies, now);
-    }
-    const replies = [
-      { id: 'r-1', tid: 't-1', author: 'demo-maya',  body: 'I found that visualizing the computation graph helps a lot. Try drawing out each node for a small network.' },
-      { id: 'r-2', tid: 't-1', author: 'demo-devin', body: 'The 3Blue1Brown series on neural networks is excellent for building the geometric intuition.' },
-      { id: 'r-3', tid: 't-4', author: 'demo-sam',   body: 'Count me in! What platform are we using for sessions?' },
-    ];
-    for (const r of replies) {
-      db.prepare('INSERT INTO community_replies (id, thread_id, user_id, body) VALUES (?, ?, ?, ?)')
-        .run(r.id, r.tid, r.author, r.body);
-    }
-    console.log('Seeded community threads and replies');
-  }
-} catch (e) { console.log('Community seed:', e.message); }
-
-// One-time re-attribution: earlier builds seeded community content under the
-// signed-in user. Move the known seed rows onto the demo members so the feed
-// and leaderboard stop crediting the user for content they didn't write (#22).
-try {
-  const reassign = { 't-1': 'demo-priya', 't-2': 'demo-sam', 't-3': 'demo-devin', 't-4': 'demo-maya', 't-5': 'demo-priya' };
-  for (const [tid, uid] of Object.entries(reassign)) {
-    db.prepare("UPDATE community_threads SET user_id = ? WHERE id = ? AND user_id = 'user-1'").run(uid, tid);
-  }
-  db.prepare("UPDATE community_replies SET user_id = 'demo-maya'  WHERE id = 'r-1' AND user_id = 'user-1'").run();
-  db.prepare("UPDATE community_replies SET user_id = 'demo-devin' WHERE id = 'r-2' AND user_id = 'user-1'").run();
-  db.prepare("UPDATE community_replies SET user_id = 'demo-sam'   WHERE id = 'r-3' AND user_id = 'user-1'").run();
-} catch (e) { console.log('Community re-attribution:', e.message); }
+// Demo community members + their threads/replies now live in db/seed.sql as
+// real database rows (applied by seedIfEmpty above) — no hardcoded seed arrays.
 
 // ── Migration: Streak tracking ───────────────────────────────────────────────
 try { db.exec("ALTER TABLE users ADD COLUMN last_activity_date TEXT"); } catch {}
