@@ -675,34 +675,3 @@ function CreateCourseModal({ onCreated }) {
   );
 }
 
-function ModuleModal({ moduleIdx, title, minutes, completed, objectives = [] }) {
-  return (
-    <div>
-      <div className="cap" style={{ marginBottom: 4 }}>Module {moduleIdx + 1}</div>
-      <h3 className="display" style={{ fontSize: 22, marginBottom: 8 }}>{title}</h3>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-        <span style={{ fontSize: 13, color: 'var(--muted)' }}>{minutes} min</span>
-        {completed && <span style={{ fontSize: 13, color: 'var(--good)' }}>✓ Completed</span>}
-      </div>
-      {objectives.length > 0 ? (
-        <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 16 }}>
-          <div className="cap" style={{ marginBottom: 8 }}>Learning objectives</div>
-          <ul style={{ paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {objectives.map((o, i) => <li key={i} style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.55 }}>{o}</li>)}
-          </ul>
-        </div>
-      ) : (
-        <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 16 }}>
-          <p style={{ fontSize: 14, color: 'var(--ink-2)', lineHeight: 1.65 }}>
-            Module content is being prepared by the course author.
-            {!completed ? ' Enroll in the course to access lessons when they\'re published.' : ''}
-          </p>
-        </div>
-      )}
-      <div style={{ display: 'flex', gap: 8 }}>
-        {!completed && <Btn variant="primary" full onClick={() => {/* enrollment handled at card level */}}>Enroll to Access</Btn>}
-        {completed && <Btn variant="outline" full>Review Materials</Btn>}
-      </div>
-    </div>
-  );
-}

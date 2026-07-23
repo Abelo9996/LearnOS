@@ -91,7 +91,6 @@ export default function Session({ setScreen }) {
 
     let replyBody = null;
     let replyAgent = 'TU';
-    let replyKind = 'text';
 
     // Try real LLM call via API
     let usedFallback = false;
@@ -117,26 +116,7 @@ export default function Session({ setScreen }) {
       const level  = (session && session.level)  || 'intermediate';
       if (lower.includes('quiz') || lower.includes('test') || lower.includes('assess')) {
         replyAgent = 'AS';
-        try {
-          const { quiz } = await API.generateQuiz({ node_id: session?.roadmap_node_id || null });
-          replyKind = 'quiz';
-          if (quiz?.questions?.length) {
-            const Q = quiz.questions[0];
-            const ids = ['a', 'b', 'c', 'd'];
-            window.__learnos_dynamic_quiz = {
-              prompt: Q.q,
-              options: (Q.options || []).map((txt, i) => ({
-                id: ids[i] || String(i),
-                text: txt,
-                verdict: i === Q.correct ? 'right' : 'wrong',
-                feedback: i === Q.correct ? (Q.why || 'Correct.') : `Not quite. ${Q.why || ''}`.trim(),
-              })),
-            };
-          } else { window.__learnos_dynamic_quiz = null; }
-        } catch {
-          replyKind = 'quiz';
-          window.__learnos_dynamic_quiz = null;
-        }
+        replyBody = `Ready to test yourself on **${topic}**? Hit **Generate quiz** in the actions above — you'll get a real, scored multiple-choice quiz that tracks your result and updates your mastery.`;
       } else if (lower.includes('cite') || lower.includes('source') || lower.includes('paper') || lower.includes('read')) {
         replyAgent = 'RE';
         let resources = [];
@@ -164,9 +144,7 @@ export default function Session({ setScreen }) {
       }
     }
 
-    const reply = replyKind === 'quiz'
-      ? { role: 'agent', agent: replyAgent, kind: 'quiz', quiz: (window.__learnos_dynamic_quiz || null) }
-      : { role: 'agent', agent: replyAgent, kind: 'text', body: replyBody };
+    const reply = { role: 'agent', agent: replyAgent, kind: 'text', body: replyBody };
 
     setMessages((m) => [...m, reply]);
     setThinking(false);
@@ -437,25 +415,20 @@ function ChatMessage({ m, session, user }) {
         <div style={{ maxWidth: '82%', padding: '10px 14px', background: 'var(--brand-grad)', color: 'oklch(0.16 0.02 270)', borderRadius: 14, borderTopRightRadius: 4, fontSize: 13.5, lineHeight: 1.5, fontWeight: 500 }}><MarkdownText text={m.body} /></div>
         <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
           <IconBtn icon={I.copy} title="Copy" onClick={() => { navigator?.clipboard?.writeText(m.body); toast('Copied to clipboard', 'success'); }} />
+          {/* Feedback only persists (and only claims to) for saved messages. */}
+          {session && session.id && session.id !== 'local' && m.id && (<>
           <IconBtn icon="👍" title="Like" onClick={async () => {
-            if (session && session.id && session.id !== 'local' && m.id) {
-              try { await API.patchMessage(session.id, m.id, { user_rating: 1 }); } catch {}
-            }
-            toast('Thanks for the feedback!', 'success');
+            try { await API.patchMessage(session.id, m.id, { user_rating: 1 }); toast('Thanks for the feedback!', 'success'); }
+            catch { toast('Could not save feedback', 'error'); }
           }} />
           <IconBtn icon="👎" title="Dislike" onClick={async () => {
-            if (session && session.id && session.id !== 'local' && m.id) {
-              try { await API.patchMessage(session.id, m.id, { user_rating: -1 }); } catch {}
-            }
-            toast('Feedback recorded. We\'ll improve.', 'info');
+            try { await API.patchMessage(session.id, m.id, { user_rating: -1 }); toast('Feedback recorded — we\'ll improve.', 'info'); }
+            catch { toast('Could not save feedback', 'error'); }
           }} />
+          </>)}
         </div>
       </div>
     );
-  }
-  if (m.kind === 'quiz') {
-    if (!m.quiz) return null; // F-01: no QUIZ fallback — render nothing
-    return <QuizCard q={m.quiz} />;
   }
   if (m.kind === 'viz' && m.vizKind === 'tradeoff-trio') {
     return (
@@ -537,63 +510,6 @@ function TradeoffTrio() {
         ))}
       </div>
     </Card>
-  );
-}
-
-function QuizCard({ q }) {
-  const [picked, setPicked] = React.useState(null);
-  const { add: toast } = useToast();
-  const opt = q.options.find((o) => o.id === picked);
-  const handlePick = (id) => {
-    if (picked) return;
-    setPicked(id);
-    const choice = q.options.find((o) => o.id === id);
-    if (choice?.verdict === 'right') toast('Correct! +15 XP earned', 'success');
-    else toast('Not quite — review the explanation', 'error');
-  };
-  return (
-    <div>
-      <ChatHeader code="AS" />
-      <div style={{ marginLeft: 42 }}>
-        <Card style={{ padding: 16 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <span className="cap">Quick check · 1 of 3</span>
-            <Tag tone="accent">{I.check} Auto-graded</Tag>
-          </div>
-          <div style={{ fontSize: 13.5, color: 'var(--ink)', lineHeight: 1.55, marginBottom: 12 }}>{q.prompt}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {q.options.map((o) => {
-              const isPicked = picked === o.id;
-              const reveal = !!picked;
-              const isAnswer = o.verdict === 'right';
-              const bd = reveal && isAnswer ? 'var(--good)' : reveal && isPicked ? 'var(--bad)' : 'var(--border)';
-              const bg = reveal && isAnswer ? 'oklch(0.78 0.16 155 / 0.10)' : reveal && isPicked ? 'oklch(0.7 0.2 25 / 0.08)' : 'transparent';
-              return (
-                <button key={o.id} disabled={reveal} onClick={() => handlePick(o.id)} style={{
-                  display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', textAlign: 'left',
-                  background: bg, border: `1px solid ${bd}`, borderRadius: 8,
-                  cursor: reveal ? 'default' : 'pointer', color: 'var(--ink)', transition: 'all var(--dur-fast)',
-                }}>
-                  <span className="mono" style={{
-                    width: 22, height: 22, flexShrink: 0, borderRadius: 5, border: `1px solid ${bd}`,
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10.5, fontWeight: 700,
-                    background: reveal && isAnswer ? 'var(--good)' : reveal && isPicked ? 'var(--bad)' : 'transparent',
-                    color: reveal && (isAnswer || isPicked) ? 'oklch(0.16 0.02 270)' : 'var(--muted)',
-                  }}>{o.id.toUpperCase()}</span>
-                  <span style={{ flex: 1, fontSize: 13 }}>{o.text}</span>
-                </button>
-              );
-            })}
-          </div>
-          {picked && (
-            <div style={{ marginTop: 12, padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 8, border: '1px solid var(--border)', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <Tag tone={opt.verdict === 'right' ? 'good' : 'danger'}>{opt.verdict === 'right' ? 'Correct' : 'Not quite'}</Tag>
-              <span style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.55, flex: 1 }}>{opt.feedback}</span>
-            </div>
-          )}
-        </Card>
-      </div>
-    </div>
   );
 }
 

@@ -12,12 +12,28 @@ const SECT_MARGIN = 16;
 function useApi(fetcher, deps = []) {
   const [data, setData]       = React.useState(null);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError]     = React.useState(null);
   const load = React.useCallback(() => {
     setLoading(true);
-    fetcher().then(setData).catch(() => {}).finally(() => setLoading(false));
+    setError(null);
+    // Surface the error instead of swallowing it — a failed load used to be
+    // indistinguishable from a genuinely empty list ("No assignments yet.").
+    fetcher().then(d => { setData(d); }).catch(e => { setError(e); }).finally(() => setLoading(false));
   }, deps);  // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => { load(); }, [load]);
-  return { data, loading, reload: load };
+  return { data, loading, error, reload: load };
+}
+
+// Honest error state so a failed load is never rendered as an empty list.
+function ErrorBanner({ error, onRetry }) {
+  if (!error) return null;
+  return (
+    <div style={{ padding: '10px 14px', marginBottom: 14, borderRadius: 10, background: 'oklch(0.7 0.2 25 / 0.10)', border: '1px solid oklch(0.7 0.2 25 / 0.35)', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'var(--ink-2)' }}>
+      <span style={{ color: 'var(--bad)' }}>⚠</span>
+      <span style={{ flex: 1 }}>Couldn't load this — {error.message || 'the server may be unavailable'}.</span>
+      {onRetry && <button onClick={onRetry} className="ui-btn" style={{ background: 'none', border: 0, color: 'var(--brand)', cursor: 'pointer', fontWeight: 600, fontSize: 12.5 }}>Retry</button>}
+    </div>
+  );
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -304,7 +320,7 @@ const ASSIGNMENT_LIBRARY = [
 export function Assignments() {
   const { add: toast } = useToast();
   const { open: openModal } = useModal();
-  const { data: rawAssignments, loading, reload } = useApi(() => API.getAssignments());
+  const { data: rawAssignments, loading, error, reload } = useApi(() => API.getAssignments());
 
   const assignments = React.useMemo(() => {
     if (!rawAssignments) return [];
@@ -387,6 +403,7 @@ export function Assignments() {
             } catch { toast('Could not generate assignment', 'error'); }
           }
         }}>Generate with AI</Btn></>} />
+      <ErrorBanner error={error} onRetry={reload} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: SECT_MARGIN }}>
         <RoadmapStat2 icon={I.check}    label="In progress" value={assignments.filter(a => a.status === 'in-progress').length.toString()} sub="active"          color="var(--brand)" />
         <RoadmapStat2 icon={I.clock}    label="Avg grade"   value={avgGrade ? `${avgGrade}%` : '—'}                                       sub="last graded"    color="var(--good)" />
@@ -647,7 +664,7 @@ function AssignmentWorkModal({ a, reload }) {
 export function Flashcards() {
   const { add: toast } = useToast();
   const { open: openModal, close: closeModal } = useModal();
-  const { data: rawCards, loading, reload } = useApi(() => API.getFlashcardsDue());
+  const { data: rawCards, loading, error, reload } = useApi(() => API.getFlashcardsDue());
 
   const cards = React.useMemo(() => {
     if (!rawCards) return [];
@@ -714,6 +731,7 @@ export function Flashcards() {
             if (target === idx) setFlipped(f => !f); else setIdx(target);
           }}>{sessionComplete ? 'New session' : total === 0 ? 'No cards due' : 'Continue'}</Btn>
         </>} />
+      <ErrorBanner error={error} onRetry={reload} />
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: SECT_MARGIN }}>
         <Card pad={false} style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 18 }}>
           {total === 0 ? (
@@ -792,7 +810,7 @@ export function Flashcards() {
    ═══════════════════════════════════════════════════════════════════════════ */
 export function Certificates() {
   const { add: toast } = useToast();
-  const { data: rawCerts,  loading: loadingCerts  } = useApi(() => API.getCertificates());
+  const { data: rawCerts,  loading: loadingCerts,  error: certsError, reload: reloadCerts } = useApi(() => API.getCertificates());
   const { data: rawBadges, loading: loadingBadges } = useApi(() => API.getBadges());
 
   const certs  = rawCerts  || [];
@@ -818,6 +836,7 @@ export function Certificates() {
           try { await navigator.clipboard.writeText(text); toast(`Copied ${certs.length} credential${certs.length === 1 ? '' : 's'} to clipboard`, 'success'); }
           catch { toast('Could not copy to clipboard', 'error'); }
         }}>Share</Btn></>} />
+      <ErrorBanner error={certsError} onRetry={reloadCerts} />
       <SectionHead title="Earned certificates" />
       {loadingCerts ? (
         <div style={{ padding: 32, color: 'var(--muted)' }}>Loading…</div>
@@ -1883,28 +1902,6 @@ function CreateCardsModal({ onCreated }) {
           }}>{creating ? 'Creating...' : 'Create cards'}</Btn>
         </div>
       </div>
-    </div>
-  );
-}
-
-function FeedbackModal({ assignment: a }) {
-  const feedbackTexts = {
-    high: "Excellent work! Your solution demonstrates a strong understanding of the core concepts.",
-    med: "Good effort! Your approach is correct but there are some areas for improvement.",
-    low: "This needs more work. Please review the foundational concepts and try again.",
-  };
-  const level = (a.grade >= 85) ? 'high' : (a.grade >= 70) ? 'med' : 'low';
-  return (
-    <div>
-      <h3 className="display" style={{ fontSize: 22, marginBottom: 4 }}>Feedback</h3>
-      <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 16 }}>{a.title} · Grade: {a.grade}%</div>
-      <div style={{ padding: 16, background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 16 }}>
-        <div className="cap" style={{ marginBottom: 8, color: level === 'high' ? 'var(--good)' : level === 'med' ? 'var(--warn)' : 'var(--bad)' }}>
-          {level === 'high' ? '★ Strong' : level === 'med' ? '● Satisfactory' : '○ Needs improvement'}
-        </div>
-        <p style={{ fontSize: 14, color: 'var(--ink-2)', lineHeight: 1.65 }}>{feedbackTexts[level]}</p>
-      </div>
-      <Btn variant="outline" full onClick={() => { navigator?.clipboard?.writeText('Assignment: ' + a.title + '\nGrade: ' + a.grade + '%\n\nFeedback: ' + feedbackTexts[level]); toast('Feedback copied', 'success'); }}>Copy to clipboard</Btn>
     </div>
   );
 }
