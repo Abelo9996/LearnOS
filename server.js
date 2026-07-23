@@ -45,14 +45,15 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      imgSrc: ["'self'", "data:", "blob:"],
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       connectSrc: ["'self'"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       objectSrc: ["'none'"],
-      frameSrc: ["'none'"],
+      // Allow embedded lecture videos (privacy-nocookie YouTube) in lessons.
+      frameSrc: ["'self'", "https://www.youtube-nocookie.com", "https://www.youtube.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https://i.ytimg.com"],
     },
   },
   crossOriginEmbedderPolicy: false,

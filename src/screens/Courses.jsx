@@ -4,6 +4,27 @@ import { Card, Btn, ProgressBar, Tag, Avatar, Kbd, PageScroll, SectionHead } fro
 import { useUser } from '../UserContext.jsx';
 import API from '../api.js';
 import { useToast, useModal } from '../App';
+import MarkdownText from '../components/Markdown';
+
+// Extract a YouTube video id so lecture videos can be embedded inline.
+function youtubeId(url) {
+  if (!url) return null;
+  const m = String(url).match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? m[1] : null;
+}
+const LESSON_KIND = {
+  video:    { label: 'Lecture video', color: 'oklch(0.7 0.19 25)',  icon: 'cap' },
+  paper:    { label: 'Paper',         color: 'oklch(0.72 0.18 295)', icon: 'search' },
+  book:     { label: 'Book',          color: 'oklch(0.76 0.15 85)',  icon: 'book' },
+  blog:     { label: 'Blog',          color: 'oklch(0.72 0.16 330)', icon: 'rss' },
+  article:  { label: 'Article',       color: 'oklch(0.74 0.16 155)', icon: 'book' },
+  website:  { label: 'Website',       color: 'oklch(0.72 0.15 220)', icon: 'graph' },
+  docs:     { label: 'Docs',          color: 'oklch(0.74 0.16 200)', icon: 'book' },
+  repo:     { label: 'Repository',    color: 'oklch(0.68 0.02 270)', icon: 'fork' },
+  reading:  { label: 'Reading',       color: 'var(--brand)',         icon: 'book' },
+  exercise: { label: 'Exercise',      color: 'oklch(0.74 0.18 25)',  icon: 'check' },
+  project:  { label: 'Project',       color: 'var(--brand-3)',       icon: 'spark' },
+};
 
 export default function Courses() {
   const { add: toast } = useToast();
@@ -165,51 +186,79 @@ export default function Courses() {
     // `user.role === 'admin'` check was never true, so verify/edit were dead.)
     const isAdmin = true;
 
-    // Lesson reader view
+    // Rich lesson reader — embeds lecture videos, renders resource cards by kind,
+    // markdown readings, with prev/next navigation across the whole course.
     if (selectedLesson) {
       const lesson = selectedLesson;
+      const flat = courseModules.flatMap(m => (m.lessons || []).map(l => ({ ...l, _module: m.title })));
+      const idx = flat.findIndex(l => l.id === lesson.id);
+      const prev = idx > 0 ? flat[idx - 1] : null;
+      const next = idx >= 0 && idx < flat.length - 1 ? flat[idx + 1] : null;
+      const meta = LESSON_KIND[lesson.kind] || LESSON_KIND.reading;
+      const vid = youtubeId(lesson.url);
+      const isDone = completedIds.includes(lesson.id);
+      const complete = async (advance) => {
+        try {
+          if (!isDone) {
+            await API.markLessonComplete(c.slug, lesson.id);
+            const p = await API.getCourseProgress(c.slug).catch(() => null);
+            if (p) setProgress(p);
+            toast('Lesson complete · +10 XP', 'success');
+          }
+          if (advance && next) setSelectedLesson(next);
+        } catch (e) { toast(e.message || 'Could not mark complete', 'error'); }
+      };
       return (
         <PageScroll>
-          <button onClick={() => setSelectedLesson(null)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 0, color: 'var(--muted)', fontSize: 12, marginBottom: 16, cursor: 'pointer' }}>
-            {React.cloneElement(I.chevronL, { size: 14 })} Back to Course
+          <button onClick={() => setSelectedLesson(null)} className="ui-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 0, color: 'var(--muted)', fontSize: 12, marginBottom: 14, cursor: 'pointer' }}>
+            {React.cloneElement(I.chevronL, { size: 14 })} {c.title}
           </button>
-          <Card style={{ padding: 28 }}>
-            <div className="cap" style={{ marginBottom: 4 }}>{lesson.kind} · {lesson.title}</div>
-            <h1 className="display" style={{ fontSize: 28, color: 'var(--ink)', margin: '8px 0 20px' }}>{lesson.title}</h1>
-            {lesson.body_md ? (
-              <div style={{ fontSize: 14.5, color: 'var(--ink-2)', lineHeight: 1.75, whiteSpace: 'pre-wrap' }}>
-                {lesson.body_md.split('\n').map((line, i) => {
-                  if (line.startsWith('### ')) return <h4 key={i} style={{ fontSize: 15, color: 'var(--ink)', margin: '16px 0 8px', fontWeight: 700 }}>{line.slice(4)}</h4>;
-                  if (line.startsWith('## ')) return <h3 key={i} style={{ fontSize: 18, color: 'var(--ink)', margin: '20px 0 10px', fontWeight: 700 }}>{line.slice(3)}</h3>;
-                  if (line.startsWith('# ')) return <h2 key={i} style={{ fontSize: 22, color: 'var(--ink)', margin: '24px 0 12px', fontWeight: 700 }}>{line.slice(2)}</h2>;
-                  if (line.startsWith('- ') || /^\d+\. /.test(line)) return <div key={i} style={{ marginLeft: 16, lineHeight: 1.8 }}>{line.replace(/^\*\*([^*]+)\*\*/, (_, t) => t)}</div>;
-                  if (!line.trim()) return <div key={i} style={{ height: 8 }} />;
-                  return <p key={i} style={{ margin: '6px 0' }} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/\*([^*]+)\*/g, '<em>$1</em>') }} />;
-                })}
-              </div>
-            ) : (
-              <div style={{ color: 'var(--muted)', fontSize: 14 }}>No lesson content yet.</div>
-            )}
-            {enrolled[c.slug] && (
-              <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
-                <Btn
-                  variant={completedIds.includes(lesson.id) ? 'outline' : 'primary'}
-                  onClick={async () => {
-                    if (completedIds.includes(lesson.id)) return;
-                    try {
-                      await API.markLessonComplete(c.slug, lesson.id);
-                      const p = await API.getCourseProgress(c.slug).catch(() => null);
-                      if (p) setProgress(p);
-                      toast('Lesson marked complete! +10 XP', 'success');
-                    } catch (e) {
-                      toast(e.message || 'Could not mark this lesson complete', 'error');
-                    }
-                  }}
-                >
-                  {completedIds.includes(lesson.id) ? '✓ Completed' : 'Mark complete'}
-                </Btn>
+          <Card style={{ padding: 0, overflow: 'hidden' }}>
+            {/* Embedded lecture video */}
+            {vid && (
+              <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', background: '#000' }}>
+                <iframe title={lesson.title} src={`https://www.youtube-nocookie.com/embed/${vid}`} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />
               </div>
             )}
+            <div style={{ padding: 28 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, fontSize: 11, fontWeight: 600, background: `color-mix(in oklch, ${meta.color} 16%, transparent)`, color: meta.color, border: `1px solid color-mix(in oklch, ${meta.color} 35%, transparent)` }}>
+                  {React.cloneElement(I[meta.icon] || I.book, { size: 12 })} {meta.label}
+                </span>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{lesson._module}</span>
+                {isDone && <span style={{ marginLeft: 'auto', fontSize: 11.5, color: 'var(--good)', fontWeight: 600 }}>✓ Completed</span>}
+              </div>
+              <h1 className="display" style={{ fontSize: 27, color: 'var(--ink)', margin: '4px 0 18px' }}>{lesson.title}</h1>
+
+              {/* Non-video external resource → rich open card */}
+              {lesson.url && !vid && (
+                <a href={lesson.url} target="_blank" rel="noopener noreferrer" className="hover-card" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, marginBottom: 18, borderRadius: 12, background: 'var(--surface)', border: `1px solid color-mix(in oklch, ${meta.color} 30%, var(--border))`, textDecoration: 'none', color: 'var(--ink)' }}>
+                  <span style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 10, background: `color-mix(in oklch, ${meta.color} 16%, transparent)`, color: meta.color, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: `1px solid color-mix(in oklch, ${meta.color} 35%, transparent)` }}>{React.cloneElement(I[meta.icon] || I.book, { size: 20 })}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 14, fontWeight: 600 }}>Open this {meta.label.toLowerCase()}</div>
+                    <div className="mono" style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(() => { try { return new URL(lesson.url).hostname.replace(/^www\./, ''); } catch { return lesson.url; } })()}</div>
+                  </div>
+                  <span style={{ color: meta.color, flexShrink: 0 }}>{React.cloneElement(I.open || I.arrowR, { size: 16 })}</span>
+                </a>
+              )}
+
+              {lesson.body_md ? (
+                <div style={{ fontSize: 14.5, lineHeight: 1.75 }}><MarkdownText text={lesson.body_md} /></div>
+              ) : (!lesson.url && <div style={{ color: 'var(--muted)', fontSize: 14 }}>No lesson content yet.</div>)}
+
+              {/* Footer: prev / complete+next */}
+              <div style={{ marginTop: 26, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Btn variant="ghost" disabled={!prev} onClick={() => prev && setSelectedLesson(prev)} icon={React.cloneElement(I.chevronL, { size: 14 })}>Previous</Btn>
+                <div style={{ flex: 1 }} />
+                {enrolled[c.slug] ? (
+                  <Btn variant="primary" onClick={() => complete(true)} iconRight={next ? React.cloneElement(I.arrowR, { size: 14 }) : undefined}>
+                    {isDone ? (next ? 'Next lesson' : 'Done') : (next ? 'Complete & continue' : 'Mark complete')}
+                  </Btn>
+                ) : (
+                  <Btn variant="outline" disabled={!next} onClick={() => next && setSelectedLesson(next)} iconRight={React.cloneElement(I.arrowR, { size: 14 })}>Next</Btn>
+                )}
+              </div>
+            </div>
           </Card>
         </PageScroll>
       );
