@@ -2,6 +2,7 @@ import { Router } from 'express';
 import db, { logActivity, awardXP } from '../db/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import { isPublicUrl } from '../middleware/url-safety.js';
+import { generateCourse } from '../ai/agents/course.js';
 
 const router = Router();
 
@@ -9,6 +10,20 @@ const router = Router();
 function getCourse(slug) {
   return db.prepare('SELECT * FROM courses WHERE slug = ?').get(slug);
 }
+
+// AI course generation — the Curriculum agent designs a full Coursera-grade
+// course (readings, verified resources, assignments, capstone). Declared before
+// the /:slug routes so "generate" is never captured as a slug.
+router.post('/generate', requireAuth, async (req, res) => {
+  const { topic, level } = req.body || {};
+  if (!topic || !String(topic).trim()) return res.status(400).json({ error: true, message: 'topic required' });
+  try {
+    const result = await generateCourse({ userId: req.userId, topic: String(topic).slice(0, 200), level });
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    res.status(e.code === 'NO_KEY' ? 400 : 502).json({ error: true, code: e.code || null, message: e.message });
+  }
+});
 
 router.get('/', (req, res) => {
   const search = req.query.search || '';

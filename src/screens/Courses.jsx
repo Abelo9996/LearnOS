@@ -368,6 +368,15 @@ export default function Courses() {
               }}>{t.label}<span className="mono" style={{ fontSize: 10.5, opacity: 0.7 }}>{t.n}</span></button>
             ))}
             <div style={{ flex: 1 }} />
+            <Btn variant="primary" icon={I.spark} onClick={() => openModal(<GenerateCourseModal onDone={async (slug) => {
+              closeModal();
+              const rows = await API.getCourses();
+              const parsed = (rows || []).map(c => ({ ...c, tags: typeof c.tags === 'string' ? JSON.parse(c.tags || '[]') : (c.tags || []) }));
+              setCourses(parsed);
+              setEnrolled(prev => ({ ...prev, [slug]: true }));
+              const created = parsed.find(c => c.slug === slug);
+              if (created) setSelectedCourse(created);
+            }} />)}>Generate with AI</Btn>
             <Btn variant="outline" icon={I.plus} onClick={() => openModal(<CreateCourseModal onCreated={async () => { closeModal(); const rows = await API.getCourses(); setCourses((rows||[]).map(c => ({...c, tags: typeof c.tags === 'string' ? JSON.parse(c.tags||'[]') : (c.tags||[])}))); toast('Course created!', 'success'); }} />)}>Create Course</Btn>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', marginBottom: 14 }}>
@@ -586,6 +595,83 @@ function TopContributorsCard({ contributors = [] }) {
   );
 }
 
+
+// AI course generator — the Curriculum agent designs a full Coursera-grade
+// course (readings, verified resources, per-module assignments, capstone).
+function GenerateCourseModal({ onDone }) {
+  const { add: toast } = useToast();
+  const [topic, setTopic] = React.useState('');
+  const [level, setLevel] = React.useState('intermediate');
+  const [phase, setPhase] = React.useState('form'); // form | generating | error
+  const [errMsg, setErrMsg] = React.useState('');
+  const inp = { width: '100%', padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13.5 };
+  const suggestions = ['Reinforcement Learning', 'Distributed Systems', 'Real Analysis', 'Modern React', 'Quantum Computing', 'Financial Modeling'];
+
+  const go = async () => {
+    if (!topic.trim()) return;
+    setPhase('generating');
+    try {
+      const res = await API.generateCourseAI({ topic: topic.trim(), level });
+      toast(`Course generated · ${res.modules} modules · ${res.resources} resources`, 'success');
+      onDone && onDone(res.slug);
+    } catch (e) {
+      setErrMsg(e.code === 'NO_KEY' || /key/i.test(e.message || '')
+        ? 'Add an OpenRouter key in Settings → API Keys to generate courses.'
+        : (e.message || 'Course generation failed — try again.'));
+      setPhase('error');
+    }
+  };
+
+  if (phase === 'generating') {
+    return (
+      <div style={{ minWidth: 440, padding: '32px 8px', textAlign: 'center' }}>
+        <div style={{ display: 'inline-flex', gap: 6, marginBottom: 16 }}>
+          {[0, 1, 2].map(i => <span key={i} style={{ width: 9, height: 9, borderRadius: 999, background: 'var(--brand)', animation: `ldot 1s ease-in-out ${i * 0.15}s infinite` }} />)}
+        </div>
+        <div className="display" style={{ fontSize: 19, color: 'var(--ink)' }}>Designing your course…</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 8, lineHeight: 1.6, maxWidth: 380, margin: '8px auto 0' }}>
+          The Curriculum agent is writing modules and readings, the Research agent is finding and verifying lecture videos, papers and articles, and the Assessment agent is authoring assignments. This can take up to a minute.
+        </div>
+      </div>
+    );
+  }
+  if (phase === 'error') {
+    return (
+      <div style={{ minWidth: 440, padding: '28px 8px', textAlign: 'center' }}>
+        <div style={{ fontSize: 40, marginBottom: 10 }}>🔌</div>
+        <div className="display" style={{ fontSize: 18, color: 'var(--ink)' }}>Couldn't generate the course</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', margin: '10px 0 20px', lineHeight: 1.6 }}>{errMsg}</div>
+        <Btn variant="outline" onClick={() => setPhase('form')}>Back</Btn>
+      </div>
+    );
+  }
+  return (
+    <div style={{ minWidth: 460, maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div>
+        <h3 className="display" style={{ fontSize: 22, margin: 0 }}>Generate a course with AI</h3>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>A full, Coursera-grade course — readings, lecture videos, papers, assignments and a capstone — built for your topic.</div>
+      </div>
+      <div>
+        <label className="cap" style={{ display: 'block', marginBottom: 6 }}>What do you want a course on?</label>
+        <input autoFocus value={topic} onChange={e => setTopic(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') go(); }} placeholder="e.g. Reinforcement learning, from bandits to PPO" style={inp} />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {suggestions.map(s => <button key={s} onClick={() => setTopic(s)} className="ui-btn" style={{ fontSize: 11.5, padding: '4px 10px', borderRadius: 999, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--ink-2)', cursor: 'pointer' }}>{s}</button>)}
+        </div>
+      </div>
+      <div>
+        <label className="cap" style={{ display: 'block', marginBottom: 6 }}>Level</label>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {['beginner', 'intermediate', 'advanced'].map(l => (
+            <button key={l} onClick={() => setLevel(l)} className="ui-btn" style={{ flex: 1, padding: '8px 10px', borderRadius: 8, textTransform: 'capitalize', cursor: 'pointer', background: level === l ? 'var(--accent-soft)' : 'var(--surface)', border: `1px solid ${level === l ? 'var(--accent-line)' : 'var(--border)'}`, color: level === l ? 'oklch(0.82 0.18 295)' : 'var(--ink-2)', fontSize: 13 }}>{l}</button>
+          ))}
+        </div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+        <Btn variant="primary" icon={I.spark} disabled={!topic.trim()} onClick={go}>Generate course</Btn>
+      </div>
+    </div>
+  );
+}
 
 function CreateCourseModal({ onCreated }) {
   const { add: toast } = useToast();
