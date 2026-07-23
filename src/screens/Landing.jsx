@@ -1,7 +1,8 @@
 import React from 'react';
 import { I } from '../components/Icons';
 import { Card, Btn, Tag, Avatar, AgentChip } from '../components/UI';
-import { AGENTS, LEARNING_PROGRESS as MARKETING_CHART_DATA } from '../data/data';
+import { AGENTS } from '../data/data';
+import API from '../api.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Shared landing primitives
@@ -227,11 +228,41 @@ function DashboardPreview() {
     { l: 'Courses', i: 'book' },
     { l: 'Certificates', i: 'ribbon' },
   ];
+  // Live preview — mirrors the real local-user dashboard from the API, so it
+  // shows genuine stored state (honest zeros on a cold start), never constants.
+  const [d, setD] = React.useState(null);
+  React.useEffect(() => {
+    let alive = true;
+    Promise.all([
+      API.getStats().catch(() => null),
+      API.getRoadmaps().catch(() => []),
+      API.getDailyStats(7).catch(() => []),
+      API.getMe().catch(() => null),
+      API.getCertificates().catch(() => []),
+    ]).then(([stats, roadmaps, daily, me, certs]) => { if (alive) setD({ stats, roadmaps, daily, me, certs }); });
+    return () => { alive = false; };
+  }, []);
+
+  const loading = !d;
+  const s = d?.stats, me = d?.me, top = (d?.roadmaps || [])[0];
+  const dash = (v) => loading ? '—' : v;
+  const firstName = me?.name ? me.name.split(' ')[0] : 'there';
+  const level = s?.level ?? me?.level ?? 1;
+  const xp = s?.xp ?? me?.xp ?? 0;
+  const xpToNext = s?.xpToNext ?? me?.xp_to_next ?? 500;
+  const levelPct = Math.min(100, Math.round((xp / Math.max(xpToNext, 1)) * 100));
+  const streak = s?.streak ?? 0, bestStreak = s?.bestStreak ?? 0, mastery = s?.mastery ?? 0;
+  const certCount = (d?.certs || []).length;
+  const completed = top?.completed_modules ?? 0, total = top?.total_modules ?? 0;
+  const roadmapFrac = top?.mastery != null ? top.mastery : 0;
+  const dailyXp = (d?.daily || []).map((x) => x.xp || 0);
+  const weekXp = dailyXp.reduce((a, b) => a + b, 0);
+
   const stats = [
-    { l: 'Overall mastery', v: '68', u: '%', d: '+6% this week', acc: 'var(--brand)' },
-    { l: 'Day streak', v: '12', u: 'days', d: 'Best 18', acc: 'oklch(0.78 0.16 75)' },
-    { l: 'XP earned', v: '2,350', u: 'xp', d: '+420 this week', acc: 'var(--brand-3)' },
-    { l: 'Certificates', v: '3', u: 'earned', d: '+1 this month', acc: 'oklch(0.74 0.18 25)' },
+    { l: 'Overall mastery', v: dash(mastery), u: '%', d: '', acc: 'var(--brand)' },
+    { l: 'Day streak', v: dash(streak), u: 'days', d: loading ? '' : `Best ${bestStreak}`, acc: 'oklch(0.78 0.16 75)' },
+    { l: 'XP earned', v: dash(xp.toLocaleString()), u: 'xp', d: loading || !weekXp ? '' : `+${weekXp.toLocaleString()} this week`, acc: 'var(--brand-3)' },
+    { l: 'Certificates', v: dash(certCount), u: 'earned', d: '', acc: 'oklch(0.74 0.18 25)' },
   ];
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '210px 1fr', minHeight: 440, fontSize: 12 }}>
@@ -252,31 +283,31 @@ function DashboardPreview() {
         ))}
         <div style={{ marginTop: 18, padding: 12, borderRadius: 10, background: 'linear-gradient(135deg, oklch(0.22 0.05 295), oklch(0.17 0.04 250))', border: '1px solid var(--accent-line)' }}>
           <div className="cap" style={{ color: 'oklch(0.82 0.18 295)', fontSize: 9.5 }}>Progress</div>
-          <div className="display" style={{ fontSize: 15, color: 'var(--ink)', marginTop: 4 }}>Level 4</div>
+          <div className="display" style={{ fontSize: 15, color: 'var(--ink)', marginTop: 4 }}>Level {dash(level)}</div>
           <div style={{ height: 4, borderRadius: 999, background: 'oklch(0.3 0.03 270)', marginTop: 8, overflow: 'hidden' }}>
-            <div style={{ width: '68%', height: '100%', background: 'var(--brand-grad)' }} />
+            <div style={{ width: `${loading ? 0 : levelPct}%`, height: '100%', background: 'var(--brand-grad)' }} />
           </div>
         </div>
       </div>
       <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16, background: 'oklch(0.125 0.02 270)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <div>
-            <div className="display" style={{ fontSize: 19, color: 'var(--ink)' }}>Welcome back, Alex</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>Pick up where you left off — Machine Learning Engineer</div>
+            <div className="display" style={{ fontSize: 19, color: 'var(--ink)' }}>Welcome back, {firstName}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>{top ? `Pick up where you left off — ${top.title}` : 'Start your first roadmap'}</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 14px', borderRadius: 999, background: 'oklch(0.17 0.025 270)', border: '1px solid var(--border)', color: 'var(--muted)' }}>
               {React.cloneElement(I.search, { size: 14 })}<span style={{ fontSize: 11.5 }}>Search…</span>
             </div>
-            <Avatar name="Alex Learner" size={32} hue={295} />
+            <Avatar name={me?.name || 'You'} size={32} hue={me?.avatar_hue || 295} />
           </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-          {stats.map((s) => (
-            <div key={s.l} style={{ padding: 14, borderRadius: 12, background: 'oklch(0.155 0.022 270)', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 11, color: 'var(--muted)' }}>{s.l}</div>
-              <div className="display" style={{ fontSize: 26, color: 'var(--ink)', marginTop: 7, lineHeight: 1 }}>{s.v}<span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500, marginLeft: 4 }}>{s.u}</span></div>
-              <div style={{ fontSize: 10.5, color: s.acc, marginTop: 8, fontFamily: 'var(--font-mono)' }}>{s.d}</div>
+          {stats.map((st) => (
+            <div key={st.l} style={{ padding: 14, borderRadius: 12, background: 'oklch(0.155 0.022 270)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: 11, color: 'var(--muted)' }}>{st.l}</div>
+              <div className="display" style={{ fontSize: 26, color: 'var(--ink)', marginTop: 7, lineHeight: 1 }}>{st.v}<span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500, marginLeft: 4 }}>{st.u}</span></div>
+              <div style={{ fontSize: 10.5, color: st.acc, marginTop: 8, fontFamily: 'var(--font-mono)', minHeight: 13 }}>{st.d}</div>
             </div>
           ))}
         </div>
@@ -284,15 +315,15 @@ function DashboardPreview() {
           <div style={{ padding: 16, borderRadius: 12, background: 'oklch(0.155 0.022 270)', border: '1px solid var(--border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
               {React.cloneElement(I.chart, { size: 15, stroke: 'var(--brand)' })}
-              <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)' }}>Learning hours</span>
-              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--brand-3)', fontFamily: 'var(--font-mono)' }}>13.1h</span>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)' }}>XP this week</span>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--brand-3)', fontFamily: 'var(--font-mono)' }}>{dash(weekXp.toLocaleString())}</span>
             </div>
-            <AreaChart />
+            <AreaChart values={dailyXp} />
           </div>
           <div style={{ padding: 16, borderRadius: 12, background: 'oklch(0.155 0.022 270)', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <span style={{ fontSize: 11.5, color: 'var(--muted)', alignSelf: 'flex-start' }}>Roadmap progress</span>
-            <Gauge value={0.68} />
-            <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>14 / 24 modules</span>
+            <Gauge value={roadmapFrac} />
+            <span style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>{dash(`${completed} / ${total}`)} modules</span>
           </div>
         </div>
       </div>
@@ -300,10 +331,10 @@ function DashboardPreview() {
   );
 }
 
-function AreaChart() {
-  const data = MARKETING_CHART_DATA.map((d) => d.v);
-  const w = 380, h = 96, max = Math.max(...data) * 1.15;
-  const pts = data.map((v, i) => [(i / (data.length - 1)) * w, h - (v / max) * h]);
+function AreaChart({ values = [] }) {
+  const data = values.length ? values : [0, 0, 0, 0, 0, 0, 0];
+  const w = 380, h = 96, max = Math.max(...data, 1) * 1.15;
+  const pts = data.map((v, i) => [(i / Math.max(data.length - 1, 1)) * w, h - (v / max) * h]);
   const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(' ');
   const area = `${line} L${w} ${h} L0 ${h} Z`;
   return (
@@ -334,7 +365,7 @@ function Gauge({ value }) {
           <stop offset="0%" stopColor="var(--brand-3)" /><stop offset="100%" stopColor="var(--brand)" />
         </linearGradient>
       </defs>
-      <text x={cx} y={cy - 8} textAnchor="middle" className="display" fill="var(--ink)" style={{ fontSize: 22 }}>68%</text>
+      <text x={cx} y={cy - 8} textAnchor="middle" className="display" fill="var(--ink)" style={{ fontSize: 22 }}>{Math.round((value || 0) * 100)}%</text>
     </svg>
   );
 }
@@ -522,8 +553,16 @@ function FeatureGrid() {
 }
 
 function ProgressSplit() {
+  const [d, setD] = React.useState(null);
+  React.useEffect(() => {
+    Promise.all([API.getStats().catch(() => null), API.getRoadmaps().catch(() => []), API.getCertificates().catch(() => [])])
+      .then(([s, r, c]) => setD({ s, r, c }));
+  }, []);
+  const top = (d?.r || [])[0];
   const rows = [
-    { l: 'Modules mastered', v: '14 / 24' }, { l: 'Day streak', v: '12' }, { l: 'Certificates earned', v: '3' },
+    { l: 'Modules mastered', v: d ? `${top?.completed_modules ?? 0} / ${top?.total_modules ?? 0}` : '—' },
+    { l: 'Day streak', v: d ? String(d.s?.streak ?? 0) : '—' },
+    { l: 'Certificates earned', v: d ? String((d.c || []).length) : '—' },
   ];
   return (
     <section style={{ ...SECT, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 56, alignItems: 'center', opacity: 1 }}>
