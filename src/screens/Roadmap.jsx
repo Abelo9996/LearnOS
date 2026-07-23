@@ -60,12 +60,22 @@ export default function Roadmap({ onOpenSession }) {
     return () => window.removeEventListener('focus', checkReplan);
   }, [roadmap?.id, loadRoadmap]);
 
+  // Initial load runs exactly once. The guard matters: this effect's deps
+  // include loadRoadmap (which depends on the unstable `toast`), so without it
+  // the effect re-runs, and the second run reads the already-consumed handoff
+  // → falls back to rows[0], clobbering the roadmap the user actually clicked.
+  const didInit = React.useRef(false);
   React.useEffect(() => {
+    if (didInit.current) return;
+    didInit.current = true;
     (async () => {
       setLoading(true);
       const rows = await loadAllRoadmaps();
-      if (rows.length > 0) await loadRoadmap(rows[0].id);
-      else setLoading(false);
+      if (!rows || rows.length === 0) { setLoading(false); return; }
+      let targetId = null;
+      try { targetId = localStorage.getItem('learnos_active_roadmap'); localStorage.removeItem('learnos_active_roadmap'); } catch {}
+      const picked = (targetId && rows.some(r => r.id === targetId)) ? targetId : rows[0].id;
+      await loadRoadmap(picked);
     })();
   }, [loadAllRoadmaps, loadRoadmap]);
 

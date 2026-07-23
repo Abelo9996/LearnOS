@@ -690,7 +690,7 @@ function TopBarSearch({ setScreen }) {
                   <div className="cap" style={{ padding: '8px 12px 4px', color: 'var(--muted)', fontSize: 10.5 }}>Roadmaps ({results.roadmaps.length})</div>
                   {results.roadmaps.slice(0, 3).map(r => (
                     <ResultItem key={r.id} icon="🗺" label={r.title} sub={`${Math.round((r.mastery || 0) * 100)}% mastery`} color="var(--brand-3)"
-                      onClick={() => { setShowDropdown(false); setQuery(''); setScreen('roadmaps'); }} />
+                      onClick={() => { setShowDropdown(false); setQuery(''); try { localStorage.setItem('learnos_active_roadmap', r.id); } catch {} setScreen('roadmaps'); }} />
                   ))}
                 </div>
               )}
@@ -708,7 +708,7 @@ function TopBarSearch({ setScreen }) {
                   <div className="cap" style={{ padding: '8px 12px 4px', color: 'var(--muted)', fontSize: 10.5 }}>Sessions ({results.sessions.length})</div>
                   {results.sessions.slice(0, 3).map(s => (
                     <ResultItem key={s.id} icon="▸" label={s.title} sub={s.course || 'Session'} color="var(--brand-3)"
-                      onClick={() => { setShowDropdown(false); setQuery(''); setScreen('session'); }} />
+                      onClick={() => { setShowDropdown(false); setQuery(''); try { localStorage.setItem('learnos_active_session', s.id); } catch {} setScreen('session'); }} />
                   ))}
                 </div>
               )}

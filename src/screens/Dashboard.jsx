@@ -154,7 +154,7 @@ function RoadmapsRow({ setScreen, onOpenRoadmap, roadmaps }) {
       ) : (
         <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
           {display.map((r) => (
-            <div key={r.id} className="hover-lift hover-glow" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 10, cursor: 'pointer', transition: 'all var(--dur-normal) var(--ease-out)' }} onClick={onOpenRoadmap}>
+            <div key={r.id} className="hover-lift hover-glow" style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, padding: 14, display: 'flex', flexDirection: 'column', gap: 10, cursor: 'pointer', transition: 'all var(--dur-normal) var(--ease-out)' }} onClick={() => { try { localStorage.setItem('learnos_active_roadmap', r.id); } catch {} onOpenRoadmap(); }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                 <span style={{ width: 30, height: 30, borderRadius: 7, background: `color-mix(in oklch, ${r.color} 22%, transparent)`, color: r.color, border: `1px solid color-mix(in oklch, ${r.color} 40%, transparent)`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{React.cloneElement(I[r.icon] || I.box, { size: 16 })}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -173,7 +173,7 @@ function RoadmapsRow({ setScreen, onOpenRoadmap, roadmaps }) {
                 <div style={{ fontSize: 12.5, color: 'var(--ink)', fontWeight: 600, marginTop: 2 }}>{r.nextModule}</div>
                 <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>in {r.modulesLeft} module{r.modulesLeft === 1 ? '' : 's'}</div>
               </div>
-              <Btn variant="primary" size="sm" full onClick={(e) => { e.stopPropagation(); onOpenRoadmap(); }}>
+              <Btn variant="primary" size="sm" full onClick={(e) => { e.stopPropagation(); try { localStorage.setItem('learnos_active_roadmap', r.id); } catch {} onOpenRoadmap(); }}>
                 Continue Roadmap {React.cloneElement(I.arrowR, { size: 13 })}
               </Btn>
             </div>
@@ -195,7 +195,7 @@ function UpcomingSessionsCard({ onOpenSession, setScreen, sessions }) {
       ) : (
         <div className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {sessions.map((s) => (
-            <div key={s.id} onClick={onOpenSession} className="hover-lift" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'pointer', transition: 'all var(--dur-normal) var(--ease-out)' }}>
+            <div key={s.id} onClick={() => { try { localStorage.setItem('learnos_active_session', s.id); } catch {} onOpenSession(); }} className="hover-lift" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'pointer', transition: 'all var(--dur-normal) var(--ease-out)' }}>
               <AgentChip code={s.agent} size={32} />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{s.title}</div>
