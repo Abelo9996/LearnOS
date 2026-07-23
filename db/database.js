@@ -106,6 +106,9 @@ try {
     updated_at TEXT DEFAULT (datetime('now'))
   )`);
 } catch (e) { console.log('Course module pre-migration:', e.message); }
+// Resource lessons carry the external URL directly so the lesson viewer can
+// embed videos / render rich resource cards instead of parsing markdown.
+try { db.exec("ALTER TABLE module_lessons ADD COLUMN url TEXT"); } catch {}
 
 ensureAgentStatus();  // app config — always present, even in zero-seed mode
 seedIfEmpty();         // example content (roadmaps, courses, demo members, community) from seed.sql

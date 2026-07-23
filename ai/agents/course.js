@@ -142,12 +142,14 @@ export async function persistCourse(userId, c, level = 'intermediate') {
     db.prepare('INSERT INTO module_lessons (id, module_id, title, body_md, kind, order_idx) VALUES (?, ?, ?, ?, ?, ?)')
       .run(`ml-${mid}-${li}`, mid, m.title, reading, 'reading', li); li++; lessonCount++;
 
-    // 2. Verified external resources → one lesson each (video/blog/paper/…)
+    // 2. Verified external resources → one lesson each (video/blog/paper/…).
+    // The URL is stored on the lesson so the viewer can embed it (videos play
+    // inline; others render as rich resource cards).
     for (const r of (m.resources || [])) {
       if (!r || !r.url || !reachable.has(r.url)) continue;
-      const body = `**${r.title}**\n\n${r.summary || ''}\n\n[Open resource →](${r.url})\n\n_Source: ${r.source || new URL(r.url).hostname}_`;
-      db.prepare('INSERT INTO module_lessons (id, module_id, title, body_md, kind, order_idx) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(`ml-${mid}-${li}`, mid, r.title, body, r.kind || 'article', li); li++; lessonCount++; resourceCount++;
+      const body = `${r.summary || ''}\n\n_Source: ${r.source || new URL(r.url).hostname}_`;
+      db.prepare('INSERT INTO module_lessons (id, module_id, title, body_md, kind, order_idx, url) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(`ml-${mid}-${li}`, mid, r.title, body, r.kind || 'article', li, r.url); li++; lessonCount++; resourceCount++;
     }
 
     // 3. Assignment → a lesson AND a real user-scoped assignment row
