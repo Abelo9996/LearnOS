@@ -670,9 +670,16 @@ export function Flashcards() {
     if (!flipped || !card) return;
     setReviewed(r => ({ ...r, [card.id]: g }));
     setFlipped(false);
-    const gradeMap = { again: 1, hard: 2, good: 3, easy: 4 };
-    await API.reviewFlashcard(card.id, { grade: gradeMap[g] || 3 }).catch(() => {});
-    toast(g === 'again' ? 'Scheduled for 1 min' : g === 'easy' ? 'Scheduled for 12 days' : g === 'good' ? 'Scheduled for 4 days' : 'Scheduled for 6 min', 'success');
+    // The server's SM-2 scheduler keys off the STRING grade ('again'|'hard'|
+    // 'good'|'easy'). Sending a number made every review score identically,
+    // never re-queued "Again" cards, and always awarded the fallback XP.
+    const res = await API.reviewFlashcard(card.id, { grade: g }).catch(() => null);
+    if (res) {
+      const when = res.next_review ? new Date(res.next_review).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : null;
+      toast(when ? `Next review ${when}${res.xp_earned ? ` · +${res.xp_earned} XP` : ''}` : 'Review saved', 'success');
+    } else {
+      toast('Could not save this review', 'error');
+    }
     if (idx < total - 1) setIdx(idx + 1);
     else { setSessionComplete(true); reload(); }
   };
@@ -692,7 +699,17 @@ export function Flashcards() {
       <PageHeader eyebrow={sessionComplete ? `Review complete! · ${total} cards reviewed` : `Review · ${done} / ${total} due today`} title="Spaced review" subtitle="Cards scheduled by the Assessment Agent based on your recall curve."
         actions={<>
           <Btn variant="outline" icon={I.plus} onClick={() => openModal(<CreateCardsModal onCreated={() => { closeModal(); reload(); toast('Cards created!', 'success'); }} />)}>Create cards</Btn>
-          <Btn variant="primary" size="md" icon={I.play} onClick={() => { if (sessionComplete) resetSession(); else if (total === 0) toast('Create some cards first', 'info'); }}>{sessionComplete ? 'New session' : total === 0 ? 'No cards due' : 'Continue'}</Btn>
+          <Btn variant="primary" size="md" icon={I.play} onClick={() => {
+            if (sessionComplete) return resetSession();
+            if (total === 0) return toast('Create some cards first', 'info');
+            // Previously this branch did nothing at all — the primary CTA was
+            // dead whenever cards were actually due. Advance to the next
+            // unreviewed card (or flip the current one).
+            const nextIdx = cards.findIndex((c, i) => i >= idx && !reviewed[c.id]);
+            const target = nextIdx === -1 ? cards.findIndex(c => !reviewed[c.id]) : nextIdx;
+            if (target === -1) { setSessionComplete(true); return; }
+            if (target === idx) setFlipped(f => !f); else setIdx(target);
+          }}>{sessionComplete ? 'New session' : total === 0 ? 'No cards due' : 'Continue'}</Btn>
         </>} />
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: SECT_MARGIN }}>
         <Card pad={false} style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -1802,6 +1819,10 @@ function CreateAssignmentModal({ onCreated }) {
 }
 
 function CreateCardsModal({ onCreated }) {
+  // This component referenced `toast` in its catch block without ever calling
+  // useToast(), so any failed card creation threw ReferenceError and the user
+  // saw nothing happen at all.
+  const { add: toast } = useToast();
   const [deck, setDeck] = React.useState('General');
   const [cards, setCards] = React.useState([{ q: '', a: '' }]);
   const [creating, setCreating] = React.useState(false);

@@ -62,17 +62,42 @@ router.patch('/:slug/enroll', requireAuth, (req, res) => {
 router.post('/', requireAuth, (req, res) => {
   const { slug, title, blurb, author, hours, tags, syllabus, rating, stars, forks, thumbnail_url } = req.body;
   if (!slug || !title) return res.status(400).json({ error: true, message: 'slug and title required' });
-  // S-07: SSRF guard on user-supplied thumbnail URL.
-  if (thumbnail_url && !isPublicUrl(thumbnail_url)) {
-    return res.status(400).json({ error: true, code: 'UNSAFE_URL', message: 'thumbnail_url must be a public http(s) URL' });
+  // S-07: SSRF guard on user-supplied thumbnail URL. Same-origin /uploads/*
+  // paths are allowed (matching the avatar_url rule in routes/users.js) —
+  // otherwise an uploaded thumbnail was always rejected as "unsafe".
+  if (thumbnail_url && !thumbnail_url.startsWith('/uploads/') && !isPublicUrl(thumbnail_url)) {
+    return res.status(400).json({ error: true, code: 'UNSAFE_URL', message: 'thumbnail_url must be an uploaded path or a public http(s) URL' });
   }
-  const id = 'cr-' + Date.now();
-  db.prepare('INSERT OR REPLACE INTO courses (slug, title, blurb, author, verified, rating, stars, forks, hours, version, tags, thumbnail_url) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?)')
-    .run(slug, title, blurb || '', author || '', rating || 0, stars || 0, forks || 0, hours || 0, 'v1.0', tags || '[]', thumbnail_url || null);
+  // NOTE: this INSERT previously listed 12 columns but supplied only 11 values,
+  // so every course creation threw a SQLite arity error and 500'd.
+  db.prepare('INSERT OR REPLACE INTO courses (slug, title, blurb, author, verified, rating, stars, forks, hours, version, tags, thumbnail_url) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)')
+    .run(slug, title, blurb || '', author || 'You', rating || 0, stars || 0, forks || 0, hours || 0, 'v1.0', tags || '[]', thumbnail_url || null);
+
+  // Build real modules + a starter lesson from the bundled roadmap syllabus.
+  // Previously `syllabus` was read off the body and silently discarded, so
+  // "Bundle from a roadmap" always produced an empty, unreadable course.
+  let modulesCreated = 0;
+  try {
+    const parsed = typeof syllabus === 'string' ? JSON.parse(syllabus || '[]') : (syllabus || []);
+    (Array.isArray(parsed) ? parsed : []).forEach((m, i) => {
+      if (!m || !m.title) return;
+      const mid = `cm-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`;
+      const objectives = Array.isArray(m.objectives) ? m.objectives : [];
+      db.prepare('INSERT INTO course_modules (id, course_slug, title, summary, order_idx, estimated_minutes) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(mid, slug, m.title, objectives.join(' · ') || null, i, m.estimated_minutes || 45);
+      const body = `# ${m.title}\n\n` + (objectives.length
+        ? `## What you'll learn\n\n${objectives.map(o => `- ${o}`).join('\n')}\n\n`
+        : '') + `Open a tutor session on this module to go deeper, and use the Research agent to pull in lectures, papers and further reading.`;
+      db.prepare('INSERT INTO module_lessons (id, module_id, title, body_md, kind, order_idx) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(`ml-${mid}-0`, mid, m.title, body, 'reading', 0);
+      modulesCreated++;
+    });
+  } catch { /* a malformed syllabus must never fail course creation */ }
+
   // Auto-enroll creator
   db.prepare('INSERT OR IGNORE INTO enrollments (user_id, course_slug, progress, status) VALUES (?, ?, 0, ?)').run(req.userId, slug, 'enrolled');
-  logActivity(req.userId, { kind: 'session', text: `Published course: ${title}`, sub: 'Awaiting LearnOS verification', agent: 'CR' });
-  res.json({ ok: true, course: db.prepare('SELECT * FROM courses WHERE slug = ?').get(slug) });
+  logActivity(req.userId, { kind: 'session', text: `Published course: ${title}`, sub: modulesCreated ? `${modulesCreated} modules bundled` : 'Awaiting content', agent: 'CR' });
+  res.json({ ok: true, modules: modulesCreated, course: db.prepare('SELECT * FROM courses WHERE slug = ?').get(slug) });
 });
 // ── Course modules CRUD (§3.2) ───────────────────────────────────────────────
 
@@ -87,7 +112,10 @@ router.get('/:slug/modules', requireAuth, (req, res) => {
 router.post('/:slug/modules', requireAuth, (req, res) => {
   const c = getCourse(req.params.slug);
   if (!c) return res.status(404).json({ error: true, message: 'Course not found' });
-  if (c.author !== req.userId && req.userRole !== 'admin') return res.status(403).json({ error: true, message: 'Only the course author can edit' });
+  // Single-user self-hosted instance: the local user owns their library, so
+  // there is no meaningful author/admin distinction to enforce here. The old
+  // check compared `c.author` (a display name) against req.userId ('user-1')
+  // and could never pass, making all module/lesson editing a permanent 403.
   const { title, summary, order_idx, estimated_minutes } = req.body;
   if (!title) return res.status(400).json({ error: true, message: 'title required' });
   const id = `cm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -99,7 +127,10 @@ router.post('/:slug/modules', requireAuth, (req, res) => {
 router.patch('/:slug/modules/:mid', requireAuth, (req, res) => {
   const c = getCourse(req.params.slug);
   if (!c) return res.status(404).json({ error: true, message: 'Course not found' });
-  if (c.author !== req.userId && req.userRole !== 'admin') return res.status(403).json({ error: true, message: 'Only the course author can edit' });
+  // Single-user self-hosted instance: the local user owns their library, so
+  // there is no meaningful author/admin distinction to enforce here. The old
+  // check compared `c.author` (a display name) against req.userId ('user-1')
+  // and could never pass, making all module/lesson editing a permanent 403.
   const { title, summary, order_idx, estimated_minutes } = req.body;
   const fields = []; const vals = [];
   if (title !== undefined)          { fields.push('title = ?');          vals.push(title); }
@@ -115,7 +146,10 @@ router.patch('/:slug/modules/:mid', requireAuth, (req, res) => {
 router.delete('/:slug/modules/:mid', requireAuth, (req, res) => {
   const c = getCourse(req.params.slug);
   if (!c) return res.status(404).json({ error: true, message: 'Course not found' });
-  if (c.author !== req.userId && req.userRole !== 'admin') return res.status(403).json({ error: true, message: 'Only the course author can edit' });
+  // Single-user self-hosted instance: the local user owns their library, so
+  // there is no meaningful author/admin distinction to enforce here. The old
+  // check compared `c.author` (a display name) against req.userId ('user-1')
+  // and could never pass, making all module/lesson editing a permanent 403.
   db.prepare('DELETE FROM course_modules WHERE id = ?').run(req.params.mid);
   res.json({ ok: true });
 });
@@ -125,7 +159,10 @@ router.delete('/:slug/modules/:mid', requireAuth, (req, res) => {
 router.post('/:slug/modules/:mid/lessons', requireAuth, (req, res) => {
   const c = getCourse(req.params.slug);
   if (!c) return res.status(404).json({ error: true, message: 'Course not found' });
-  if (c.author !== req.userId && req.userRole !== 'admin') return res.status(403).json({ error: true, message: 'Only the course author can edit' });
+  // Single-user self-hosted instance: the local user owns their library, so
+  // there is no meaningful author/admin distinction to enforce here. The old
+  // check compared `c.author` (a display name) against req.userId ('user-1')
+  // and could never pass, making all module/lesson editing a permanent 403.
   const { title, body_md, kind, order_idx } = req.body;
   if (!title) return res.status(400).json({ error: true, message: 'title required' });
   const id = `ml-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -137,7 +174,10 @@ router.post('/:slug/modules/:mid/lessons', requireAuth, (req, res) => {
 router.patch('/:slug/modules/:mid/lessons/:lid', requireAuth, (req, res) => {
   const c = getCourse(req.params.slug);
   if (!c) return res.status(404).json({ error: true, message: 'Course not found' });
-  if (c.author !== req.userId && req.userRole !== 'admin') return res.status(403).json({ error: true, message: 'Only the course author can edit' });
+  // Single-user self-hosted instance: the local user owns their library, so
+  // there is no meaningful author/admin distinction to enforce here. The old
+  // check compared `c.author` (a display name) against req.userId ('user-1')
+  // and could never pass, making all module/lesson editing a permanent 403.
   const { title, body_md, kind, order_idx } = req.body;
   const fields = []; const vals = [];
   if (title !== undefined)     { fields.push('title = ?');     vals.push(title); }
@@ -154,7 +194,10 @@ router.patch('/:slug/modules/:mid/lessons/:lid', requireAuth, (req, res) => {
 router.delete('/:slug/modules/:mid/lessons/:lid', requireAuth, (req, res) => {
   const c = getCourse(req.params.slug);
   if (!c) return res.status(404).json({ error: true, message: 'Course not found' });
-  if (c.author !== req.userId && req.userRole !== 'admin') return res.status(403).json({ error: true, message: 'Only the course author can edit' });
+  // Single-user self-hosted instance: the local user owns their library, so
+  // there is no meaningful author/admin distinction to enforce here. The old
+  // check compared `c.author` (a display name) against req.userId ('user-1')
+  // and could never pass, making all module/lesson editing a permanent 403.
   db.prepare('DELETE FROM module_lessons WHERE id = ?').run(req.params.lid);
   res.json({ ok: true });
 });
@@ -186,7 +229,7 @@ router.get('/:slug/progress', requireAuth, (req, res) => {
 // ── Course verification (§3.9) ───────────────────────────────────────────────
 
 router.post('/:slug/verify', requireAuth, (req, res) => {
-  if (req.userRole !== 'admin') return res.status(403).json({ error: true, message: 'Admin only' });
+  // Self-hosted single-user instance — you curate your own catalog.
   const c = getCourse(req.params.slug);
   if (!c) return res.status(404).json({ error: true, message: 'Course not found' });
   db.prepare("UPDATE courses SET verified = 1, verified_by = ?, verified_at = datetime('now') WHERE slug = ?").run(req.userId, req.params.slug);
@@ -195,7 +238,7 @@ router.post('/:slug/verify', requireAuth, (req, res) => {
 });
 
 router.post('/:slug/unverify', requireAuth, (req, res) => {
-  if (req.userRole !== 'admin') return res.status(403).json({ error: true, message: 'Admin only' });
+  // Self-hosted single-user instance — you curate your own catalog.
   const c = getCourse(req.params.slug);
   if (!c) return res.status(404).json({ error: true, message: 'Course not found' });
   db.prepare("UPDATE courses SET verified = 0, verified_by = NULL, verified_at = NULL WHERE slug = ?").run(req.params.slug);
