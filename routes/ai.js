@@ -68,6 +68,51 @@ router.post('/ping', async (req, res) => {
   }
 });
 
+// Learning Coach — the adaptive advisor. Derives a proficiency + pace read from
+// REAL signals (recent quiz scores, assignment grades, node mastery, activity)
+// and returns concrete, actionable recommendations that guide and adjust the
+// learner's path. Heuristic (works without a key); the numbers are all real.
+router.get('/coach', (req, res) => {
+  const uid = req.userId;
+  const quizzes = db.prepare('SELECT score FROM quiz_attempts WHERE user_id = ? ORDER BY created_at DESC LIMIT 5').all(uid);
+  const grades = db.prepare("SELECT grade FROM assignments WHERE user_id = ? AND status = 'graded' AND grade IS NOT NULL ORDER BY updated_at DESC LIMIT 5").all(uid);
+  const nodes = db.prepare('SELECT rn.title, rn.mastery, rn.status, r.id AS roadmap_id, r.title AS roadmap FROM roadmap_nodes rn JOIN roadmaps r ON r.id = rn.roadmap_id WHERE r.user_id = ?').all(uid);
+  const recent = db.prepare("SELECT COUNT(*) AS c FROM activity_log WHERE user_id = ? AND created_at >= date('now','-7 days')").get(uid).c;
+  const pending = db.prepare("SELECT COUNT(*) AS c FROM assignments WHERE user_id = ? AND status != 'graded'").get(uid).c;
+
+  const activeNode = nodes.find(n => n.status === 'active') || nodes.find(n => n.status === 'next');
+  const weak = nodes.filter(n => n.status === 'done' && (n.mastery || 0) < 0.55)
+    .sort((a, b) => (a.mastery || 0) - (b.mastery || 0)).slice(0, 3);
+
+  const avg = (arr, f) => arr.length ? arr.reduce((s, x) => s + f(x), 0) / arr.length : null;
+  const avgQuiz = avg(quizzes, q => q.score);
+  const avgGrade = avg(grades, g => g.grade);
+  const avgMastery = nodes.length ? avg(nodes, n => (n.mastery || 0) * 100) : null;
+  const signals = [avgQuiz, avgGrade, avgMastery].filter(v => v != null);
+  const proficiency = signals.length ? Math.round(signals.reduce((a, b) => a + b, 0) / signals.length) : null;
+  const pace = recent >= 8 ? 'ahead' : recent >= 3 ? 'steady' : 'behind';
+
+  const recs = [];
+  if (activeNode) recs.push({ icon: 'play', tone: 'brand', title: `Continue: ${activeNode.title}`, detail: `Pick up your ${activeNode.roadmap} path where you left off.`, action: { screen: 'roadmaps', roadmap_id: activeNode.roadmap_id } });
+  if (proficiency != null && proficiency >= 82) recs.push({ icon: 'spark', tone: 'good', title: "You're ahead — take a stretch", detail: 'Your recent scores are strong. Try a harder assignment or jump to the next module.', action: { screen: 'assignments' } });
+  else if (proficiency != null && proficiency < 55) recs.push({ icon: 'chart', tone: 'warn', title: "Let's slow down and reinforce", detail: 'Recent results suggest reviewing fundamentals before moving on — a quiz will pinpoint gaps.', action: { screen: 'roadmaps', roadmap_id: activeNode?.roadmap_id } });
+  for (const w of weak) recs.push({ icon: 'chart', tone: 'warn', title: `Revisit: ${w.title}`, detail: `Mastery is ${Math.round((w.mastery || 0) * 100)}% — a quick review or quiz will lift it.`, action: { screen: 'roadmaps', roadmap_id: w.roadmap_id } });
+  if (pending > 0) recs.push({ icon: 'check', tone: 'brand', title: `${pending} assignment${pending === 1 ? '' : 's'} to complete`, detail: 'Submitting graded work is what moves your mastery the most.', action: { screen: 'assignments' } });
+  if (avgQuiz == null) recs.push({ icon: 'check', tone: 'accent', title: 'Take a quiz to calibrate', detail: 'A short quiz lets the coach gauge your level and tailor the difficulty of what comes next.', action: { screen: 'roadmaps', roadmap_id: activeNode?.roadmap_id } });
+
+  const paceMsg = pace === 'ahead' ? "You're moving fast — keep the momentum."
+    : pace === 'steady' ? 'A steady, consistent pace — nicely done.'
+    : 'You\'ve slowed down — even one short session today keeps your streak and momentum.';
+
+  res.json({
+    proficiency, pace, paceMsg,
+    nextStep: activeNode ? { title: activeNode.title, roadmap: activeNode.roadmap, roadmap_id: activeNode.roadmap_id } : null,
+    recommendations: recs.slice(0, 4),
+    weakAreas: weak.map(w => w.title),
+    signals: { quizzes: quizzes.length, grades: grades.length, activity7d: recent, pending },
+  });
+});
+
 // Recent agent runs — observability (PLAT-05).
 router.get('/runs', (req, res) => {
   const runs = db.prepare(
