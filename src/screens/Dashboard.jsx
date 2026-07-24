@@ -14,8 +14,10 @@ export default function Dashboard({ onOpenSession, onOpenRoadmap, onOpenCourses,
   const [activity, setActivity]   = React.useState([]);
   const [stats, setStats]         = React.useState(null);
   const [dailyStats, setDailyStats] = React.useState([]);
+  const [coach, setCoach]         = React.useState(null);
 
   React.useEffect(() => {
+    API.getCoach().then(c => { if (c) setCoach(c); }).catch(() => {});
     API.getDailyStats(14).then(rows => { if (Array.isArray(rows)) setDailyStats(rows); }).catch(() => {});
     API.getRoadmaps().then(rows => {
       if (Array.isArray(rows) && rows.length) {
@@ -85,6 +87,7 @@ export default function Dashboard({ onOpenSession, onOpenRoadmap, onOpenCourses,
         <StreakCard streak={streak} />
       </div>
       <StatRow streak={streak} bestStreak={bestStreak} mastery={mastery} pending={pending} totalSessions={totalSessions} completedSessions={completedSessions} onOpenAssignments={() => setScreen('assignments')} streakBars={streakBars} />
+      <LearningCoach coach={coach} setScreen={setScreen} />
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) minmax(0, 1fr)', gap: 16, marginTop: 16 }}>
         <RoadmapsRow setScreen={setScreen} onOpenRoadmap={onOpenRoadmap} roadmaps={roadmaps} />
         <UpcomingSessionsCard onOpenSession={onOpenSession} setScreen={setScreen} sessions={sessions} />
@@ -96,6 +99,52 @@ export default function Dashboard({ onOpenSession, onOpenRoadmap, onOpenCourses,
       </div>
       <AgentActivityStrip setScreen={setScreen} />
     </PageScroll>
+  );
+}
+
+// The adaptive advisor, front and center: real proficiency/pace read + concrete,
+// clickable next steps driven by the learner's actual results.
+function LearningCoach({ coach, setScreen }) {
+  if (!coach || !coach.recommendations?.length) return null;
+  const prof = coach.proficiency;
+  const profColor = prof == null ? 'var(--muted)' : prof >= 75 ? 'var(--good)' : prof >= 50 ? 'var(--brand-3)' : 'var(--warn)';
+  const iconMap = { play: I.play, spark: I.spark, chart: I.chart, check: I.check };
+  const go = (action) => {
+    if (!action) return;
+    if (action.screen === 'roadmaps' && action.roadmap_id) { try { localStorage.setItem('learnos_active_roadmap', action.roadmap_id); } catch {} }
+    setScreen(action.screen || 'dashboard');
+  };
+  return (
+    <Card style={{ padding: 20, marginTop: 16, background: 'linear-gradient(135deg, oklch(0.19 0.035 295), var(--bg-window))', border: '1px solid var(--accent-line)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <AgentChip code="AN" size={34} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="display" style={{ fontSize: 18, color: 'var(--ink)' }}>Your Learning Coach</div>
+          <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>{coach.paceMsg}</div>
+        </div>
+        {prof != null && (
+          <div style={{ textAlign: 'right' }}>
+            <div className="display" style={{ fontSize: 26, color: profColor, lineHeight: 1 }}>{prof}%</div>
+            <div className="cap" style={{ color: 'var(--muted)', marginTop: 2 }}>Proficiency</div>
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
+        {coach.recommendations.map((r, i) => {
+          const c = r.tone === 'good' ? 'var(--good)' : r.tone === 'warn' ? 'var(--warn)' : r.tone === 'accent' ? 'var(--brand-3)' : 'var(--brand)';
+          return (
+            <button key={i} onClick={() => go(r.action)} className="hover-card" style={{ display: 'flex', gap: 10, textAlign: 'left', padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+              <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 8, background: `color-mix(in oklch, ${c} 16%, transparent)`, color: c, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: `1px solid color-mix(in oklch, ${c} 35%, transparent)` }}>{React.cloneElement(iconMap[r.icon] || I.spark, { size: 15 })}</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{r.title}</div>
+                <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2, lineHeight: 1.45 }}>{r.detail}</div>
+              </div>
+              <span style={{ color: 'var(--muted)', flexShrink: 0, alignSelf: 'center' }}>{React.cloneElement(I.arrowR, { size: 14 })}</span>
+            </button>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 
