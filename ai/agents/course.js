@@ -131,7 +131,10 @@ export async function persistCourse(userId, c, level = 'intermediate') {
     if (!m || !m.title) return;
     const mid = `cm-${slug}-${i}`;
     const objectives = Array.isArray(m.objectives) ? m.objectives : [];
-    pathway.push({ title: m.title, objectives });
+    // Carry the module's *verified* resources onto the pathway so the companion
+    // roadmap node embeds the same media (videos/papers/blogs) the course lesson does.
+    const verifiedRes = (m.resources || []).filter(r => r && r.url && reachable.has(r.url));
+    pathway.push({ title: m.title, objectives, resources: verifiedRes });
     db.prepare('INSERT INTO course_modules (id, course_slug, title, summary, order_idx, estimated_minutes) VALUES (?, ?, ?, ?, ?, ?)')
       .run(mid, slug, m.title, m.summary || objectives.join(' · ') || null, i, 45 + (m.resources?.length || 0) * 10);
     moduleCount++;
@@ -193,7 +196,7 @@ export async function persistCourse(userId, c, level = 'intermediate') {
   // what makes a roadmap a course pathway rather than a disconnected graph.
   const rmId = `rm-${slug}`;
   try {
-    if (cap && cap.title) pathway.push({ title: `Capstone · ${cap.title}`, objectives: [] });
+    if (cap && cap.title) pathway.push({ title: `Capstone · ${cap.title}`, objectives: [], resources: [] });
     db.prepare(`INSERT INTO roadmaps (id, user_id, title, subtitle, authored_by, mastery, total_modules, completed_modules, status, next_module, modules_left, course_slug)
                 VALUES (?, ?, ?, ?, ?, 0, ?, 0, 'active', ?, ?, ?)`)
       .run(rmId, userId, c.title, `Guided pathway · ${level}`, 'Curriculum agent', pathway.length, pathway[0]?.title || '', pathway.length, slug);
@@ -205,6 +208,16 @@ export async function persistCourse(userId, c, level = 'intermediate') {
       (p.objectives || []).slice(0, 4).forEach((o, k) => {
         db.prepare('INSERT INTO node_objectives (id, node_id, roadmap_id, text, order_idx) VALUES (?, ?, ?, ?, ?)')
           .run(`no-${nid}-${k}`, nid, rmId, o, k);
+      });
+      // Node resources = the module's already-verified resources (marked verified
+      // so they surface without a re-check; they were reachability-checked above).
+      (p.resources || []).forEach((r, k) => {
+        try {
+          db.prepare(`INSERT INTO node_resources (id, node_id, roadmap_id, kind, title, url, source, summary, status, verified_at, verified_by)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'verified', datetime('now'), 'Research agent')`)
+            .run(`nr-${nid}-${k}`, nid, rmId, r.kind || 'article', r.title || r.url, r.url,
+              r.source || (() => { try { return new URL(r.url).hostname; } catch { return null; } })(), r.summary || null);
+        } catch { /* skip a bad resource, keep the rest */ }
       });
       if (i > 0) db.prepare('INSERT OR IGNORE INTO roadmap_edges (roadmap_id, from_node, to_node) VALUES (?, ?, ?)').run(rmId, `${rmId}-n${i - 1}`, nid);
     });
