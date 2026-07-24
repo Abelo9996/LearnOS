@@ -6,7 +6,7 @@ import API from '../api.js';
 import { useToast, useModal } from '../App';
 import QuizModal from '../components/QuizModal.jsx';
 
-export default function Roadmap({ onOpenSession }) {
+export default function Roadmap({ onOpenSession, onOpenCourse }) {
   const { add: toast } = useToast();
   const { open: openModal, close: closeModal } = useModal();
   const [allRoadmaps, setAllRoadmaps]   = React.useState([]);
@@ -253,7 +253,7 @@ export default function Roadmap({ onOpenSession }) {
           </>
         )}
       </Card>
-      {sel && nodes.length > 0 && <ModuleDetail node={sel} nodes={nodes} edges={r.edges || []} onOpenSession={handleResume} toast={toast} openModal={openModal} closeModal={closeModal} onMasteryChange={() => loadRoadmap(r.id)} />}
+      {sel && nodes.length > 0 && <ModuleDetail node={sel} nodes={nodes} edges={r.edges || []} onOpenSession={handleResume} toast={toast} openModal={openModal} closeModal={closeModal} onMasteryChange={() => loadRoadmap(r.id)} onOpenCourse={onOpenCourse} />}
     </PageScroll>
   );
 }
@@ -463,7 +463,7 @@ function Kanban({ nodes, selected, setSelected }) {
   );
 }
 
-function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, openModal, closeModal, onMasteryChange }) {
+function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, openModal, closeModal, onMasteryChange, onOpenCourse }) {
   const isActive = node.status === 'active';
   const isLocked = node.status === 'locked';
   const isDone   = node.status === 'done';
@@ -527,6 +527,11 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, open
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
           {(isActive || isNext) && <Btn variant="primary" size="md" icon={I.play} onClick={onOpenSession}>{isActive ? 'Resume session' : 'Start session'}</Btn>}
           {isDone && <Btn variant="outline" size="md" onClick={onOpenSession}>Review</Btn>}
+          {node.course_slug && onOpenCourse && (
+            <Btn variant="outline" size="md" icon={React.cloneElement(I.book, { size: 15 })} onClick={() => onOpenCourse(node.course_slug)}>
+              Study content
+            </Btn>
+          )}
           {!isLocked && openModal && (
             <Btn variant="outline" size="md" icon={React.cloneElement(I.check, { size: 15 })}
               onClick={() => openModal(<QuizModal nodeId={node.id} title={node.title} onClose={closeModal} onDone={() => onMasteryChange && onMasteryChange()} />)}>
