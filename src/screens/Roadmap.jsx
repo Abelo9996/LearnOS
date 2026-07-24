@@ -6,6 +6,13 @@ import API from '../api.js';
 import { useToast, useModal } from '../App';
 import QuizModal from '../components/QuizModal.jsx';
 
+// Extract a YouTube video id so lecture videos embed inline (like the course
+// lesson viewer) rather than opening in a new tab.
+const youtubeId = (url) => {
+  const m = String(url || '').match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? m[1] : null;
+};
+
 export default function Roadmap({ onOpenSession, onOpenCourse }) {
   const { add: toast } = useToast();
   const { open: openModal, close: closeModal } = useModal();
@@ -615,26 +622,49 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, open
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {resources.slice(0, 10).map(r => (
-                  <a key={r.id} href={r.url} target="_blank" rel="noopener noreferrer"
-                     style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, textDecoration: 'none', color: 'var(--ink)', transition: 'all 0.15s' }}
-                     onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand)'; e.currentTarget.style.background = 'var(--surface-3)'; }}
-                     onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--surface-2)'; }}>
-                    {(() => {
-                      const KM = { video: ['oklch(0.7 0.19 25)', 'video'], paper: ['oklch(0.72 0.18 295)', 'paper'], book: ['oklch(0.76 0.15 85)', 'book'], blog: ['oklch(0.72 0.16 330)', 'blog'], article: ['oklch(0.74 0.16 155)', 'article'], website: ['oklch(0.72 0.15 220)', 'site'], docs: ['oklch(0.74 0.16 200)', 'docs'], repo: ['oklch(0.68 0.02 270)', 'repo'] };
-                      const [c, label] = KM[r.kind] || KM.article;
-                      return <span className="mono" style={{ fontSize: 9.5, padding: '2px 6px', borderRadius: 4, background: `color-mix(in oklch, ${c} 18%, transparent)`, color: c, textTransform: 'uppercase', fontWeight: 600, flexShrink: 0, marginTop: 1, letterSpacing: '0.04em' }}>{label}</span>;
-                    })()}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.35 }}>{r.title}</div>
-                      <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>
-                        {r.source}
-                        {r.status === 'verified' && <span style={{ marginLeft: 6, color: 'var(--good)' }}>✓ verified</span>}
-                        {r.status === 'proposed' && <span style={{ marginLeft: 6, color: 'oklch(0.74 0.18 80)' }}>· unverified</span>}
-                      </div>
+                {resources.slice(0, 10).map(r => {
+                  const KM = { video: ['oklch(0.7 0.19 25)', 'video'], paper: ['oklch(0.72 0.18 295)', 'paper'], book: ['oklch(0.76 0.15 85)', 'book'], blog: ['oklch(0.72 0.16 330)', 'blog'], article: ['oklch(0.74 0.16 155)', 'article'], website: ['oklch(0.72 0.15 220)', 'site'], docs: ['oklch(0.74 0.16 200)', 'docs'], repo: ['oklch(0.68 0.02 270)', 'repo'] };
+                  const [c, label] = KM[r.kind] || KM.article;
+                  const vid = youtubeId(r.url);
+                  const badge = (
+                    <div style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>
+                      {r.source}
+                      {r.status === 'verified' && <span style={{ marginLeft: 6, color: 'var(--good)' }}>✓ verified</span>}
+                      {r.status === 'proposed' && <span style={{ marginLeft: 6, color: 'oklch(0.74 0.18 80)' }}>· unverified</span>}
                     </div>
-                  </a>
-                ))}
+                  );
+                  // Lecture videos embed inline; everything else stays a rich link card.
+                  if (vid) {
+                    return (
+                      <div key={r.id} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                        <div style={{ position: 'relative', width: '100%', paddingTop: '56.25%', background: '#000' }}>
+                          <iframe src={`https://www.youtube-nocookie.com/embed/${vid}`} title={r.title}
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen
+                            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />
+                        </div>
+                        <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          <span className="mono" style={{ fontSize: 9.5, padding: '2px 6px', borderRadius: 4, background: `color-mix(in oklch, ${c} 18%, transparent)`, color: c, textTransform: 'uppercase', fontWeight: 600, flexShrink: 0, marginTop: 1, letterSpacing: '0.04em' }}>{label}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.35 }}>{r.title}</div>
+                            {badge}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <a key={r.id} href={r.url} target="_blank" rel="noopener noreferrer"
+                       style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 8, textDecoration: 'none', color: 'var(--ink)', transition: 'all 0.15s' }}
+                       onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand)'; e.currentTarget.style.background = 'var(--surface-3)'; }}
+                       onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--surface-2)'; }}>
+                      <span className="mono" style={{ fontSize: 9.5, padding: '2px 6px', borderRadius: 4, background: `color-mix(in oklch, ${c} 18%, transparent)`, color: c, textTransform: 'uppercase', fontWeight: 600, flexShrink: 0, marginTop: 1, letterSpacing: '0.04em' }}>{label}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 500, lineHeight: 1.35 }}>{r.title}</div>
+                        {badge}
+                      </div>
+                    </a>
+                  );
+                })}
               </div>
             )}
           </div>
