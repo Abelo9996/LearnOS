@@ -125,11 +125,13 @@ export async function persistCourse(userId, c, level = 'intermediate') {
 
   let moduleCount = 0, lessonCount = 0, resourceCount = 0, assignmentCount = 0;
   const dueBase = Date.now();
+  const pathway = []; // {title, objectives} per module, for the companion roadmap
 
   c.modules.forEach((m, i) => {
     if (!m || !m.title) return;
     const mid = `cm-${slug}-${i}`;
     const objectives = Array.isArray(m.objectives) ? m.objectives : [];
+    pathway.push({ title: m.title, objectives });
     db.prepare('INSERT INTO course_modules (id, course_slug, title, summary, order_idx, estimated_minutes) VALUES (?, ?, ?, ?, ?, ?)')
       .run(mid, slug, m.title, m.summary || objectives.join(' · ') || null, i, 45 + (m.resources?.length || 0) * 10);
     moduleCount++;
@@ -184,7 +186,31 @@ export async function persistCourse(userId, c, level = 'intermediate') {
   }
 
   db.prepare('INSERT OR IGNORE INTO enrollments (user_id, course_slug, progress, status) VALUES (?, ?, 0, ?)').run(userId, slug, 'enrolled');
-  try { logActivity(userId, { kind: 'session', text: `AI-generated course: ${c.title}`, sub: `${moduleCount} modules · ${resourceCount} resources · ${assignmentCount} assignments`, agent: 'CR' }); } catch {}
 
-  return { slug, title: c.title, modules: moduleCount, lessons: lessonCount, resources: resourceCount, assignments: assignmentCount };
+  // Companion roadmap: a real pathway from A→B through the course's modules.
+  // One node per module (capstone included), sequenced linearly with mastery
+  // gates (prereq edges) and linked back to the course for its content. This is
+  // what makes a roadmap a course pathway rather than a disconnected graph.
+  const rmId = `rm-${slug}`;
+  try {
+    if (cap && cap.title) pathway.push({ title: `Capstone · ${cap.title}`, objectives: [] });
+    db.prepare(`INSERT INTO roadmaps (id, user_id, title, subtitle, authored_by, mastery, total_modules, completed_modules, status, next_module, modules_left, course_slug)
+                VALUES (?, ?, ?, ?, ?, 0, ?, 0, 'active', ?, ?, ?)`)
+      .run(rmId, userId, c.title, `Guided pathway · ${level}`, 'Curriculum agent', pathway.length, pathway[0]?.title || '', pathway.length, slug);
+    pathway.forEach((p, i) => {
+      const nid = `${rmId}-n${i}`;
+      const status = i === 0 ? 'active' : i === 1 ? 'next' : 'locked';
+      db.prepare('INSERT INTO roadmap_nodes (id, roadmap_id, title, col, row_idx, mastery, status, course_slug) VALUES (?, ?, ?, ?, ?, 0, ?, ?)')
+        .run(nid, rmId, p.title, i % 6, Math.floor(i / 6), status, slug);
+      (p.objectives || []).slice(0, 4).forEach((o, k) => {
+        db.prepare('INSERT INTO node_objectives (id, node_id, roadmap_id, text, order_idx) VALUES (?, ?, ?, ?, ?)')
+          .run(`no-${nid}-${k}`, nid, rmId, o, k);
+      });
+      if (i > 0) db.prepare('INSERT OR IGNORE INTO roadmap_edges (roadmap_id, from_node, to_node) VALUES (?, ?, ?)').run(rmId, `${rmId}-n${i - 1}`, nid);
+    });
+  } catch (e) { /* the course still stands even if the pathway fails */ }
+
+  try { logActivity(userId, { kind: 'session', text: `AI-generated course + pathway: ${c.title}`, sub: `${moduleCount} modules · ${resourceCount} resources · ${assignmentCount} assignments`, agent: 'CR' }); } catch {}
+
+  return { slug, roadmap_id: rmId, title: c.title, modules: moduleCount, lessons: lessonCount, resources: resourceCount, assignments: assignmentCount, pathwayNodes: pathway.length };
 }

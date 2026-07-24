@@ -73,6 +73,21 @@ export default function Courses() {
     return () => { alive = false; };
   }, [detailSlug, enrolled[detailSlug]]);
 
+  // Handoff from the roadmap: when a module links to a course, the Roadmap
+  // screen stashes the slug in localStorage and switches here. Consume it once
+  // the catalog has loaded, then clear it so a later revisit stays on the list.
+  const didHandoff = React.useRef(false);
+  React.useEffect(() => {
+    if (didHandoff.current || loading || !courses.length) return;
+    let slug;
+    try { slug = localStorage.getItem('learnos_open_course'); } catch { slug = null; }
+    if (!slug) { didHandoff.current = true; return; }
+    try { localStorage.removeItem('learnos_open_course'); } catch {}
+    didHandoff.current = true;
+    const hit = courses.find(c => c.slug === slug);
+    if (hit) setSelectedCourse(hit);
+  }, [loading, courses]);
+
   // Keep the catalog row and the open detail in sync after verify/unverify.
   const applyVerified = (slug, verified) => {
     setSelectedCourse(prev => (prev && prev.slug === slug ? { ...prev, verified } : prev));

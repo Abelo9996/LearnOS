@@ -509,6 +509,9 @@ try {
 // while the column did not exist, so every re-plan threw (swallowed) and the
 // "Suggested by AN" highlight could never appear.
 try { db.exec("ALTER TABLE roadmap_nodes ADD COLUMN source TEXT"); } catch {}
+// Links a roadmap node to the course whose module teaches it, so a roadmap can
+// be a real course pathway from mastery A→B.
+try { db.exec("ALTER TABLE roadmap_nodes ADD COLUMN course_slug TEXT"); } catch {}
 
 // ── Migration: profile customization (§3.12) ──────────────────────────────────
 try { db.exec("ALTER TABLE users ADD COLUMN bio TEXT"); } catch {}
