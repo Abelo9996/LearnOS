@@ -4,6 +4,7 @@ import { Card, Btn, ProgressBar, Ring, MiniBars, Tag, Avatar, AgentChip, PageScr
 import { AGENTS } from '../data/data';
 import API, { timeAgo, fmtDate, dueLabel } from '../api.js';
 import { useToast, useModal } from '../App';
+import MarkdownText from '../components/Markdown';
 
 const SECT_MARGIN = 16;
 
@@ -343,6 +344,13 @@ export function Assignments() {
   const [tab, setTab]                 = React.useState('all');
   const [expandedId, setExpandedId]   = React.useState(null);
   const [filterPriority, setFilterPriority] = React.useState('all');
+  const [examId, setExamId]           = React.useState(null);
+
+  // Full-page examination view (replaces the cramped popup).
+  const openExam = assignments.find(a => a.id === examId);
+  if (openExam) {
+    return <AssignmentExam a={openExam} onClose={() => { setExamId(null); reload(); }} />;
+  }
 
   const filtered = assignments.filter(a => {
     if (tab === 'todo')   return a.status === 'todo' || a.status === 'in-progress';
@@ -458,10 +466,10 @@ export function Assignments() {
               <div className="mono" style={{ fontSize: 11.5, color: a.due === 'Yesterday' ? 'var(--bad)' : 'var(--ink-2)' }}>Due {a.due}</div>
               <div style={{ textAlign: 'right', display: 'flex', gap: 4, justifyContent: 'flex-end', alignItems: 'center' }}>
                 {a.status === 'graded' ? (
-                  <Btn variant="ghost" iconRight={React.cloneElement(I.arrowR, { size: 13 })} onClick={(e) => { e.stopPropagation(); openModal(<AssignmentWorkModal a={a} reload={reload} />); }}>Review</Btn>
+                  <Btn variant="ghost" iconRight={React.cloneElement(I.arrowR, { size: 13 })} onClick={(e) => { e.stopPropagation(); setExamId(a.id); }}>Review</Btn>
                 ) : (
                   <Btn variant={a.status === 'in-progress' ? 'outline' : 'primary'} iconRight={React.cloneElement(I.arrowR, { size: 13 })}
-                    onClick={(e) => { e.stopPropagation(); openModal(<AssignmentWorkModal a={a} reload={reload} />); }}>
+                    onClick={(e) => { e.stopPropagation(); setExamId(a.id); }}>
                     {a.status === 'in-progress' ? 'Continue' : 'Open'}
                   </Btn>
                 )}
@@ -498,52 +506,54 @@ function RoadmapStat2({ icon, label, value, sub, color }) {
 }
 
 // Real work surface: description + task checklist + written submission → LLM grading.
-function AssignmentWorkModal({ a, reload }) {
-  const { add: toast } = useToast();
-  const { close } = useModal();
-  const total = a.tasks?.length || 0;
-  const [checked, setChecked] = React.useState(() => {
-    const n = Math.round((a.pct || 0) * total);
-    return (a.tasks || []).map((_, i) => a.status === 'graded' ? true : i < n);
-  });
-  const [submission, setSubmission] = React.useState('');
-  const [grading, setGrading] = React.useState(false);
-  const [feedback, setFeedback] = React.useState(null); // { grade, feedback_md, rubric }
-  const isGraded = a.status === 'graded';
-  const done = checked.filter(Boolean).length;
-  const pct = total ? done / total : 0;
-  const kindLabel = { coding: 'Coding exercise', project: 'Project', quiz: 'Quiz', analysis: 'Analysis', homework: 'Homework' }[a.kind] || 'Assignment';
+// Full-page examination — a real, Coursera-grade assignment experience with a
+// two-column layout, requirements checklist, a proper work surface (autosaving,
+// monospace for coding), AI grading and a detailed rubric.
+const EXAM_KIND = {
+  coding:   { label: 'Coding exercise', color: 'oklch(0.72 0.17 200)', icon: 'api' },
+  project:  { label: 'Project',         color: 'var(--brand-3)',        icon: 'spark' },
+  quiz:     { label: 'Quiz',            color: 'oklch(0.74 0.18 25)',   icon: 'check' },
+  analysis: { label: 'Analysis',        color: 'oklch(0.74 0.16 155)',  icon: 'chart' },
+  homework: { label: 'Homework',        color: 'var(--brand)',          icon: 'book' },
+};
 
-  // Load existing submission on mount
+function AssignmentExam({ a, onClose }) {
+  const { add: toast } = useToast();
+  const total = a.tasks?.length || 0;
+  const [submission, setSubmission] = React.useState('');
+  const [checked, setChecked] = React.useState(() => (a.tasks || []).map(() => a.status === 'graded'));
+  const [grading, setGrading] = React.useState(false);
+  const [feedback, setFeedback] = React.useState(null);
+  const isGraded = a.status === 'graded';
+  const isCoding = a.kind === 'coding';
+  const meta = EXAM_KIND[a.kind] || { label: 'Assignment', color: 'var(--brand)', icon: 'book' };
+  const storeKey = `learnos_exam_${a.id}`;
+
   React.useEffect(() => {
     let alive = true;
+    let draft = null;
+    try { draft = localStorage.getItem(storeKey); } catch {}
+    if (draft) setSubmission(draft);
     API.getAssignmentSubmission(a.id).then(res => {
       if (!alive || !res?.submission) return;
-      if (res.submission.body_md) setSubmission(res.submission.body_md);
+      if (res.submission.body_md && !draft) setSubmission(res.submission.body_md);
       if (res.status === 'graded' && res.submission.grade != null) {
-        let rubric = [];
-        try { rubric = JSON.parse(res.submission.rubric_json || '[]'); } catch {}
+        let rubric = []; try { rubric = JSON.parse(res.submission.rubric_json || '[]'); } catch {}
         setFeedback({ grade: res.submission.grade, feedback_md: res.submission.feedback_md, rubric });
       }
     }).catch(() => {});
     return () => { alive = false; };
   }, [a.id]);
 
-  const toggle = (i) => { if (isGraded) return; setChecked(c => c.map((v, j) => j === i ? !v : v)); };
-  const saveProgress = async () => {
-    await API.patchAssignment(a.id, { status: 'in-progress', progress: pct }).catch(() => {});
-    toast('Progress saved', 'success');
-    close(); reload();
-  };
+  // Autosave the draft locally.
+  React.useEffect(() => { try { localStorage.setItem(storeKey, submission); } catch {} }, [storeKey, submission]);
+
   const submit = async () => {
-    if (!submission.trim()) { toast('Please write your submission before submitting', 'error'); return; }
+    if (!submission.trim()) { toast('Write your submission before submitting', 'error'); return; }
     setGrading(true);
     try {
-      // Submit the written work — server stores it and enqueues a grade-assignment job
-      const res = await API.submitAssignment(a.id, submission.trim());
-      const subId = res.submission?.id;
-      toast('Submission sent — grading…', 'info');
-      // Poll for grading result (up to 60s)
+      await API.submitAssignment(a.id, submission.trim());
+      toast('Submitted — the Assessment agent is grading your work…', 'info');
       let graded = null;
       for (let i = 0; i < 30; i++) {
         await new Promise(r => setTimeout(r, 2000));
@@ -551,110 +561,143 @@ function AssignmentWorkModal({ a, reload }) {
         if (poll?.status === 'graded') { graded = poll.submission; break; }
       }
       if (graded) {
-        let rubric = [];
-        try { rubric = JSON.parse(graded.rubric_json || '[]'); } catch {}
+        let rubric = []; try { rubric = JSON.parse(graded.rubric_json || '[]'); } catch {}
         setFeedback({ grade: graded.grade, feedback_md: graded.feedback_md, rubric });
-        toast(`Graded: ${graded.grade}%`, graded.grade >= 70 ? 'success' : 'error');
+        toast(`Graded: ${graded.grade}%`, graded.grade >= 70 ? 'success' : 'info');
       } else {
-        // Still pending — show a placeholder
-        setFeedback({ grade: null, feedback_md: '**Grading in progress…**\n\nThe Assessment agent is reviewing your submission. Check back in a moment.', rubric: [] });
-        toast('Grading is still in progress — check back shortly', 'info');
+        setFeedback({ grade: null, feedback_md: '**Grading in progress…** The Assessment agent is still reviewing your work — reopen this assignment shortly to see the result.', rubric: [] });
       }
-    } catch (e) {
-      toast(e.message || 'Could not submit for grading', 'error');
-    } finally {
-      setGrading(false);
-    }
+    } catch (e) { toast(e.message || 'Could not submit for grading', 'error'); }
+    finally { setGrading(false); }
   };
 
-  const displayGrade = feedback?.grade ?? a.grade;
-  const displayFeedback = feedback?.feedback_md;
-  const displayRubric = feedback?.rubric;
+  const grade = feedback?.grade ?? a.grade;
+  const doneT = checked.filter(Boolean).length;
+  const gradeColor = grade == null ? 'var(--muted)' : grade >= 80 ? 'var(--good)' : grade >= 60 ? 'var(--warn)' : 'var(--bad)';
+  const prTone = { high: 'danger', med: 'warn', low: 'neutral' }[a.priority] || 'neutral';
 
   return (
-    <div style={{ minWidth: 520, maxWidth: 640 }}>
-      <div className="cap" style={{ marginBottom: 4 }}>{kindLabel} · {a.course}</div>
-      <h3 className="display" style={{ fontSize: 22, marginBottom: 8 }}>{a.title}</h3>
-      {displayGrade != null && <Tag tone="good" style={{ marginBottom: 10 }}>Graded · {displayGrade}%</Tag>}
-      {grading && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--accent-soft)', border: '1px solid var(--accent-line)', borderRadius: 8, marginBottom: 12 }}>
-          <span style={{ display: 'inline-flex', gap: 4 }}>{[0,1,2].map(i => <span key={i} style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--brand)', animation: `ldot 1s ease-in-out ${i*0.15}s infinite` }} />)}</span>
-          <span style={{ fontSize: 13 }}>Assessment agent is grading your submission…</span>
-        </div>
-      )}
-      {a.description && <p style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.6, marginBottom: 14 }}>{a.description}</p>}
-      <div className="cap" style={{ marginBottom: 8 }}>Tasks ({done}/{total})</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-        {total === 0 ? (
-          <div style={{ fontSize: 13, color: 'var(--muted)' }}>No task breakdown for this assignment.</div>
-        ) : a.tasks.map((t, i) => (
-          <label key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 10px', borderRadius: 8, background: 'var(--surface)', border: '1px solid var(--border)', cursor: isGraded ? 'default' : 'pointer' }}>
-            <input type="checkbox" checked={checked[i]} onChange={() => toggle(i)} disabled={isGraded} style={{ marginTop: 2 }} />
-            <span style={{ fontSize: 13, color: checked[i] ? 'var(--muted)' : 'var(--ink)', textDecoration: checked[i] ? 'line-through' : 'none', lineHeight: 1.5 }}>{t}</span>
-          </label>
-        ))}
-      </div>
-      {!isGraded && <ProgressBar value={pct} height={6} />}
-      <div style={{ marginTop: 16 }}>
-        <div className="cap" style={{ marginBottom: 6 }}>Your submission</div>
-        <textarea
-          value={submission}
-          onChange={e => setSubmission(e.target.value)}
-          disabled={isGraded || grading}
-          placeholder={"Write your answer, paste code, or describe your solution here.\n\nThe Assessment agent will grade this against the assignment's objectives."}
-          rows={6}
-          style={{ width: '100%', padding: '10px 12px', background: isGraded ? 'var(--surface-2)' : 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13, resize: 'vertical', fontFamily: 'var(--font-body)', lineHeight: 1.6 }}
-        />
-        <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 4, textAlign: 'right' }}>{submission.length} chars</div>
-      </div>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 16 }}>
-        {isGraded || displayGrade != null ? (
-          <>
-            {feedback && <Btn variant="outline" onClick={() => { close(); reload(); }}>Done</Btn>}
-          </>
-        ) : (
-          <>
-            <Btn variant="outline" onClick={saveProgress} disabled={grading}>Save progress</Btn>
-            <Btn variant="primary" disabled={grading || !submission.trim()} onClick={submit}>
-              {grading ? 'Grading…' : 'Submit for grading'}
-            </Btn>
-          </>
-        )}
-      </div>
-      {displayFeedback && !grading && (
-        <div style={{ marginTop: 16, padding: 16, background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', animation: 'pageEnter var(--dur-fast) var(--ease-out)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <div className="cap" style={{ color: displayGrade >= 85 ? 'var(--good)' : displayGrade >= 70 ? 'var(--warn)' : 'var(--bad)' }}>
-              {displayGrade >= 85 ? '★ Strong work' : displayGrade >= 70 ? '● Satisfactory' : '○ Needs improvement'}
+    <PageScroll>
+      <button onClick={onClose} className="ui-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 0, color: 'var(--muted)', fontSize: 12, marginBottom: 14, cursor: 'pointer' }}>
+        {React.cloneElement(I.chevronL, { size: 14 })} Assignments
+      </button>
+
+      {/* Header */}
+      <Card style={{ padding: 22, marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 20 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 999, fontSize: 11.5, fontWeight: 600, background: `color-mix(in oklch, ${meta.color} 16%, transparent)`, color: meta.color, border: `1px solid color-mix(in oklch, ${meta.color} 35%, transparent)` }}>
+                {React.cloneElement(I[meta.icon] || I.book, { size: 12 })} {meta.label}
+              </span>
+              {a.course && <Tag>{a.course}</Tag>}
+              <Tag tone={prTone}>{a.priority} priority</Tag>
+              {isGraded && <Tag tone="good">Graded</Tag>}
             </div>
-            <span className="mono" style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)', marginLeft: 'auto' }}>{displayGrade != null ? `${displayGrade}%` : '…'}</span>
+            <h1 className="display" style={{ fontSize: 28, color: 'var(--ink)', margin: '2px 0 10px' }}>{a.title}</h1>
+            <div style={{ display: 'flex', gap: 18, fontSize: 12, color: 'var(--muted)' }}>
+              <span>⏱ {a.est}</span><span>📅 Due {a.due}</span><span>✓ {total} requirement{total === 1 ? '' : 's'}</span>
+            </div>
           </div>
-          {displayRubric?.length > 0 && (
-            <div style={{ marginBottom: 10 }}>
-              <div className="cap" style={{ marginBottom: 6 }}>Detailed rubric</div>
-              {displayRubric.map((r, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}>
-                  <span style={{ fontSize: 12, color: 'var(--ink-2)', flex: 1 }}>{r.criterion}</span>
-                  <span className="mono" style={{ fontSize: 12, color: r.score >= 80 ? 'var(--good)' : r.score >= 60 ? 'var(--warn)' : 'var(--bad)' }}>{r.score}%</span>
-                </div>
-              ))}
-            </div>
+          {grade != null && <Ring value={grade / 100} size={78} sw={7} color={gradeColor} label={`${grade}%`} />}
+        </div>
+      </Card>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.7fr) minmax(0, 1fr)', gap: 16, alignItems: 'start' }}>
+        {/* Main */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Card style={{ padding: 20 }}>
+            <SectionHead title="Overview" />
+            <div style={{ fontSize: 14.5, lineHeight: 1.7 }}><MarkdownText text={a.description || 'This assignment applies the module’s objectives. Complete every requirement below in your submission.'} /></div>
+          </Card>
+
+          {total > 0 && (
+            <Card style={{ padding: 20 }}>
+              <SectionHead title={`Requirements (${doneT}/${total})`} subtitle="Tick these off as you address each in your submission." />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {a.tasks.map((t, i) => (
+                  <label key={i} className="hover-lift" style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px', borderRadius: 8, background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={checked[i]} onChange={() => setChecked(c => c.map((v, j) => j === i ? !v : v))} style={{ marginTop: 3, accentColor: 'var(--brand)' }} />
+                    <span style={{ fontSize: 13.5, color: checked[i] ? 'var(--muted)' : 'var(--ink)', textDecoration: checked[i] ? 'line-through' : 'none', lineHeight: 1.55 }}><span className="mono" style={{ color: 'var(--brand)', marginRight: 6 }}>{i + 1}.</span>{t}</span>
+                  </label>
+                ))}
+              </div>
+            </Card>
           )}
-          <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.65, whiteSpace: 'pre-wrap' }}>
-            {displayFeedback.split('\n').map((line, i) => {
-              if (line.startsWith('### ')) return <h4 key={i} style={{ fontSize: 14, color: 'var(--ink)', margin: '10px 0 4px', fontWeight: 700 }}>{line.slice(4)}</h4>;
-              if (line.startsWith('## ')) return <h3 key={i} style={{ fontSize: 15, color: 'var(--ink)', margin: '12px 0 6px', fontWeight: 700 }}>{line.slice(3)}</h3>;
-              if (line.startsWith('**') && line.endsWith('**')) return <div key={i} style={{ fontWeight: 700, color: 'var(--ink)', margin: '6px 0 2px' }}>{line.slice(2, -2)}</div>;
-              if (line.startsWith('- ') || line.startsWith('* ')) return <div key={i} style={{ paddingLeft: 14, margin: '2px 0' }}>• {line.slice(2)}</div>;
-              if (!line.trim()) return <div key={i} style={{ height: 4 }} />;
-              // Inline bold
-              const formatted = line.replace(/\*\*([^*]+)\*\*/g, '**$1**');
-              return <p key={i} style={{ margin: '3px 0' }} dangerouslySetInnerHTML={{ __html: formatted.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>') }} />;
-            })}
-          </div>
+
+          <Card style={{ padding: 20 }}>
+            <SectionHead title={isCoding ? 'Your solution (code)' : 'Your submission'} subtitle={isGraded ? 'Submitted — reviewed below.' : 'Autosaves as you type. The Assessment agent grades it against the requirements.'} />
+            {grading && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--accent-soft)', border: '1px solid var(--accent-line)', borderRadius: 8, marginBottom: 12 }}>
+                <span style={{ display: 'inline-flex', gap: 4 }}>{[0, 1, 2].map(i => <span key={i} style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--brand)', animation: `ldot 1s ease-in-out ${i * 0.15}s infinite` }} />)}</span>
+                <span style={{ fontSize: 13 }}>Assessment agent is grading your submission…</span>
+              </div>
+            )}
+            <textarea
+              value={submission}
+              onChange={e => setSubmission(e.target.value)}
+              disabled={isGraded || grading}
+              placeholder={isCoding ? '// Paste or write your code here…' : 'Write your answer, analysis, or solution here — address each requirement above.'}
+              rows={isCoding ? 16 : 12}
+              style={{ width: '100%', padding: '12px 14px', background: isCoding ? 'oklch(0.12 0.02 270)' : 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: isCoding ? 12.5 : 13.5, resize: 'vertical', fontFamily: isCoding ? 'var(--font-mono)' : 'var(--font-body)', lineHeight: 1.6 }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', marginTop: 10 }}>
+              <span className="mono" style={{ fontSize: 10.5, color: 'var(--muted)' }}>{submission.trim().split(/\s+/).filter(Boolean).length} words · {submission.length} chars</span>
+              <div style={{ flex: 1 }} />
+              {!isGraded && <Btn variant="primary" disabled={grading || !submission.trim()} onClick={submit}>{grading ? 'Grading…' : 'Submit for grading'}</Btn>}
+            </div>
+          </Card>
+
+          {feedback?.feedback_md && !grading && (
+            <Card style={{ padding: 20, animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                <Ring value={(grade || 0) / 100} size={56} sw={6} color={gradeColor} label={grade != null ? `${grade}%` : '…'} />
+                <div>
+                  <div className="display" style={{ fontSize: 18, color: 'var(--ink)' }}>{grade >= 85 ? 'Strong work' : grade >= 70 ? 'Satisfactory' : grade == null ? 'Grading…' : 'Needs improvement'}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Graded by the Assessment agent</div>
+                </div>
+              </div>
+              {feedback.rubric?.length > 0 && (
+                <div style={{ marginBottom: 14 }}>
+                  <div className="cap" style={{ marginBottom: 8 }}>Rubric</div>
+                  {feedback.rubric.map((r, i) => (
+                    <div key={i} style={{ padding: '8px 0', borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                        <span style={{ fontSize: 12.5, color: 'var(--ink)', flex: 1 }}>{r.criterion}</span>
+                        <span className="mono" style={{ fontSize: 12, color: r.score >= 80 ? 'var(--good)' : r.score >= 60 ? 'var(--warn)' : 'var(--bad)' }}>{r.score}%</span>
+                      </div>
+                      <ProgressBar value={(r.score || 0) / 100} height={4} gradient={false} track="var(--surface-3)" />
+                      {r.why && <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 5, lineHeight: 1.5 }}>{r.why}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="cap" style={{ marginBottom: 6 }}>Feedback</div>
+              <div style={{ fontSize: 13.5, lineHeight: 1.65 }}><MarkdownText text={feedback.feedback_md} /></div>
+            </Card>
+          )}
         </div>
-      )}
-    </div>
+
+        {/* Sidebar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Card style={{ padding: 18 }}>
+            <div className="cap" style={{ marginBottom: 10 }}>How you'll be graded</div>
+            <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+              The Assessment agent scores your submission against each requirement, returns a per-criterion rubric with feedback, and the grade flows into your mastery and XP. Address every requirement explicitly.
+            </div>
+          </Card>
+          <Card style={{ padding: 18 }}>
+            <div className="cap" style={{ marginBottom: 10 }}>Tips</div>
+            <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.7 }}>
+              <li>Be concrete — show your reasoning and steps.</li>
+              {isCoding && <li>Include working code and note how to run it.</li>}
+              <li>Reference the module's lessons and resources.</li>
+              <li>Your draft autosaves — you can leave and return.</li>
+            </ul>
+          </Card>
+        </div>
+      </div>
+    </PageScroll>
   );
 }
 
