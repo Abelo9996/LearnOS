@@ -43,20 +43,27 @@ This is the north star; the tasks below are the road to it. Updated as we go.
 - A roadmap that is a **course pathway A→B**, unlocking by demonstrated mastery,
   re-planned when the learner struggles or races ahead.
 
-## Workstreams (tracked as tasks)
+## Workstreams (tracked as tasks) — all shipped ✅
 
-1. **Rich embedded lesson viewer** — embed YouTube, render resource cards by kind,
-   proper reading rendering, lesson navigation (prev/next), progress.
-2. **Full-page examination/assignment experience** — replace the modal with a real
-   screen: instructions, reference resources, work surface, rubric grading, quiz
-   exam flow.
-3. **Adaptive learning engine + coach** — proficiency/pace model from sessions,
-   quizzes, assignment grades; recommendations surfaced on Dashboard + a coach
-   panel; auto-adjust difficulty and re-plan.
-4. **Roadmap = course pathway (A→B)** — generate roadmaps as sequenced
-   courses/modules with mastery gates; link nodes ↔ courses.
-5. **Resource enrichment everywhere** — every module/node carries embeddable,
-   verified public resources (video/paper/blog/article/docs), auto-proposed.
+1. ✅ **Rich embedded lesson viewer** — embeds YouTube inline (youtube-nocookie
+   16:9), resource cards by kind, MarkdownText readings, prev/next navigation,
+   completion→advance. `src/screens/Courses.jsx`.
+2. ✅ **Full-page examination/assignment experience** — `AssignmentExam` replaces
+   the modal: instructions, requirements checklist, autosaving work surface (code
+   editor for coding kinds), submit → rubric feedback with score bars, grading
+   sidebar. `src/screens/Extras.jsx`. Quiz exam flow via `QuizModal`.
+3. ✅ **Adaptive learning engine + coach** — `GET /api/ai/coach` proficiency/pace
+   from quiz_attempts + graded assignments + node mastery + activity; mastery-
+   derived assignment difficulty; `LearningCoach` panel on Dashboard with
+   clickable recommendations. `routes/ai.js`, `ai/agents/assessment.js`.
+4. ✅ **Roadmap = course pathway (A→B)** — every AI course spins up a companion
+   roadmap: one node per module (capstone included), linear prereq edges as
+   mastery gates, `course_slug` on each node, "Study content" opens the course.
+   `ai/agents/course.js`, `src/screens/Roadmap.jsx`.
+5. ✅ **Resource enrichment everywhere** — module resources are reachability-
+   verified before shipping and copied onto roadmap nodes (node_resources);
+   the roadmap embeds lecture video inline. RE agent `propose-resources` job
+   enriches any node on demand. `ai/agents/research.js`, `routes/nodes.js`.
 
 ## Constraints / principles
 
