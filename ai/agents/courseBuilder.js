@@ -78,7 +78,11 @@ Requirements:
 Calibrate scope and rigor to the requested level. Return only the structured object.`;
 
 // ── Stage 2: per-module content ──────────────────────────────────────────────
-const moduleSchema = {
+// Split into TWO calls per module. A single combined call let the readings eat
+// the whole token budget: a real 9-module build produced 39 readings but 0 labs,
+// 0 graded assessments and 0 resources. Prose and assessment now get their own
+// budgets so neither can starve the other.
+const readingsSchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
@@ -95,6 +99,30 @@ const moduleSchema = {
         required: ['title', 'body_md', 'minutes'],
       },
     },
+    resources: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          title: { type: 'string' },
+          url: { type: 'string' },
+          kind: { type: 'string', enum: ['video', 'paper', 'book', 'blog', 'article', 'website', 'docs', 'repo'] },
+          source: { type: 'string' },
+          summary: { type: 'string' },
+          minutes: { type: 'integer' },
+        },
+        required: ['title', 'url', 'kind', 'source', 'summary', 'minutes'],
+      },
+    },
+  },
+  required: ['readings', 'resources'],
+};
+
+const assessmentSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
     quiz_items: {
       type: 'array',
       items: {
@@ -149,36 +177,26 @@ const moduleSchema = {
       },
       required: ['title', 'kind', 'description', 'tasks', 'minutes', 'rubric'],
     },
-    resources: {
-      type: 'array',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        properties: {
-          title: { type: 'string' },
-          url: { type: 'string' },
-          kind: { type: 'string', enum: ['video', 'paper', 'book', 'blog', 'article', 'website', 'docs', 'repo'] },
-          source: { type: 'string' },
-          summary: { type: 'string' },
-          minutes: { type: 'integer' },
-        },
-        required: ['title', 'url', 'kind', 'source', 'summary', 'minutes'],
-      },
-    },
   },
-  required: ['readings', 'quiz_items', 'lab', 'graded', 'resources'],
+  required: ['quiz_items', 'lab', 'graded'],
 };
 
-const MODULE_SYSTEM = `You are the Curriculum agent for LearnOS writing ONE module of a course in full. This module must be as substantial as a week of a top university course. Thin output is a failure.
+const READINGS_SYSTEM = `You are the Curriculum agent for LearnOS writing the TEACHING CONTENT of one module. This module must be as substantial as a week of a top university course. Thin output is a failure.
 
 Produce:
 - "readings": 3-4 original lessons that actually TEACH. Each body_md must be at least 450 words (${FLOORS.readingChars}+ characters) of real instruction in Markdown: headings, worked intuition, a concrete example or derivation, common pitfalls, and why it matters. Do not summarize — teach. Never use placeholder text.
-- "quiz_items": exactly 10 practice questions with 4 choices each, the correct "answer_idx" (0-based), and an "explanation" that teaches why the answer is right and why the tempting distractor is wrong. Vary difficulty. Tag each with the "skill" it tests.
-- "lab": a hands-on exercise the learner actually performs, with 4-8 concrete steps. This is the "doing" half of the module.
-- "graded": the assessment that counts, with a 4-7 step task list and a 3-5 criterion rubric. Weights must sum to 1.
-- "resources": 4-6 REAL, canonical external resources at long-stable URLs. Diversify kind across lecture videos (prefer YouTube: MIT OCW, Stanford, 3Blue1Brown, conference talks), papers (arXiv), canonical books, high-signal blogs, docs and key repos. NEVER invent a URL — omit anything you are not confident exists; a verifier drops dead links.
+- "resources": 4-6 REAL, canonical external resources at long-stable URLs. Diversify "kind" across lecture videos (prefer YouTube: MIT OCW, Stanford, 3Blue1Brown, conference talks), papers (arXiv), canonical books, high-signal blogs, docs and key repos. NEVER invent a URL — omit anything you are not confident exists; a verifier drops dead links, and a module with no surviving resources is a failure.
 
 "minutes" fields are honest time estimates for a learner at the stated level.`;
+
+const ASSESSMENT_SYSTEM = `You are the Assessment agent for LearnOS writing the ASSESSMENT for one module of a course. The teaching content already exists; you are writing what proves the learner absorbed it.
+
+Produce ALL THREE:
+- "quiz_items": exactly 10 practice questions with 4 choices each, the correct "answer_idx" (0-based), and an "explanation" that teaches why the answer is right and why the tempting distractor is wrong. Vary difficulty across easy/medium/hard. Tag each with the "skill" it tests.
+- "lab": a hands-on exercise the learner actually performs, with 4-8 concrete steps. This is the "doing" half of the module.
+- "graded": the assessment that counts, with a 4-7 step task list and a 3-5 criterion rubric whose weights sum to 1.
+
+"minutes" fields are honest time estimates. Returning fewer than 10 quiz items, or omitting the lab or the graded assessment, is a failure.`;
 
 // ── Pipeline ─────────────────────────────────────────────────────────────────
 
@@ -205,40 +223,62 @@ export async function buildCourse({ userId, topic, level, onProgress = () => {} 
   // Stage 2 — one call per module. This is where the depth actually comes from.
   const modules = [];
   const failures = [];
-  for (let i = 0; i < bp.modules.length; i++) {
+  const N = bp.modules.length;
+  for (let i = 0; i < N; i++) {
     const m = bp.modules[i];
-    onProgress(0.05 + 0.85 * (i / bp.modules.length), `Writing module ${i + 1}/${bp.modules.length}: ${m.title}`);
+    const context = [
+      `Course: ${bp.title} (${lvl})`,
+      `Course outcomes: ${(bp.outcomes || []).join('; ')}`,
+      `This module (${i + 1} of ${N}): ${m.title}`,
+      `Module summary: ${m.summary}`,
+      `Module objectives: ${(m.objectives || []).join('; ')}`,
+      i > 0 ? `Already covered: ${bp.modules.slice(0, i).map(x => x.title).join('; ')}` : 'This is the first module.',
+    ].join('\n');
+
     try {
-      const content = (await complete({
+      onProgress(0.05 + 0.85 * (i / N), `Writing module ${i + 1}/${N}: ${m.title}`);
+      const teaching = (await complete({
         userId, agentCode: 'CR',
-        schema: moduleSchema,
+        schema: readingsSchema,
         maxTokens: 8000,
-        system: MODULE_SYSTEM,
-        messages: [
-          `Course: ${bp.title} (${lvl})`,
-          `Course outcomes: ${(bp.outcomes || []).join('; ')}`,
-          `This module (${i + 1} of ${bp.modules.length}): ${m.title}`,
-          `Module summary: ${m.summary}`,
-          `Module objectives: ${(m.objectives || []).join('; ')}`,
-          i > 0 ? `Already covered: ${bp.modules.slice(0, i).map(x => x.title).join('; ')}` : 'This is the first module.',
-          '\nWrite this module in full.',
-        ].join('\n'),
+        system: READINGS_SYSTEM,
+        messages: `${context}\n\nWrite the readings and resources for this module.`,
       })).json;
-      if (!content || !Array.isArray(content.readings) || !content.readings.length) {
-        throw new Error('module content came back empty');
+
+      if (!teaching || !Array.isArray(teaching.readings) || !teaching.readings.length) {
+        throw new Error('module readings came back empty');
       }
-      modules.push({ ...m, ...content });
+
+      // Second call: assessment gets its own budget, so readings can't starve it.
+      onProgress(0.05 + 0.85 * ((i + 0.5) / N), `Assessing module ${i + 1}/${N}: ${m.title}`);
+      let assessment = {};
+      try {
+        assessment = (await complete({
+          userId, agentCode: 'AS',
+          schema: assessmentSchema,
+          maxTokens: 6000,
+          system: ASSESSMENT_SYSTEM,
+          messages: `${context}\n\nWrite the quiz items, lab and graded assessment for this module.`,
+        })).json || {};
+      } catch (e) {
+        console.warn(`[courseBuilder] assessment for module ${i + 1} failed: ${e?.message || e}`);
+        failures.push({ module: m.title, stage: 'assessment', error: e?.message || String(e) });
+      }
+
+      modules.push({ ...m, ...teaching, ...assessment });
     } catch (e) {
       // One weak module must not sink the course, but the failure must be
       // visible — silently pushing an empty module is how a "successful" build
       // shipped 1 lesson across 8 modules.
       console.warn(`[courseBuilder] module ${i + 1} (${m.title}) failed: ${e?.message || e}`);
-      failures.push({ module: m.title, error: e?.message || String(e) });
+      failures.push({ module: m.title, stage: 'teaching', error: e?.message || String(e) });
       modules.push({ ...m, readings: [], quiz_items: [], lab: null, graded: null, resources: [] });
     }
   }
 
   onProgress(0.92, 'Verifying external resources…');
+  await topUpResources({ userId, bp, modules, level: lvl, onProgress });
+
   const persisted = await persistRichCourse(userId, { ...bp, modules }, lvl);
 
   onProgress(0.99, 'Checking depth floors…');
@@ -246,6 +286,83 @@ export async function buildCourse({ userId, topic, level, onProgress = () => {} 
   onProgress(1, depth.ok ? 'Course ready' : `Course ready (${depth.violations.length} depth warnings)`);
 
   return { ...persisted, failures, depth: { ok: depth.ok, violations: depth.violations.length, stats: depth.stats } };
+}
+
+// ── Resource top-up ──────────────────────────────────────────────────────────
+// Models confidently cite URLs that don't exist. We never ship a dead link, so
+// those get dropped — which left real builds with modules holding 0 verified
+// resources. This pass re-asks for *canonical* sources (the kind that genuinely
+// have stable URLs) for any module still under the floor.
+
+const topUpSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    resources: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          title: { type: 'string' },
+          url: { type: 'string' },
+          kind: { type: 'string', enum: ['video', 'paper', 'book', 'blog', 'article', 'website', 'docs', 'repo'] },
+          source: { type: 'string' },
+          summary: { type: 'string' },
+          minutes: { type: 'integer' },
+        },
+        required: ['title', 'url', 'kind', 'source', 'summary', 'minutes'],
+      },
+    },
+  },
+  required: ['resources'],
+};
+
+const TOPUP_SYSTEM = `You are the Research agent for LearnOS. A module currently has too few WORKING external resources, because previously suggested URLs failed a reachability check.
+
+Suggest 8 resources whose URLs you are certain exist and are stable. Strongly prefer:
+- Wikipedia articles (https://en.wikipedia.org/wiki/<Exact_Article_Title>)
+- arXiv papers you know the real ID of (https://arxiv.org/abs/XXXX.XXXXX)
+- Official documentation root pages of well-known projects
+- Long-established YouTube channels' well-known videos (3Blue1Brown, MIT OpenCourseWare)
+- Canonical textbook or course homepages at university domains
+
+Accuracy of the URL matters more than novelty. Do not invent article titles, paper IDs or video IDs. If unsure of an exact URL, prefer a well-known Wikipedia article on the concept.`;
+
+async function verifyReachable(resources) {
+  const ok = new Set();
+  await Promise.all((resources || []).map(async (r) => {
+    if (!r || !r.url) return;
+    try { if (await checkUrlReachable(r.url, r.kind)) ok.add(r.url); } catch { /* drop */ }
+  }));
+  return ok;
+}
+
+async function topUpResources({ userId, bp, modules, level, onProgress }) {
+  for (let i = 0; i < modules.length; i++) {
+    const m = modules[i];
+    const have = await verifyReachable(m.resources);
+    m.resources = (m.resources || []).filter(r => have.has(r.url));
+    if (m.resources.length >= FLOORS.resourcesPerModule) continue;
+
+    onProgress(0.92, `Finding working resources for “${m.title}”…`);
+    try {
+      const extra = (await complete({
+        userId, agentCode: 'RE',
+        schema: topUpSchema,
+        maxTokens: 2000,
+        system: TOPUP_SYSTEM,
+        messages: `Course: ${bp.title} (${level})\nModule: ${m.title}\nSummary: ${m.summary || ''}\nObjectives: ${(m.objectives || []).join('; ')}\n\nSuggest resources with URLs you are confident exist.`,
+      })).json;
+      const okExtra = await verifyReachable(extra?.resources);
+      const seen = new Set(m.resources.map(r => r.url));
+      for (const r of (extra?.resources || [])) {
+        if (okExtra.has(r.url) && !seen.has(r.url)) { m.resources.push(r); seen.add(r.url); }
+      }
+    } catch (e) {
+      console.warn(`[courseBuilder] resource top-up failed for ${m.title}: ${e?.message || e}`);
+    }
+  }
 }
 
 // ── Persistence ──────────────────────────────────────────────────────────────
