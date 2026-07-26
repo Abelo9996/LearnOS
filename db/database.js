@@ -110,6 +110,71 @@ try {
 // embed videos / render rich resource cards instead of parsing markdown.
 try { db.exec("ALTER TABLE module_lessons ADD COLUMN url TEXT"); } catch {}
 
+// ── M1: Coursera-grade content model (docs/MASTERY_SPEC_V2.md §3.1) ──────────
+// Coursera puts a time estimate on *every* item ("Video: 8 min", "Quiz: 30 min")
+// and separates ungraded practice from graded, attempt-limited assessment. These
+// columns make our lessons carry the same metadata so a syllabus can be honest
+// about what it costs and what actually counts.
+try { db.exec("ALTER TABLE module_lessons ADD COLUMN estimated_minutes INTEGER"); } catch {}
+try { db.exec("ALTER TABLE module_lessons ADD COLUMN is_graded INTEGER DEFAULT 0"); } catch {}
+try { db.exec("ALTER TABLE module_lessons ADD COLUMN is_optional INTEGER DEFAULT 0"); } catch {}
+try { db.exec("ALTER TABLE module_lessons ADD COLUMN pass_threshold REAL"); } catch {}
+try { db.exec("ALTER TABLE module_lessons ADD COLUMN max_attempts INTEGER"); } catch {}
+
+// Module objectives become first-class (they only existed on roadmap nodes), so
+// every module can state measurable outcomes the way Coursera modules do.
+try { db.exec("ALTER TABLE course_modules ADD COLUMN objectives TEXT"); } catch {}
+
+// Course-level framing: what you can DO after, what you need first, skills tracked.
+try { db.exec("ALTER TABLE courses ADD COLUMN outcomes TEXT"); } catch {}
+try { db.exec("ALTER TABLE courses ADD COLUMN prerequisites TEXT"); } catch {}
+try { db.exec("ALTER TABLE courses ADD COLUMN skills TEXT"); } catch {}
+try { db.exec("ALTER TABLE courses ADD COLUMN level TEXT"); } catch {}
+
+// Assessment config for assignments: auto-graded programming test cases, the
+// pass bar, and how many attempts a learner gets.
+try { db.exec("ALTER TABLE assignments ADD COLUMN tests_json TEXT"); } catch {}
+try { db.exec("ALTER TABLE assignments ADD COLUMN rubric_json TEXT"); } catch {}
+try { db.exec("ALTER TABLE assignments ADD COLUMN pass_threshold REAL"); } catch {}
+try { db.exec("ALTER TABLE assignments ADD COLUMN max_attempts INTEGER"); } catch {}
+
+// Item bank — questions persist per module/skill so retakes aren't identical and
+// spaced review can draw from the same pool.
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS quiz_items (
+    id TEXT PRIMARY KEY,
+    course_slug TEXT,
+    module_id TEXT,
+    lesson_id TEXT,
+    node_id TEXT,
+    question TEXT NOT NULL,
+    choices_json TEXT NOT NULL,
+    answer_idx INTEGER NOT NULL,
+    explanation TEXT,
+    difficulty TEXT DEFAULT 'medium',
+    skill TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  )`);
+  db.exec("CREATE INDEX IF NOT EXISTS idx_quiz_items_module ON quiz_items(module_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_quiz_items_course ON quiz_items(course_slug)");
+} catch (e) { console.log('quiz_items migration:', e.message); }
+
+// In-lesson retrieval practice — Coursera poses questions mid-lecture and answers
+// them in the next video; we attach them to the lesson at a position.
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS lesson_checkpoints (
+    id TEXT PRIMARY KEY,
+    lesson_id TEXT NOT NULL,
+    position INTEGER DEFAULT 0,
+    question TEXT NOT NULL,
+    choices_json TEXT,
+    answer_idx INTEGER,
+    explanation TEXT,
+    created_at TEXT DEFAULT (datetime('now'))
+  )`);
+  db.exec("CREATE INDEX IF NOT EXISTS idx_lesson_checkpoints ON lesson_checkpoints(lesson_id)");
+} catch (e) { console.log('lesson_checkpoints migration:', e.message); }
+
 ensureAgentStatus();  // app config — always present, even in zero-seed mode
 seedIfEmpty();         // example content (roadmaps, courses, demo members, community) from seed.sql
 
