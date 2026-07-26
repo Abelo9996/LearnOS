@@ -138,6 +138,11 @@ try { db.exec("ALTER TABLE assignments ADD COLUMN rubric_json TEXT"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN pass_threshold REAL"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN max_attempts INTEGER"); } catch {}
 
+// Staged course generation is long-running (one LLM call per module), so jobs
+// report incremental progress instead of looking hung.
+try { db.exec("ALTER TABLE agent_jobs ADD COLUMN progress REAL"); } catch {}
+try { db.exec("ALTER TABLE agent_jobs ADD COLUMN progress_msg TEXT"); } catch {}
+
 // Item bank — questions persist per module/skill so retakes aren't identical and
 // spaced review can draw from the same pool.
 try {

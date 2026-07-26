@@ -57,13 +57,23 @@ function resolveKey(userId) {
 // ```json fences — different models format structured output differently.
 function parseJson(text) {
   if (!text) return null;
+
+  // Try the raw response FIRST. Structured-output models return bare JSON, and
+  // when a string field carries Markdown containing ``` code fences, pulling the
+  // "fenced" region out instead would slice the object apart and lose the whole
+  // response — which silently emptied every generated lesson body.
+  try { return JSON.parse(text.trim()); } catch { /* not bare JSON — keep going */ }
+
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const candidate = fenced ? fenced[1] : text;
-  try { return JSON.parse(candidate.trim()); } catch { /* fall through */ }
-  const start = candidate.indexOf('{');
-  const end = candidate.lastIndexOf('}');
+  if (fenced) {
+    try { return JSON.parse(fenced[1].trim()); } catch { /* fall through */ }
+  }
+
+  // Last resort: widest {...} span in the raw text (not the fenced fragment).
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
   if (start !== -1 && end > start) {
-    try { return JSON.parse(candidate.slice(start, end + 1)); } catch { /* ignore */ }
+    try { return JSON.parse(text.slice(start, end + 1)); } catch { /* ignore */ }
   }
   return null;
 }
