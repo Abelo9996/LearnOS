@@ -2,8 +2,52 @@ import { Router } from 'express';
 import db from '../db/database.js';
 import { enqueueJob } from '../ai/jobs.js';
 import '../ai/agents/curriculum.js'; // registers the 'generate-roadmap' job handler
+import '../ai/agents/specialization.js'; // registers 'plan-specialization' + 'build-pathway-course'
+import { applyPlacement } from '../ai/agents/specialization.js';
 
 const router = Router();
+
+// ── Specializations (M4) ────────────────────────────────────────────────────
+// A pathway of whole COURSES from where the learner is (A) to their goal (B).
+
+// Plan one from a goal. Async → jobId.
+router.post('/specialization', (req, res) => {
+  const { goal, level } = req.body || {};
+  if (!goal || !String(goal).trim()) return res.status(400).json({ error: true, message: 'goal required' });
+  const jobId = enqueueJob(req.userId, 'plan-specialization', { goal: String(goal).trim().slice(0, 400), level });
+  res.json({ ok: true, jobId });
+});
+
+// The placement diagnostic — answer keys are never sent to the client.
+router.get('/:id/placement', (req, res) => {
+  const rm = db.prepare('SELECT id, title, goal, placement_json FROM roadmaps WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+  if (!rm) return res.status(404).json({ error: true, message: 'Roadmap not found' });
+  let qs = [];
+  try { qs = JSON.parse(rm.placement_json || '[]'); } catch {}
+  if (!qs.length) return res.status(404).json({ error: true, code: 'NO_PLACEMENT', message: 'This pathway has no placement diagnostic.' });
+  res.json({
+    ok: true, roadmap: { id: rm.id, title: rm.title, goal: rm.goal },
+    questions: qs.map((q, i) => ({ index: i, question: q.question, choices: q.choices, skill: q.skill, course_index: q.course_index })),
+  });
+});
+
+// Score it and move the learner to their real starting point.
+router.post('/:id/placement/submit', (req, res) => {
+  const { answers } = req.body || {};
+  if (!Array.isArray(answers)) return res.status(400).json({ error: true, message: 'answers required' });
+  const out = applyPlacement(req.userId, req.params.id, answers);
+  if (!out) return res.status(404).json({ error: true, message: 'No placement diagnostic for this roadmap' });
+  res.json({ ok: true, ...out });
+});
+
+// Build the course behind a pathway node, on demand. Async → jobId.
+router.post('/:id/nodes/:nodeId/build', (req, res) => {
+  const node = db.prepare('SELECT id, course_slug, build_status FROM roadmap_nodes WHERE id = ? AND roadmap_id = ?').get(req.params.nodeId, req.params.id);
+  if (!node) return res.status(404).json({ error: true, message: 'Node not found' });
+  if (node.course_slug) return res.json({ ok: true, alreadyBuilt: true, slug: node.course_slug });
+  const jobId = enqueueJob(req.userId, 'build-pathway-course', { node_id: node.id, level: req.body?.level });
+  res.json({ ok: true, jobId });
+});
 
 // Generate a real roadmap from a goal (CR-2). Runs async → returns a jobId.
 router.post('/generate', (req, res) => {
