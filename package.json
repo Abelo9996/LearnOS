@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "start": "node server.js",
     "depth:check": "node scripts/depth-check.mjs",
+    "verify:pipeline": "node scripts/verify-pipeline.mjs",
+    "verify:assessment": "node scripts/verify-assessment.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
