@@ -50,6 +50,15 @@ export function validateCourseDepth(slug, floors = FLOORS) {
     const lessons = db.prepare('SELECT id, title, kind, body_md, url, estimated_minutes, is_graded FROM module_lessons WHERE module_id = ?').all(m.id);
     totalLessons += lessons.length;
 
+    // A capstone is one culminating project by design, not a teaching module, so
+    // the per-module content floors don't apply — it only has to actually be graded.
+    const isCapstone = /-capstone$/.test(m.id) || /^capstone\b/i.test(m.title || '');
+    if (isCapstone) {
+      for (const l of lessons) totalMinutes += Number(l.estimated_minutes) || 0;
+      if (!lessons.some(l => l.is_graded)) fail('GRADED', m.title, 'capstone is not graded', 0, 1);
+      continue;
+    }
+
     if (lessons.length < floors.lessonsPerModule) {
       fail('LESSONS', m.title, `only ${lessons.length} lessons`, lessons.length, floors.lessonsPerModule);
     }

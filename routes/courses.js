@@ -3,6 +3,8 @@ import db, { logActivity, awardXP } from '../db/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import { isPublicUrl } from '../middleware/url-safety.js';
 import { generateCourse } from '../ai/agents/course.js';
+import { enqueueJob } from '../ai/jobs.js';
+import '../ai/agents/courseBuilder.js'; // registers the 'build-course' job handler
 
 const router = Router();
 
@@ -23,6 +25,16 @@ router.post('/generate', requireAuth, async (req, res) => {
   } catch (e) {
     res.status(e.code === 'NO_KEY' ? 400 : 502).json({ error: true, code: e.code || null, message: e.message });
   }
+});
+
+// Staged build (M2) — one LLM call per module produces a course with real depth.
+// Too slow for a request/response cycle, so it returns a jobId to poll; the job
+// reports progress per module and validates the result against the depth floors.
+router.post('/build', requireAuth, (req, res) => {
+  const { topic, level } = req.body || {};
+  if (!topic || !String(topic).trim()) return res.status(400).json({ error: true, message: 'topic required' });
+  const jobId = enqueueJob(req.userId, 'build-course', { topic: String(topic).slice(0, 200), level });
+  res.json({ ok: true, jobId });
 });
 
 router.get('/', (req, res) => {

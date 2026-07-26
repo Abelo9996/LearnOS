@@ -668,20 +668,36 @@ function GenerateCourseModal({ onDone }) {
   const [level, setLevel] = React.useState('intermediate');
   const [phase, setPhase] = React.useState('form'); // form | generating | error
   const [errMsg, setErrMsg] = React.useState('');
+  const [progress, setProgress] = React.useState({ pct: 0, msg: '' });
   const inp = { width: '100%', padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13.5 };
   const suggestions = ['Reinforcement Learning', 'Distributed Systems', 'Real Analysis', 'Modern React', 'Quantum Computing', 'Financial Modeling'];
 
   const go = async () => {
     if (!topic.trim()) return;
     setPhase('generating');
+    setProgress({ pct: 0, msg: 'Starting the build…' });
     try {
-      const res = await API.generateCourseAI({ topic: topic.trim(), level });
-      toast(`Course generated · ${res.modules} modules · ${res.resources} resources`, 'success');
-      onDone && onDone(res.slug);
+      // Staged build: one LLM call per module, so it runs as a job we poll.
+      const { jobId } = await API.buildCourseAI({ topic: topic.trim(), level });
+      for (;;) {
+        await new Promise(r => setTimeout(r, 2000));
+        const j = await API.getJob(jobId).catch(() => null);
+        if (!j) continue;
+        if (typeof j.progress === 'number' || j.progress_msg) {
+          setProgress({ pct: j.progress || 0, msg: j.progress_msg || '' });
+        }
+        if (j.status === 'done') {
+          const res = j.result || {};
+          toast(`Course built · ${res.modules} modules · ${res.lessons} lessons · ${res.quizItems} quiz items`, 'success');
+          onDone && onDone(res.slug);
+          return;
+        }
+        if (j.status === 'failed') throw Object.assign(new Error(j.error || 'Build failed'), { code: /key/i.test(j.error || '') ? 'NO_KEY' : null });
+      }
     } catch (e) {
       setErrMsg(e.code === 'NO_KEY' || /key/i.test(e.message || '')
-        ? 'Add an OpenRouter key in Settings → API Keys to generate courses.'
-        : (e.message || 'Course generation failed — try again.'));
+        ? 'Add an OpenRouter key in Settings → API Keys to build courses.'
+        : (e.message || 'Course build failed — try again.'));
       setPhase('error');
     }
   };
@@ -692,9 +708,15 @@ function GenerateCourseModal({ onDone }) {
         <div style={{ display: 'inline-flex', gap: 6, marginBottom: 16 }}>
           {[0, 1, 2].map(i => <span key={i} style={{ width: 9, height: 9, borderRadius: 999, background: 'var(--brand)', animation: `ldot 1s ease-in-out ${i * 0.15}s infinite` }} />)}
         </div>
-        <div className="display" style={{ fontSize: 19, color: 'var(--ink)' }}>Designing your course…</div>
-        <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 8, lineHeight: 1.6, maxWidth: 380, margin: '8px auto 0' }}>
-          The Curriculum agent is writing modules and readings, the Research agent is finding and verifying lecture videos, papers and articles, and the Assessment agent is authoring assignments. This can take up to a minute.
+        <div className="display" style={{ fontSize: 19, color: 'var(--ink)' }}>Building your course…</div>
+        <div style={{ maxWidth: 380, margin: '14px auto 0' }}>
+          <ProgressBar value={progress.pct || 0} height={8} />
+          <div className="mono" style={{ fontSize: 11.5, color: 'var(--brand)', marginTop: 8, minHeight: 16 }}>
+            {progress.msg || 'Starting…'}
+          </div>
+        </div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 12, lineHeight: 1.6, maxWidth: 400, margin: '12px auto 0' }}>
+          Each module is written in full — readings, ten practice questions, a hands-on lab and a graded assessment — then every external resource is reachability-verified. This takes a few minutes and is why the result has real depth.
         </div>
       </div>
     );

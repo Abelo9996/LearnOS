@@ -123,6 +123,9 @@ const API = {
   getEnrollments:     () => API.get('/users/enrollments'),
   createCourse:       (data) => API.post('/courses', data),
   generateCourseAI:   (data) => API.post('/courses/generate', data),
+  // Staged build (M2): returns a jobId to poll — one LLM call per module, so it
+  // takes minutes but produces a course with real depth.
+  buildCourseAI:      (data) => API.post('/courses/build', data),
 
   // ── AI ─────────────────────────────────────────────────────────────────────
   postChat:            (data) => API.post('/ai/chat', data),

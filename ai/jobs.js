@@ -21,7 +21,16 @@ export function enqueueJob(userId, kind, input) {
 export function getJob(id, userId) {
   const j = db.prepare('SELECT * FROM agent_jobs WHERE id = ? AND user_id = ?').get(id, userId);
   if (!j) return null;
-  return { id: j.id, kind: j.kind, status: j.status, error: j.error, created_at: j.created_at, updated_at: j.updated_at, result: parse(j.result_json) };
+  return { id: j.id, kind: j.kind, status: j.status, error: j.error, created_at: j.created_at, updated_at: j.updated_at, result: parse(j.result_json), progress: j.progress ?? null, progress_msg: j.progress_msg ?? null };
+}
+
+// Long multi-stage jobs (e.g. staged course generation) report progress so the
+// UI can show real movement instead of an indefinite spinner.
+export function setJobProgress(jobId, pct, msg) {
+  try {
+    db.prepare("UPDATE agent_jobs SET progress = ?, progress_msg = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(typeof pct === 'number' ? Math.max(0, Math.min(1, pct)) : null, msg || null, jobId);
+  } catch { /* progress is best-effort, never fails the job */ }
 }
 
 let running = false;
