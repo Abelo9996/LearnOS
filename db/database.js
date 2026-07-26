@@ -138,6 +138,18 @@ try { db.exec("ALTER TABLE assignments ADD COLUMN rubric_json TEXT"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN pass_threshold REAL"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN max_attempts INTEGER"); } catch {}
 
+// ── M3: two-tier assessment (spec §3.2) ─────────────────────────────────────
+// Coursera separates ungraded practice (unlimited attempts, explanations shown)
+// from graded assessment (attempt-limited, pass threshold, counts toward
+// progression). quiz_attempts needs to know which it was, which module/lesson it
+// belonged to, which attempt number it is, and whether it passed.
+try { db.exec("ALTER TABLE quiz_attempts ADD COLUMN module_id TEXT"); } catch {}
+try { db.exec("ALTER TABLE quiz_attempts ADD COLUMN lesson_id TEXT"); } catch {}
+try { db.exec("ALTER TABLE quiz_attempts ADD COLUMN course_slug TEXT"); } catch {}
+try { db.exec("ALTER TABLE quiz_attempts ADD COLUMN mode TEXT DEFAULT 'practice'"); } catch {}
+try { db.exec("ALTER TABLE quiz_attempts ADD COLUMN attempt_no INTEGER DEFAULT 1"); } catch {}
+try { db.exec("ALTER TABLE quiz_attempts ADD COLUMN passed INTEGER DEFAULT 0"); } catch {}
+
 // Staged course generation is long-running (one LLM call per module), so jobs
 // report incremental progress instead of looking hung.
 try { db.exec("ALTER TABLE agent_jobs ADD COLUMN progress REAL"); } catch {}
