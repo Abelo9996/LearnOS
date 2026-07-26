@@ -11,6 +11,7 @@
     "depth:check": "node scripts/depth-check.mjs",
     "verify:pipeline": "node scripts/verify-pipeline.mjs",
     "verify:assessment": "node scripts/verify-assessment.mjs",
+    "verify:specialization": "node scripts/verify-specialization.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

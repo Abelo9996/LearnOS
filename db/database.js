@@ -138,6 +138,19 @@ try { db.exec("ALTER TABLE assignments ADD COLUMN rubric_json TEXT"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN pass_threshold REAL"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN max_attempts INTEGER"); } catch {}
 
+// ── M4: specialization roadmaps (spec §3.3) ─────────────────────────────────
+// A Coursera Specialization sequences 3-6 whole COURSES into one credential.
+// Ours must do the same: a roadmap is a pathway from the learner's measured
+// starting point (A) to their stated goal (B), whose nodes can be entire courses
+// rather than single modules.
+try { db.exec("ALTER TABLE roadmaps ADD COLUMN kind TEXT DEFAULT 'course'"); } catch {}
+try { db.exec("ALTER TABLE roadmaps ADD COLUMN goal TEXT"); } catch {}
+try { db.exec("ALTER TABLE roadmaps ADD COLUMN placement_json TEXT"); } catch {}
+try { db.exec("ALTER TABLE roadmap_nodes ADD COLUMN node_kind TEXT DEFAULT 'module'"); } catch {}
+try { db.exec("ALTER TABLE roadmap_nodes ADD COLUMN skills TEXT"); } catch {}
+try { db.exec("ALTER TABLE roadmap_nodes ADD COLUMN course_topic TEXT"); } catch {}
+try { db.exec("ALTER TABLE roadmap_nodes ADD COLUMN build_status TEXT"); } catch {}
+
 // ── M3: two-tier assessment (spec §3.2) ─────────────────────────────────────
 // Coursera separates ungraded practice (unlimited attempts, explanations shown)
 // from graded assessment (attempt-limited, pass threshold, counts toward
