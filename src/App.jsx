@@ -131,7 +131,14 @@ function useModal() { return React.useContext(ModalContext); }
 // No login: a cleaned-up Landing is the front door, then straight into the app.
 // (First run with an empty library drops into onboarding.)
 function AppRoot() {
-  const [phase, setPhase] = React.useState('landing');
+  // The landing page is a front door, not a toll gate. Someone who has already
+  // been inside should reopen straight into their dashboard — being shown the
+  // marketing page every single load is friction for the person who uses this
+  // daily, which is the only person there is.
+  const [phase, setPhase] = React.useState(() => {
+    try { return localStorage.getItem('learnos_entered') === '1' ? 'app' : 'landing'; }
+    catch { return 'landing'; }
+  });
   const [version, setVersion] = React.useState(0);
 
   // Does this user still need onboarding? (no roadmaps + never onboarded)
@@ -154,18 +161,32 @@ function AppRoot() {
     return false;
   };
 
+  const remember = (entered) => {
+    try { localStorage.setItem('learnos_entered', entered ? '1' : '0'); } catch {}
+  };
+
   async function handleEnterApp() {
     setPhase('loading');
     const needsOnboarding = await checkOnboarding();
     if (!needsOnboarding) {
+      remember(true);
       setVersion(v => v + 1);
       setPhase('app');
     }
   }
 
   function handleOnboardingComplete() {
+    remember(true);
     setVersion(v => v + 1);
     setPhase('app');
+  }
+
+  // Going back out to the landing page must be possible — it holds the project's
+  // "what is this / open source" story, which someone may well want to reread or
+  // show to another person.
+  function handleExitToLanding() {
+    remember(false);
+    setPhase('landing');
   }
 
   React.useEffect(() => {
@@ -177,7 +198,7 @@ function AppRoot() {
   if (phase === 'loading') return <AppLoader />;
   if (phase === 'landing') return <Landing onEnterApp={handleEnterApp} />;
   if (phase === 'onboarding') return <Onboarding onComplete={handleOnboardingComplete} />;
-  return <App key={version} />;
+  return <App key={version} onExitToLanding={handleExitToLanding} />;
 }
 
 function AppLoader() {
@@ -215,7 +236,7 @@ export default AppRoot;
 // must live below the providers in the tree (you cannot read a context in the
 // same component that renders its Provider — useContext returns the default
 // null and destructuring `{ add }` throws).
-function App() {
+function App({ onExitToLanding }) {
   const [me, setMe] = React.useState(null);
 
   React.useEffect(() => {
@@ -239,13 +260,13 @@ function App() {
   return (
     <UserProvider user={me}>
       <ToastProvider><ModalProvider>
-        <AppShell />
+        <AppShell onExitToLanding={onExitToLanding} />
       </ModalProvider></ToastProvider>
     </UserProvider>
   );
 }
 
-function AppShell() {
+function AppShell({ onExitToLanding }) {
   const [screen, setScreen]               = React.useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const [density, setDensity]             = React.useState('regular');
@@ -343,7 +364,7 @@ function AppShell() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', overflowX: 'hidden' }}>
-      {!isMobile && <Sidebar screen={screen} setScreen={go} collapsed={sidebarCollapsed} onToggle={toggleSidebar} counts={navCounts} />}
+      {!isMobile && <Sidebar screen={screen} setScreen={go} collapsed={sidebarCollapsed} onToggle={toggleSidebar} counts={navCounts} onExitToLanding={onExitToLanding} />}
       <main style={{
         flex: 1,
         width: isMobile ? '100%' : `calc(100vw - ${sw}px)`,
@@ -361,7 +382,7 @@ function AppShell() {
       </main>
       {/* Without this there is literally no way to navigate on a phone — the
           sidebar is hidden and nothing replaces it. */}
-      {isMobile && <MobileNav screen={screen} setScreen={go} counts={navCounts} />}
+      {isMobile && <MobileNav screen={screen} setScreen={go} counts={navCounts} onExitToLanding={onExitToLanding} />}
     </div>
   );
 }
@@ -372,7 +393,7 @@ function AppShell() {
    Bottom-anchored because that is where thumbs are. */
 const MOBILE_PRIMARY = ['dashboard', 'roadmaps', 'courses', 'assignments', 'cards'];
 
-function MobileNav({ screen, setScreen, counts = {} }) {
+function MobileNav({ screen, setScreen, counts = {}, onExitToLanding }) {
   const [moreOpen, setMoreOpen] = React.useState(false);
   const allItems = NAV.flatMap(g => g.items);
   const primary = MOBILE_PRIMARY.map(id => allItems.find(i => i.id === id)).filter(Boolean);
@@ -424,6 +445,18 @@ function MobileNav({ screen, setScreen, counts = {} }) {
               display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
             }}
           >
+            {onExitToLanding && (
+              <button key="__about"
+                onClick={() => { setMoreOpen(false); onExitToLanding(); }}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '12px 6px',
+                  borderRadius: 10, cursor: 'pointer', background: 'var(--surface-2)',
+                  border: '1px solid var(--border)', color: 'var(--ink-2)',
+                }}>
+                {React.cloneElement(I.home, { size: 18 })}
+                <span style={{ fontSize: 11, textAlign: 'center', lineHeight: 1.2 }}>About</span>
+              </button>
+            )}
             {rest.map(item => (
               <button key={item.id}
                 onClick={() => { setScreen(item.id); setMoreOpen(false); }}
@@ -569,7 +602,7 @@ function ProgressPopup({ onClose }) {
 }
 
 /* ── Sidebar ──────────────────────────────────────────────────────────────── */
-function Sidebar({ screen, setScreen, collapsed, onToggle, counts = {} }) {
+function Sidebar({ screen, setScreen, collapsed, onToggle, counts = {}, onExitToLanding }) {
   const { open: openModal, close: closeModal } = useModal();
   const user = useUser();
   const w = collapsed ? 64 : 240;
@@ -583,13 +616,19 @@ function Sidebar({ screen, setScreen, collapsed, onToggle, counts = {} }) {
       transition: 'width var(--dur-normal) var(--ease-smooth)',
       overflow: 'hidden',
     }}>
-      {/* Logo */}
-      <div style={{
-        padding: collapsed ? '16px 0' : '16px 18px',
-        display: 'flex', alignItems: 'center', gap: 10,
-        justifyContent: collapsed ? 'center' : 'flex-start',
-        transition: 'padding var(--dur-normal) var(--ease-smooth)',
-      }}>
+      {/* Logo — also the way back out to the landing page. */}
+      <button
+        onClick={() => onExitToLanding && onExitToLanding()}
+        title="About LearnOS"
+        aria-label="About LearnOS"
+        className="sidebar-home"
+        style={{
+          padding: collapsed ? '16px 0' : '16px 18px',
+          display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          background: 'none', border: 0, cursor: 'pointer', textAlign: 'left',
+          transition: 'padding var(--dur-normal) var(--ease-smooth), background var(--dur-fast) var(--ease-smooth)',
+        }}>
         <span className="sidebar-logo" style={{
           width: 32, height: 32, display: 'inline-flex',
           alignItems: 'center', justifyContent: 'center',
@@ -610,7 +649,7 @@ function Sidebar({ screen, setScreen, collapsed, onToggle, counts = {} }) {
             animation: 'labelFadeIn var(--dur-normal) var(--ease-smooth) both',
           }}>LearnOS</span>
         )}
-      </div>
+      </button>
 
       {/* Nav items */}
       <div className="scroll" style={{
