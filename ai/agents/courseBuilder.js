@@ -25,6 +25,26 @@ import { registerJobHandler, setJobProgress } from '../jobs.js';
 
 const LEVELS = ['beginner', 'intermediate', 'advanced'];
 
+// How many modules are written at once. Modules are independent given the
+// blueprint, so this is pure wall-clock win; kept modest to stay well inside
+// provider rate limits.
+const MODULE_CONCURRENCY = 4;
+
+/** Bounded-concurrency map that preserves input order in the output. */
+async function mapWithConcurrency(items, limit, fn) {
+  const out = new Array(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    for (;;) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return out;
+}
+
 // ── Stage 1: blueprint ───────────────────────────────────────────────────────
 const blueprintSchema = {
   type: 'object',
@@ -220,12 +240,16 @@ export async function buildCourse({ userId, topic, level, onProgress = () => {} 
     throw new Error('Curriculum agent returned an invalid blueprint');
   }
 
-  // Stage 2 — one call per module. This is where the depth actually comes from.
-  const modules = [];
+  // Stage 2 — two calls per module. This is where the depth comes from, and it
+  // is also the whole cost of a build, so modules are written CONCURRENTLY.
+  // Sequentially a 9-module course took ~13 minutes; the modules don't depend on
+  // each other's output (only on the blueprint), so a bounded pool cuts that to
+  // a few minutes without hammering the provider.
   const failures = [];
   const N = bp.modules.length;
-  for (let i = 0; i < N; i++) {
-    const m = bp.modules[i];
+  let finished = 0;
+
+  const buildModule = async (m, i) => {
     const context = [
       `Course: ${bp.title} (${lvl})`,
       `Course outcomes: ${(bp.outcomes || []).join('; ')}`,
@@ -235,8 +259,9 @@ export async function buildCourse({ userId, topic, level, onProgress = () => {} 
       i > 0 ? `Already covered: ${bp.modules.slice(0, i).map(x => x.title).join('; ')}` : 'This is the first module.',
     ].join('\n');
 
+    const tick = (msg) => onProgress(0.05 + 0.85 * (finished / N), msg);
     try {
-      onProgress(0.05 + 0.85 * (i / N), `Writing module ${i + 1}/${N}: ${m.title}`);
+      tick(`Writing module ${i + 1}/${N}: ${m.title}`);
       const teaching = (await complete({
         userId, agentCode: 'CR',
         schema: readingsSchema,
@@ -250,7 +275,6 @@ export async function buildCourse({ userId, topic, level, onProgress = () => {} 
       }
 
       // Second call: assessment gets its own budget, so readings can't starve it.
-      onProgress(0.05 + 0.85 * ((i + 0.5) / N), `Assessing module ${i + 1}/${N}: ${m.title}`);
       let assessment = {};
       try {
         assessment = (await complete({
@@ -265,16 +289,24 @@ export async function buildCourse({ userId, topic, level, onProgress = () => {} 
         failures.push({ module: m.title, stage: 'assessment', error: e?.message || String(e) });
       }
 
-      modules.push({ ...m, ...teaching, ...assessment });
+      finished++;
+      tick(`Finished ${finished}/${N} modules`);
+      return { ...m, ...teaching, ...assessment };
     } catch (e) {
       // One weak module must not sink the course, but the failure must be
       // visible — silently pushing an empty module is how a "successful" build
       // shipped 1 lesson across 8 modules.
       console.warn(`[courseBuilder] module ${i + 1} (${m.title}) failed: ${e?.message || e}`);
       failures.push({ module: m.title, stage: 'teaching', error: e?.message || String(e) });
-      modules.push({ ...m, readings: [], quiz_items: [], lab: null, graded: null, resources: [] });
+      finished++;
+      tick(`Finished ${finished}/${N} modules`);
+      return { ...m, readings: [], quiz_items: [], lab: null, graded: null, resources: [] };
     }
-  }
+  };
+
+  // Order is preserved regardless of completion order — a course's modules must
+  // stay in their taught sequence.
+  const modules = await mapWithConcurrency(bp.modules, MODULE_CONCURRENCY, buildModule);
 
   onProgress(0.92, 'Verifying external resources…');
   await topUpResources({ userId, bp, modules, level: lvl, onProgress });
@@ -287,6 +319,175 @@ export async function buildCourse({ userId, topic, level, onProgress = () => {} 
 
   return { ...persisted, failures, depth: { ok: depth.ok, violations: depth.violations.length, stats: depth.stats } };
 }
+
+// ── Enrichment ───────────────────────────────────────────────────────────────
+// Deepens an EXISTING course in place rather than regenerating it. This is how a
+// thin course — the hand-written seed courses, an imported one, anything that
+// predates the depth model — is brought up to the floors without losing what it
+// already has or changing its slug.
+
+const extendSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    modules: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          title: { type: 'string' },
+          summary: { type: 'string' },
+          objectives: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['title', 'summary', 'objectives'],
+      },
+    },
+  },
+  required: ['modules'],
+};
+
+export async function enrichCourse({ userId, slug, onProgress = () => {} }) {
+  const course = db.prepare('SELECT slug, title, blurb, hours, level, tags FROM courses WHERE slug = ?').get(slug);
+  if (!course) throw new Error(`Course not found: ${slug}`);
+  const lvl = LEVELS.includes(course.level) ? course.level : 'intermediate';
+
+  let modules = db.prepare('SELECT id, title, summary, objectives, order_idx FROM course_modules WHERE course_slug = ? ORDER BY order_idx').all(slug);
+  const isCapstone = (m) => /-capstone$/.test(m.id) || /^capstone\b/i.test(m.title || '');
+  const teaching = modules.filter(m => !isCapstone(m));
+
+  // 1. Too few modules → extend the syllabus, continuing what's already there.
+  const needed = FLOORS.modulesPerCourse - teaching.length;
+  if (needed > 0) {
+    onProgress(0.05, `Extending the syllabus by ${needed} module${needed === 1 ? '' : 's'}…`);
+    try {
+      const ext = (await complete({
+        userId, agentCode: 'CR', schema: extendSchema, maxTokens: 2500,
+        system: `You are the Curriculum agent extending an EXISTING course. Propose exactly ${needed} additional modules that continue the course beyond what it already covers — deeper, more applied, or the natural next topics. Do not repeat existing modules. Each needs a title, a 1-2 sentence summary and 3-5 measurable objectives.`,
+        messages: `Course: ${course.title} (${lvl})\n${course.blurb || ''}\nExisting modules:\n${teaching.map((m, i) => `${i + 1}. ${m.title}`).join('\n')}\n\nPropose ${needed} more.`,
+      })).json;
+      let idx = modules.length;
+      for (const m of (ext?.modules || []).slice(0, needed)) {
+        const mid = `cm-${slug}-x${idx}`;
+        db.prepare('INSERT INTO course_modules (id, course_slug, title, summary, order_idx, estimated_minutes, objectives) VALUES (?, ?, ?, ?, ?, 0, ?)')
+          .run(mid, slug, m.title, m.summary || null, idx, JSON.stringify(m.objectives || []));
+        idx++;
+      }
+    } catch (e) {
+      console.warn(`[enrich] extending ${slug} failed: ${e?.message || e}`);
+    }
+    modules = db.prepare('SELECT id, title, summary, objectives, order_idx FROM course_modules WHERE course_slug = ? ORDER BY order_idx').all(slug);
+  }
+
+  const targets = modules.filter(m => !isCapstone(m));
+  let done = 0;
+
+  await mapWithConcurrency(targets, MODULE_CONCURRENCY, async (m) => {
+    const objectives = (() => { try { return JSON.parse(m.objectives || '[]'); } catch { return []; } })();
+    const lessons = db.prepare('SELECT id, kind, url, is_graded FROM module_lessons WHERE module_id = ?').all(m.id);
+    const items = db.prepare('SELECT COUNT(*) c FROM quiz_items WHERE module_id = ?').get(m.id).c;
+
+    const readings = lessons.filter(l => l.kind === 'reading').length;
+    const hasLab = lessons.some(l => ['lab', 'exercise', 'programming', 'project'].includes(l.kind));
+    const hasGraded = lessons.some(l => l.is_graded);
+    const resources = lessons.filter(l => l.url && !['lab', 'exercise', 'programming', 'project'].includes(l.kind)).length;
+
+    const context = [
+      `Course: ${course.title} (${lvl})`,
+      `Module: ${m.title}`,
+      `Module summary: ${m.summary || ''}`,
+      `Module objectives: ${objectives.join('; ')}`,
+    ].join('\n');
+
+    // Fill only what's missing, and append — never destroy existing content.
+    let order = lessons.length;
+    const add = (title, body, kind, opts = {}) => {
+      const mins = Math.max(1, Number(opts.minutes) || 10);
+      db.prepare(`INSERT INTO module_lessons (id, module_id, title, body_md, kind, order_idx, url, estimated_minutes, is_graded, pass_threshold, max_attempts)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .run(`ml-${m.id}-e${order}`, m.id, title, body || '', kind, order, opts.url || null, mins,
+          opts.graded ? 1 : 0, opts.graded ? 0.8 : null, opts.graded ? 3 : null);
+      order++;
+      return `ml-${m.id}-e${order - 1}`;
+    };
+
+    if (readings < 3 || resources < FLOORS.resourcesPerModule) {
+      try {
+        const t = (await complete({
+          userId, agentCode: 'CR', schema: readingsSchema, maxTokens: 8000,
+          system: READINGS_SYSTEM,
+          messages: `${context}\n\nThis module currently has ${readings} reading(s) and ${resources} working resource(s). Write the readings and resources it is missing.`,
+        })).json;
+        for (const r of (t?.readings || []).slice(0, Math.max(0, 3 - readings))) {
+          if (r?.body_md) add(r.title || m.title, r.body_md, 'reading', { minutes: r.minutes || 12 });
+        }
+        const reach = await verifyReachable(t?.resources);
+        const existing = new Set(lessons.map(l => l.url).filter(Boolean));
+        for (const r of (t?.resources || [])) {
+          if (!reach.has(r.url) || existing.has(r.url)) continue;
+          add(r.title, `${r.summary || ''}\n\n_Source: ${r.source || safeHost(r.url)}_`, r.kind || 'article', { url: r.url, minutes: r.minutes || 15 });
+          existing.add(r.url);
+        }
+      } catch (e) { console.warn(`[enrich] readings for ${m.title}: ${e?.message || e}`); }
+    }
+
+    if (items < FLOORS.quizItemsPerModule || !hasLab || !hasGraded) {
+      try {
+        const a = (await complete({
+          userId, agentCode: 'AS', schema: assessmentSchema, maxTokens: 6000,
+          system: ASSESSMENT_SYSTEM,
+          messages: `${context}\n\nThis module currently has ${items} quiz item(s)${hasLab ? '' : ', no lab'}${hasGraded ? '' : ', no graded assessment'}. Write what it is missing.`,
+        })).json || {};
+
+        const valid = (a.quiz_items || []).filter(q => q?.question && Array.isArray(q.choices) && q.choices.length >= 2);
+        if (items < FLOORS.quizItemsPerModule && valid.length) {
+          const quizLesson = lessons.find(l => l.kind === 'practice_quiz')?.id
+            || add(`Practice quiz · ${m.title}`, `Check your understanding of **${m.title}**. Unlimited attempts, every answer explained.`, 'practice_quiz', { minutes: Math.max(5, Math.round(valid.length * 1.5)) });
+          valid.forEach((q, k) => {
+            try {
+              db.prepare(`INSERT INTO quiz_items (id, course_slug, module_id, lesson_id, question, choices_json, answer_idx, explanation, difficulty, skill)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+                .run(`qi-${m.id}-e${k}`, slug, m.id, quizLesson, q.question, JSON.stringify(q.choices),
+                  Math.max(0, Math.min(q.choices.length - 1, Number(q.answer_idx) || 0)), q.explanation || null, q.difficulty || 'medium', q.skill || null);
+            } catch { /* skip malformed */ }
+          });
+        }
+        if (!hasLab && a.lab?.title) {
+          add(a.lab.title, `# ${a.lab.title}\n\n${a.lab.description || ''}\n\n## Steps\n\n${(a.lab.steps || []).map((s, k) => `${k + 1}. ${s}`).join('\n')}`, 'lab', { minutes: a.lab.minutes || 45 });
+        }
+        if (!hasGraded && a.graded?.title && Array.isArray(a.graded.tasks) && a.graded.tasks.length) {
+          const g = a.graded;
+          add(g.title, `# ${g.title}\n\n${g.description || ''}\n\n## Your tasks\n\n${g.tasks.map((t, k) => `${k + 1}. ${t}`).join('\n')}`, 'graded_quiz', { minutes: g.minutes || 60, graded: true });
+          try {
+            db.prepare(`INSERT OR REPLACE INTO assignments (id, user_id, title, course, status, progress, priority, estimated_minutes, kind, description, tasks, due_date, rubric_json, pass_threshold, max_attempts)
+                        VALUES (?, ?, ?, ?, 'todo', 0, 'med', ?, ?, ?, ?, ?, ?, 0.8, 3)`)
+              .run(`as-${m.id}`, userId, g.title, course.title, g.minutes || 60, g.kind || 'homework', g.description || '',
+                JSON.stringify(g.tasks), new Date(Date.now() + 86400000 * 14).toISOString().split('T')[0], JSON.stringify(g.rubric || []));
+          } catch { /* assignment is a bonus, lesson already exists */ }
+        }
+      } catch (e) { console.warn(`[enrich] assessment for ${m.title}: ${e?.message || e}`); }
+    }
+
+    const mins = db.prepare('SELECT COALESCE(SUM(estimated_minutes),0) s FROM module_lessons WHERE module_id = ?').get(m.id).s;
+    db.prepare('UPDATE course_modules SET estimated_minutes = ? WHERE id = ?').run(mins, m.id);
+
+    done++;
+    onProgress(0.1 + 0.85 * (done / targets.length), `Deepened ${done}/${targets.length} modules`);
+  });
+
+  // Hours must stay honest after enrichment.
+  const total = db.prepare(`SELECT COALESCE(SUM(l.estimated_minutes),0) s FROM module_lessons l JOIN course_modules m ON m.id = l.module_id WHERE m.course_slug = ?`).get(slug).s;
+  if (total > 0) db.prepare('UPDATE courses SET hours = ? WHERE slug = ?').run(Math.max(1, Math.round(total / 60)), slug);
+
+  const depth = validateCourseDepth(slug);
+  onProgress(1, depth.ok ? 'Course now meets the depth floors' : `Deepened (${depth.violations.length} floors still unmet)`);
+  try { logActivity(userId, { kind: 'session', text: `Deepened course: ${course.title}`, sub: `${depth.stats.lessons} lessons · ${depth.stats.quizItems} quiz items`, agent: 'CR' }); } catch {}
+
+  return { slug, title: course.title, depth: { ok: depth.ok, violations: depth.violations.length, stats: depth.stats } };
+}
+
+registerJobHandler('enrich-course', async ({ userId, input, jobId }) =>
+  enrichCourse({ userId, slug: input?.slug, onProgress: (p, m) => setJobProgress(jobId, p, m) }));
 
 // ── Resource top-up ──────────────────────────────────────────────────────────
 // Models confidently cite URLs that don't exist. We never ship a dead link, so
@@ -339,11 +540,10 @@ async function verifyReachable(resources) {
 }
 
 async function topUpResources({ userId, bp, modules, level, onProgress }) {
-  for (let i = 0; i < modules.length; i++) {
-    const m = modules[i];
+  await mapWithConcurrency(modules, MODULE_CONCURRENCY, async (m) => {
     const have = await verifyReachable(m.resources);
     m.resources = (m.resources || []).filter(r => have.has(r.url));
-    if (m.resources.length >= FLOORS.resourcesPerModule) continue;
+    if (m.resources.length >= FLOORS.resourcesPerModule) return;
 
     onProgress(0.92, `Finding working resources for “${m.title}”…`);
     try {
@@ -362,7 +562,7 @@ async function topUpResources({ userId, bp, modules, level, onProgress }) {
     } catch (e) {
       console.warn(`[courseBuilder] resource top-up failed for ${m.title}: ${e?.message || e}`);
     }
-  }
+  });
 }
 
 // ── Persistence ──────────────────────────────────────────────────────────────

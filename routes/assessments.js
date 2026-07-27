@@ -133,6 +133,22 @@ router.post('/module/:moduleId/submit', (req, res) => {
   const reveal = mode === 'practice' || g.passed || exhausted;
   const results = g.results.map((r, i) => reveal ? { ...r, explanation: items[i].explanation || '' } : r);
 
+  // A failure must come with a diagnosis, not just a number: which skills went
+  // wrong, so the learner knows what to fix before spending another attempt.
+  let weakSkills = null;
+  if (!g.passed) {
+    const t = new Map();
+    g.results.forEach((r, i) => {
+      const skill = items[i].skill || 'General';
+      const rec = t.get(skill) || { skill, correct: 0, total: 0 };
+      rec.total++; if (r.isCorrect) rec.correct++;
+      t.set(skill, rec);
+    });
+    weakSkills = [...t.values()].filter(r => r.correct < r.total)
+      .sort((a, b) => (a.correct / a.total) - (b.correct / b.total))
+      .slice(0, 5);
+  }
+
   res.json({
     ok: true, mode, score: g.score, correct: g.correct, total: g.total,
     passed: g.passed, passThreshold: mode === 'graded' ? passThreshold : null,
@@ -140,7 +156,7 @@ router.post('/module/:moduleId/submit', (req, res) => {
     maxAttempts: mode === 'graded' ? maxAttempts : null,
     attemptsLeft: mode === 'graded' ? Math.max(0, maxAttempts - attemptNo) : null,
     explanationsRevealed: reveal,
-    unlocked, results,
+    unlocked, results, weakSkills,
   });
 });
 
@@ -148,7 +164,7 @@ router.post('/module/:moduleId/submit', (req, res) => {
  * POST /api/assessments/assignment/:id/run  { source }
  * Auto-grades a programming assignment: score == % of declared tests passed.
  */
-router.post('/assignment/:id/run', (req, res) => {
+router.post('/assignment/:id/run', async (req, res) => {
   const a = db.prepare('SELECT id, user_id, title, tests_json, pass_threshold FROM assignments WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
   if (!a) return res.status(404).json({ error: true, message: 'Assignment not found' });
   const tests = parse(a.tests_json, []);
@@ -156,7 +172,7 @@ router.post('/assignment/:id/run', (req, res) => {
     return res.status(400).json({ error: true, code: 'NO_TESTS', message: 'This assignment has no automated tests — submit it for rubric review instead.' });
   }
 
-  const out = runCodeTests(req.body?.source, tests, { passThreshold: a.pass_threshold ?? DEFAULT_PASS_THRESHOLD });
+  const out = await runCodeTests(req.body?.source, tests, { passThreshold: a.pass_threshold ?? DEFAULT_PASS_THRESHOLD });
   if (out.ok) {
     try {
       db.prepare('UPDATE assignments SET grade = ?, progress = ?, status = ? WHERE id = ?')
@@ -166,6 +182,88 @@ router.post('/assignment/:id/run', (req, res) => {
     } catch { /* best effort */ }
   }
   res.json({ ok: true, ...out });
+});
+
+/**
+ * GET /api/assessments/module/:moduleId/remediation
+ *
+ * The failure path. Coursera tells you that you scored 60% and leaves you to it;
+ * a system that claims to take someone to mastery has to say *what* to fix. This
+ * reads the learner's most recent attempts, finds the skills they actually got
+ * wrong, and hands back the readings that teach those skills plus targeted
+ * practice drawn only from those skills.
+ */
+router.get('/module/:moduleId/remediation', (req, res) => {
+  const moduleId = req.params.moduleId;
+  const mod = db.prepare('SELECT id, title, course_slug FROM course_modules WHERE id = ?').get(moduleId);
+  if (!mod) return res.status(404).json({ error: true, message: 'Module not found' });
+
+  const attempts = db.prepare('SELECT questions_json, answers_json FROM quiz_attempts WHERE user_id = ? AND module_id = ? ORDER BY created_at DESC LIMIT 5')
+    .all(req.userId, moduleId);
+  if (!attempts.length) return res.status(404).json({ error: true, code: 'NO_ATTEMPTS', message: 'Take an assessment first — there is nothing to diagnose yet.' });
+
+  const all = bankItems(moduleId);
+  const byId = new Map(all.map(i => [i.id, i]));
+
+  // Tally per skill across recent attempts; the most recent attempt wins for a
+  // given item, so improvement is reflected rather than held against the learner.
+  const seenItems = new Set();
+  const tally = new Map();
+  for (const a of attempts) {
+    const ids = parse(a.questions_json, []);
+    const ans = parse(a.answers_json, []);
+    ids.forEach((id, i) => {
+      if (seenItems.has(id)) return;
+      seenItems.add(id);
+      const it = byId.get(id);
+      if (!it) return;
+      const skill = it.skill || 'General';
+      const rec = tally.get(skill) || { skill, correct: 0, total: 0, missedItemIds: [] };
+      rec.total++;
+      if (ans[i] === it.answer_idx) rec.correct++;
+      else rec.missedItemIds.push(id);
+      tally.set(skill, rec);
+    });
+  }
+
+  const weak = [...tally.values()]
+    .filter(r => r.correct < r.total)
+    .map(r => ({ ...r, ratio: r.total ? r.correct / r.total : 0 }))
+    .sort((a, b) => a.ratio - b.ratio);
+
+  if (!weak.length) {
+    return res.json({ ok: true, module: { id: moduleId, title: mod.title }, mastered: true, weakSkills: [], reviewLessons: [], practice: [] });
+  }
+
+  const weakSkills = new Set(weak.map(w => w.skill));
+
+  // Readings that teach the weak skills: match on the skill name appearing in
+  // the lesson, falling back to the module's readings so there is always
+  // something concrete to revisit.
+  const readings = db.prepare("SELECT id, title, body_md, kind, estimated_minutes FROM module_lessons WHERE module_id = ? AND kind IN ('reading','lab','video')").all(moduleId);
+  const targeted = readings.filter(l => [...weakSkills].some(s => {
+    const needle = String(s).toLowerCase();
+    return (l.title || '').toLowerCase().includes(needle) || (l.body_md || '').toLowerCase().includes(needle);
+  }));
+  const reviewLessons = (targeted.length ? targeted : readings).map(l => ({ id: l.id, title: l.title, kind: l.kind, estimated_minutes: l.estimated_minutes }));
+
+  // Targeted practice: only items testing the weak skills, missed ones first.
+  const missed = new Set(weak.flatMap(w => w.missedItemIds));
+  const practice = all
+    .filter(i => weakSkills.has(i.skill || 'General'))
+    .sort((a, b) => (missed.has(b.id) ? 1 : 0) - (missed.has(a.id) ? 1 : 0))
+    .slice(0, 10)
+    .map(i => ({ id: i.id, question: i.question, choices: i.choices, skill: i.skill, difficulty: i.difficulty, previouslyMissed: missed.has(i.id) }));
+
+  res.json({
+    ok: true,
+    module: { id: moduleId, title: mod.title, course_slug: mod.course_slug },
+    mastered: false,
+    weakSkills: weak.map(w => ({ skill: w.skill, correct: w.correct, total: w.total, ratio: Math.round(w.ratio * 100) / 100 })),
+    reviewLessons,
+    practice,
+    advice: `Revisit ${reviewLessons.length} lesson${reviewLessons.length === 1 ? '' : 's'} covering ${weak.slice(0, 3).map(w => w.skill).join(', ')}, then retry the practice quiz before spending another graded attempt.`,
+  });
 });
 
 /** GET /api/assessments/module/:moduleId/attempts — history + remaining attempts. */
