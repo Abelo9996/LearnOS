@@ -281,3 +281,22 @@ export function BrandLockup() {
     </a>
   );
 }
+
+
+/**
+ * Shimmering placeholder for content that is still loading.
+ *
+ * A bare "Loading…" gives no sense of what is coming or how much of it; a
+ * skeleton keeps the layout stable and makes the wait feel like progress rather
+ * than a stall.
+ */
+export function SkeletonRows({ rows = 4, height = 44, gap = 8, style }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap, ...style }} aria-busy="true" aria-live="polite">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="skeleton" style={{ height, opacity: 1 - i * 0.12 }} />
+      ))}
+      <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading</span>
+    </div>
+  );
+}

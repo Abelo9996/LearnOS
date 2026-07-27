@@ -420,7 +420,7 @@ export default function Courses() {
                       {mod.lessons?.map((lesson, li) => {
                         const isCompleted = completedIds.includes(lesson.id);
                         return (
-                          <div key={lesson.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0 8px 38px', borderTop: '1px solid var(--border)', cursor: 'pointer' }} onClick={() => { if (enrolled[c.slug]) setSelectedLesson(lesson); else toast('Enroll in this course to open its lessons', 'info'); }}>
+                          <div key={lesson.id} className="list-row" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 8px 8px 38px', borderTop: '1px solid var(--border)', cursor: 'pointer', borderRadius: 6 }} onClick={() => { if (enrolled[c.slug]) setSelectedLesson(lesson); else toast('Enroll in this course to open its lessons', 'info'); }}>
                             <span style={{ width: 20, height: 20, borderRadius: 4, border: `1px solid ${isCompleted ? 'var(--good)' : 'var(--border)'}`, background: isCompleted ? 'var(--good)' : 'transparent', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: isCompleted ? 'oklch(0.16 0.02 270)' : 'transparent', fontSize: 10 }}>
                               {isCompleted && '✓'}
                             </span>

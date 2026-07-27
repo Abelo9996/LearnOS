@@ -1,6 +1,6 @@
 import React from 'react';
 import { I } from '../components/Icons';
-import { Card, Btn, Tag, PageScroll, PageHeader, SectionHead } from '../components/UI';
+import { Card, Btn, Tag, PageScroll, PageHeader, SectionHead, SkeletonRows } from '../components/UI';
 import API from '../api.js';
 import { useToast } from '../App';
 
@@ -133,11 +133,11 @@ export default function Share() {
           <SectionHead title="Export a course" subtitle="Everything travels with it — lessons, verified resources, labs and the question bank" />
         </div>
         {loading ? (
-          <div style={{ padding: '0 var(--pad) var(--pad)', color: 'var(--muted)', fontSize: 13 }}>Loading…</div>
+          <div style={{ padding: '0 var(--pad) var(--pad)' }}><SkeletonRows rows={4} height={46} /></div>
         ) : courses.length === 0 ? (
           <div style={{ padding: '0 var(--pad) var(--pad)', color: 'var(--muted)', fontSize: 13 }}>No courses yet — generate one first.</div>
         ) : (
-          <div>
+          <div className="stagger">
             {courses.map(c => (
               <div key={c.slug} className="list-row" style={{
                 display: 'flex', alignItems: 'center', gap: 12,

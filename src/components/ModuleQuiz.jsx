@@ -171,6 +171,7 @@ export default function ModuleQuiz({ moduleId, mode = 'practice', title, onDone,
                 const sel = answers[i] === ci;
                 return (
                   <button key={ci} onClick={() => setAnswers(a => ({ ...a, [i]: ci }))}
+                    className="option"
                     style={{ textAlign: 'left', padding: '9px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 13, lineHeight: 1.45,
                       background: sel ? `color-mix(in oklch, ${accent} 14%, transparent)` : 'var(--surface)',
                       border: `1px solid ${sel ? accent : 'var(--border)'}`, color: 'var(--ink)' }}>

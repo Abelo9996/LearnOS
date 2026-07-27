@@ -202,7 +202,12 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .page-enter { animation: pageEnter var(--dur-slow) var(--ease-out) both; }
 @keyframes pageEnter { from { opacity: 0; transform: translateY(12px) scale(0.995) } to { opacity: 1; transform: translateY(0) scale(1); } }
 
-/* ── stagger ── */
+/* ── stagger ──
+   These delays used to apply to nothing: the children were given an
+   animation-delay but never an animation, so every "staggered" grid in the app
+   appeared instantly in one hard cut. That silent no-op is a large part of why
+   the product read as static. */
+.stagger > * { animation: riseIn var(--dur-slow) var(--ease-out) both; }
 .stagger > *:nth-child(1) { animation-delay: 0ms; }
 .stagger > *:nth-child(2) { animation-delay: 40ms; }
 .stagger > *:nth-child(3) { animation-delay: 80ms; }
@@ -294,3 +299,80 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 .sidebar-home:hover { background: var(--surface-2) !important; }
 .sidebar-home:hover .sidebar-logo { transform: rotate(-5deg) scale(1.05); }
 .sidebar-home:focus-visible { outline: 2px solid var(--accent-line); outline-offset: -2px; }
+
+/* ── Interaction layer ──────────────────────────────────────────────────────
+   The motion vocabulary above (tokens, .hover-card, .ui-btn) existed, but most
+   of the app is inline-styled elements that never opted into it — roughly sixty
+   clickable things with no hover, press or focus feedback at all, which is why
+   the product read as static. These rules cover them generically.
+
+   Everything uses :where() so it carries zero specificity: any component that
+   defines its own hover/active state still wins outright. */
+
+:where(button, [role="button"], summary) {
+  transition:
+    background var(--dur-fast) var(--ease-smooth),
+    border-color var(--dur-fast) var(--ease-smooth),
+    color var(--dur-fast) var(--ease-smooth),
+    filter var(--dur-fast) var(--ease-smooth),
+    transform var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-smooth);
+}
+:where(button, [role="button"]):not(:disabled):not([aria-disabled="true"]):hover { filter: brightness(1.12); }
+:where(button, [role="button"]):not(:disabled):not([aria-disabled="true"]):active { transform: scale(0.975); transition-duration: 90ms; }
+:where(button, [role="button"]):disabled,
+:where(button, [role="button"])[aria-disabled="true"] { cursor: not-allowed; filter: none; transform: none; }
+
+/* Rows in a list: the whole row should acknowledge the pointer, not just a
+   button inside it. */
+.list-row {
+  transition: background var(--dur-fast) var(--ease-smooth), border-color var(--dur-fast) var(--ease-smooth);
+}
+.list-row:hover { background: var(--surface-2); }
+.list-row:hover .row-reveal { opacity: 1; transform: translateX(0); }
+.row-reveal {
+  opacity: 0; transform: translateX(-4px);
+  transition: opacity var(--dur-fast) var(--ease-smooth), transform var(--dur-fast) var(--ease-out);
+}
+
+/* Selectable options (quiz answers, pickers). */
+.option {
+  transition: background var(--dur-fast) var(--ease-smooth), border-color var(--dur-fast) var(--ease-smooth), transform var(--dur-fast) var(--ease-out);
+}
+.option:hover { border-color: var(--border-strong); background: var(--surface-2); }
+.option:active { transform: scale(0.995); }
+
+/* Drop targets need to visibly accept the drag. */
+.drop-zone[data-over="1"] {
+  border-color: var(--brand) !important;
+  background: var(--accent-soft) !important;
+}
+
+/* Tiles/cards that navigate somewhere. */
+.tile {
+  transition: transform var(--dur-normal) var(--ease-out), box-shadow var(--dur-normal) var(--ease-out), border-color var(--dur-normal) var(--ease-smooth);
+}
+.tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--border-strong); }
+.tile:active { transform: translateY(0) scale(0.995); transition-duration: var(--dur-fast); }
+
+/* Items past the tenth share the last delay rather than trickling in forever. */
+.stagger > *:nth-child(n+11) { animation-delay: 380ms; }
+@keyframes riseIn { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+
+/* Loading placeholders that shimmer instead of sitting there blank. */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-2) 37%, var(--surface) 63%);
+  background-size: 400% 100%;
+  animation: lshimmer 1.4s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* Numbers that change should not just snap. */
+.value-shift { transition: color var(--dur-normal) var(--ease-smooth); }
+
+/* Keyboard users get the same affordances as pointer users. */
+:where(a, button, [role="button"], [tabindex]):focus-visible {
+  outline: 2px solid var(--accent-line);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
