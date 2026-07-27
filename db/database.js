@@ -397,7 +397,9 @@ seedNodeResources([
   { node_id: 'ga1', roadmap_id: 'rm-genai', kind: 'video',   title: '3Blue1Brown — But what is a GPT?',           url: 'https://www.youtube.com/watch?v=wjZofJX0v4M', source: 'YouTube', summary: 'Visual explainer for transformers and attention.' },
   { node_id: 'ga1', roadmap_id: 'rm-genai', kind: 'article', title: 'Jay Alammar — The Illustrated Transformer',  url: 'https://jalammar.github.io/illustrated-transformer/', source: 'jalammar.github.io', summary: 'Diagrams of every step inside a transformer block.' },
   // Tokenization & embeddings (ga2)
-  { node_id: 'ga2', roadmap_id: 'rm-genai', kind: 'docs',    title: 'OpenAI — Tokenizer playground',  url: 'https://platform.openai.com/tokenizer', source: 'platform.openai.com', summary: 'Interactive byte-pair tokenization examples.' },
+  // Was platform.openai.com/tokenizer — now behind auth and unreachable, caught
+  // by the V10 integrity check. Seed URLs must be stable, not just plausible.
+  { node_id: 'ga2', roadmap_id: 'rm-genai', kind: 'article', title: 'Byte pair encoding',  url: 'https://en.wikipedia.org/wiki/Byte_pair_encoding', source: 'Wikipedia', summary: 'How subword tokenization actually works.' },
   { node_id: 'ga2', roadmap_id: 'rm-genai', kind: 'video',   title: 'Andrej Karpathy — Let’s build the GPT tokenizer', url: 'https://www.youtube.com/watch?v=zduSFxRajkE', source: 'YouTube', summary: 'Building BPE from scratch.' },
   { node_id: 'ga2', roadmap_id: 'rm-genai', kind: 'article', title: 'Hugging Face — Word embeddings', url: 'https://huggingface.co/learn/nlp-course/chapter1/4', source: 'huggingface.co', summary: 'How embeddings represent meaning as vectors.' },
   // Few-shot & chain-of-thought (ga4)
@@ -411,7 +413,8 @@ seedNodeResources([
   { node_id: 'ds6', roadmap_id: 'rm-data-sci', kind: 'article', title: 'Khan Academy — Hypothesis testing',      url: 'https://www.khanacademy.org/math/statistics-probability/significance-tests-one-sample', source: 'khanacademy.org', summary: 'Walk-through with worked problems.' },
   { node_id: 'ds6', roadmap_id: 'rm-data-sci', kind: 'docs',    title: 'SciPy — Statistical tests reference',    url: 'https://docs.scipy.org/doc/scipy/reference/stats.html', source: 'docs.scipy.org', summary: 'Run t-tests, chi-square, ANOVA in Python.' },
   { node_id: 'ds7', roadmap_id: 'rm-data-sci', kind: 'video',   title: 'StatQuest — Linear regression',          url: 'https://www.youtube.com/watch?v=nk2CQITm_eo', source: 'YouTube', summary: 'Fitting and interpreting linear models.' },
-  { node_id: 'ds8', roadmap_id: 'rm-data-sci', kind: 'article', title: 'Trustworthy Online Controlled Experiments (Kohavi)', url: 'https://exp-platform.com/Documents/2013-02-CHI2013-LongVersionLessonsFromRunningAB-TestsAtScale.pdf', source: 'exp-platform.com', summary: 'Canonical A/B testing pitfalls paper.' },
+  // exp-platform.com no longer resolves; replaced with a stable canonical reference.
+  { node_id: 'ds8', roadmap_id: 'rm-data-sci', kind: 'article', title: 'A/B testing', url: 'https://en.wikipedia.org/wiki/A/B_testing', source: 'Wikipedia', summary: 'Controlled online experiments and their common pitfalls.' },
 ]);
 
 // ── Migration: node_lessons (P10) ────────────────────────────────────────────
