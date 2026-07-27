@@ -138,6 +138,17 @@ try { db.exec("ALTER TABLE assignments ADD COLUMN rubric_json TEXT"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN pass_threshold REAL"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN max_attempts INTEGER"); } catch {}
 
+// ── M10: retention (spec §3.7) ──────────────────────────────────────────────
+// Passing an assessment once is not mastery. Coursera does not solve this
+// either — a certificate records that you could do something in March, not that
+// you can do it in September. We track when a node was last practised so
+// retention can decay, and link auto-generated review cards back to the item
+// that caught the gap.
+try { db.exec("ALTER TABLE roadmap_nodes ADD COLUMN last_practiced_at TEXT"); } catch {}
+try { db.exec("ALTER TABLE flashcards ADD COLUMN source_item_id TEXT"); } catch {}
+try { db.exec("ALTER TABLE flashcards ADD COLUMN source_module_id TEXT"); } catch {}
+try { db.exec("CREATE INDEX IF NOT EXISTS idx_flashcards_source ON flashcards(source_item_id)"); } catch {}
+
 // ── M8: executable labs (spec §3.6) ─────────────────────────────────────────
 // Hands-on practice is the most-valued part of a Coursera program and was the
 // thing we most obviously faked — our labs were instructions to go do something

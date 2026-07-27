@@ -11,6 +11,7 @@ import db, { logActivity, awardXP, awardBadge } from '../db/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import { gradeQuiz, runCodeTests, DEFAULT_PASS_THRESHOLD, DEFAULT_MAX_ATTEMPTS } from '../ai/assessment/grader.js';
 import { runLabWithTests, availableLanguages } from '../ai/assessment/labRunner.js';
+import { cardFromMissedItem, markPractised, retentionFor, nodesNeedingReview } from '../ai/quality/retention.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -142,6 +143,18 @@ router.post('/module/:moduleId/submit', (req, res) => {
   const reveal = mode === 'practice' || g.passed || exhausted;
   const results = g.results.map((r, i) => reveal ? { ...r, explanation: items[i].explanation || '' } : r);
 
+  // Every question you got wrong becomes a spaced-review card, in either mode.
+  // Getting something wrong is the single best signal about what you'll forget,
+  // and it was being thrown away.
+  let cardsQueued = 0;
+  try {
+    g.results.forEach((r, i) => {
+      if (r.isCorrect) return;
+      const made = cardFromMissedItem(req.userId, { ...items[i], module_id: moduleId }, mod?.title || 'Review');
+      if (made) cardsQueued++;
+    });
+  } catch { /* review is a bonus, never fail the submission over it */ }
+
   // A failure must come with a diagnosis, not just a number: which skills went
   // wrong, so the learner knows what to fix before spending another attempt.
   let weakSkills = null;
@@ -165,7 +178,7 @@ router.post('/module/:moduleId/submit', (req, res) => {
     maxAttempts: mode === 'graded' ? maxAttempts : null,
     attemptsLeft: mode === 'graded' ? Math.max(0, maxAttempts - attemptNo) : null,
     explanationsRevealed: reveal,
-    unlocked, results, weakSkills,
+    unlocked, results, weakSkills, cardsQueued,
   });
 });
 
@@ -275,6 +288,35 @@ router.get('/module/:moduleId/remediation', (req, res) => {
   });
 });
 
+/**
+ * GET /api/assessments/retention
+ *
+ * What the learner can probably still do today, as opposed to what they once
+ * proved. Demonstrated mastery is never lowered — it is the evidence a
+ * certificate rests on — but retention decays with time since last practice, and
+ * that is the number worth acting on.
+ */
+router.get('/retention', (req, res) => {
+  const nodes = db.prepare(`SELECT n.id, n.title, n.mastery, n.last_practiced_at, n.course_slug, n.roadmap_id, r.title AS roadmap_title
+                            FROM roadmap_nodes n JOIN roadmaps r ON r.id = n.roadmap_id
+                            WHERE r.user_id = ? AND n.mastery > 0`).all(req.userId);
+  const detailed = nodes.map(n => ({
+    node_id: n.id, title: n.title, roadmap_id: n.roadmap_id, roadmap_title: n.roadmap_title,
+    course_slug: n.course_slug,
+    mastery: n.mastery,
+    retention: retentionFor(n.mastery, n.last_practiced_at),
+    lastPracticedAt: n.last_practiced_at,
+  }));
+  const dueCards = db.prepare("SELECT COUNT(*) c FROM flashcards WHERE user_id = ? AND next_review <= date('now')").get(req.userId).c;
+  res.json({
+    ok: true,
+    nodes: detailed,
+    needsReview: nodesNeedingReview(req.userId),
+    dueCards,
+    averageRetention: detailed.length ? Math.round((detailed.reduce((s, n) => s + n.retention, 0) / detailed.length) * 100) / 100 : null,
+  });
+});
+
 /** GET /api/assessments/runtimes — which lab languages this machine can run. */
 router.get('/runtimes', async (_req, res) => {
   res.json({ ok: true, runtimes: await availableLanguages() });
@@ -343,6 +385,7 @@ function applyMasteryForModule(userId, moduleId, ratio) {
   if (!node) return null;
 
   const next = Math.max(node.mastery || 0, Math.round(ratio * 100) / 100);
+  markPractised(node.id);
   db.prepare("UPDATE roadmap_nodes SET mastery = ?, status = CASE WHEN ? >= 0.8 THEN 'done' ELSE status END WHERE id = ?").run(next, next, node.id);
   try {
     db.prepare(`INSERT INTO mastery_events (id, user_id, node_id, roadmap_id, event_type, mastery_before, mastery_after, delta, source)
