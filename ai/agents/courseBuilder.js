@@ -178,11 +178,17 @@ const assessmentSchema = {
             properties: {
               name: { type: 'string' },
               fn: { type: 'string' },
-              args: { type: 'array' },
-              expected: {},
+              // Args and expected values are arbitrary JSON, but a schema of `{}`
+              // (or an array with no item type) is rejected outright by strict
+              // providers — "Empty schema that accepts any JSON value is not
+              // supported" — which failed the WHOLE assessment call and silently
+              // cost every module its quiz items. Carrying them as JSON strings
+              // keeps the schema concrete and portable.
+              args_json: { type: 'string' },
+              expected_json: { type: 'string' },
               hidden: { type: 'boolean' },
             },
-            required: ['name', 'fn', 'args', 'expected', 'hidden'],
+            required: ['name', 'fn', 'args_json', 'expected_json', 'hidden'],
           },
         },
       },
@@ -232,7 +238,7 @@ const ASSESSMENT_SYSTEM = `You are the Assessment agent for LearnOS writing the 
 Produce ALL THREE:
 - "quiz_items": exactly 10 practice questions with 4 choices each, the correct "answer_idx" (0-based), and an "explanation" that teaches why the answer is right and why the tempting distractor is wrong. Vary difficulty across easy/medium/hard. Tag each with the "skill" it tests.
 - "lab": a hands-on exercise the learner actually performs, with 4-8 concrete steps. This is the "doing" half of the module.
-  Whenever the topic admits code, make the lab RUNNABLE: set "language" to "javascript" or "python", give "starter_code" that defines the required function(s) with a clear TODO body the learner completes, and 3-6 "tests" as data ({name, fn, args, expected, hidden}) that check the finished function. Mark 1-2 tests hidden. "expected" must be a plain JSON value the function returns — not a description. If the topic genuinely has no code (a design or writing exercise), set "language" to "none", "starter_code" to "" and "tests" to [].
+  Whenever the topic admits code, make the lab RUNNABLE: set "language" to "javascript" or "python", give "starter_code" that defines the required function(s) with a clear TODO body the learner completes, and 3-6 "tests" that check the finished function. Mark 1-2 tests hidden. Each test is {name, fn, args_json, expected_json, hidden} where "args_json" is a JSON ARRAY of the call arguments (e.g. "[2, 3]") and "expected_json" is the JSON value the function must return (e.g. "5" or "[1,2]") — both as JSON-encoded STRINGS, and describing a value, never prose. If the topic genuinely has no code (a design or writing exercise), set "language" to "none", "starter_code" to "" and "tests" to [].
 - "graded": the assessment that counts, with a 4-7 step task list and a 3-5 criterion rubric whose weights sum to 1.
 
 "minutes" fields are honest time estimates. Returning fewer than 10 quiz items, or omitting the lab or the graded assessment, is a failure.`;
@@ -812,9 +818,18 @@ function attachLabCode(lessonId, lab) {
   if (!lessonId || !lab) return;
   const lang = lab.language;
   if (lang !== 'javascript' && lang !== 'python') return;
-  const tests = Array.isArray(lab.tests)
-    ? lab.tests.filter(t => t && typeof t.fn === 'string' && Array.isArray(t.args) && t.expected !== undefined)
-    : [];
+  // Test args/expected travel as JSON strings (see the schema comment) and are
+  // decoded here; anything that doesn't decode cleanly is dropped rather than
+  // shipped as a broken case.
+  const tests = (Array.isArray(lab.tests) ? lab.tests : []).flatMap((t) => {
+    if (!t || typeof t.fn !== 'string') return [];
+    try {
+      const args = JSON.parse(t.args_json ?? '[]');
+      const expected = JSON.parse(t.expected_json ?? 'null');
+      if (!Array.isArray(args)) return [];
+      return [{ name: t.name || t.fn, fn: t.fn, args, expected, hidden: !!t.hidden }];
+    } catch { return []; }
+  });
   if (!lab.starter_code && !tests.length) return;
   try {
     db.prepare('UPDATE module_lessons SET lab_language = ?, starter_code = ?, lab_tests_json = ? WHERE id = ?')
