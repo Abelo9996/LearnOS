@@ -78,6 +78,25 @@ export default function ModuleQuiz({ moduleId, mode = 'practice', title, onDone,
           </div>
         </div>
 
+        {/* A failure has to come with a diagnosis, not just a number. */}
+        {result.weakSkills?.length > 0 && (
+          <div style={{ padding: 14, borderRadius: 10, marginBottom: 14, background: 'var(--surface-2)', border: '1px solid color-mix(in oklch, var(--bad) 30%, var(--border))' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>What to fix before your next attempt</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+              {result.weakSkills.map((w, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5 }}>
+                  <span style={{ flex: 1, color: 'var(--ink-2)' }}>{w.skill}</span>
+                  <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{w.correct}/{w.total}</span>
+                  <div style={{ width: 70 }}><ProgressBar value={w.total ? w.correct / w.total : 0} height={5} /></div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>
+              Revisit these before spending another attempt — practice quizzes on this module are unlimited and free.
+            </div>
+          </div>
+        )}
+
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, maxHeight: '46vh', overflowY: 'auto', paddingRight: 4 }}>
           {result.results.map((r, i) => (
             <div key={i} style={{ padding: 12, borderRadius: 10, background: 'var(--surface-2)', border: `1px solid ${r.isCorrect ? 'color-mix(in oklch, var(--good) 40%, var(--border))' : 'color-mix(in oklch, var(--bad) 40%, var(--border))'}` }}>
@@ -96,6 +115,7 @@ export default function ModuleQuiz({ moduleId, mode = 'practice', title, onDone,
                       <MarkdownText text={r.explanation} />
                     </div>
                   )}
+                  <ReportProblem itemId={r.id} />
                 </div>
               </div>
             </div>
@@ -172,6 +192,54 @@ export default function ModuleQuiz({ moduleId, mode = 'practice', title, onDone,
         </Btn>
       </div>
     </Shell>
+  );
+}
+
+/**
+ * One-click "this question is wrong" (M7).
+ *
+ * Generated content can be confidently wrong in ways no automated check catches,
+ * and the learner working through it is the last line of defence. Reporting has
+ * teeth: the question is pulled out of graded assessment immediately, not queued.
+ */
+function ReportProblem({ itemId }) {
+  const [state, setState] = React.useState('idle'); // idle | picking | sent
+  const REASONS = [
+    ['wrong_answer', 'The marked answer is wrong'],
+    ['factual_error', 'Something here is factually wrong'],
+    ['unclear', 'Ambiguous — more than one answer works'],
+    ['other', 'Something else'],
+  ];
+
+  const send = async (reason) => {
+    setState('sent');
+    try { await API.reportContent({ target_type: 'quiz_item', target_id: itemId, reason }); }
+    catch { /* the badge below is optimistic; a failed report is not worth a modal */ }
+  };
+
+  if (state === 'sent') return (
+    <div style={{ fontSize: 11.5, color: 'var(--good)', marginTop: 8 }}>
+      ✓ Reported — this question won't be used to grade you until it's reviewed.
+    </div>
+  );
+
+  if (state === 'picking') return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+      {REASONS.map(([k, label]) => (
+        <button key={k} onClick={() => send(k)}
+          style={{ fontSize: 11, padding: '3px 8px', borderRadius: 999, background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--ink-2)', cursor: 'pointer' }}>
+          {label}
+        </button>
+      ))}
+      <button onClick={() => setState('idle')} style={{ fontSize: 11, padding: '3px 8px', background: 'none', border: 0, color: 'var(--muted)', cursor: 'pointer' }}>cancel</button>
+    </div>
+  );
+
+  return (
+    <button onClick={() => setState('picking')}
+      style={{ fontSize: 11, marginTop: 8, background: 'none', border: 0, padding: 0, color: 'var(--muted)', cursor: 'pointer', textDecoration: 'underline' }}>
+      Report a problem with this question
+    </button>
   );
 }
 

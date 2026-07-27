@@ -133,6 +133,13 @@ const API = {
   submitModuleQuiz:   (moduleId, data) => API.post(`/assessments/module/${moduleId}/submit`, data),
   getModuleAttempts:  (moduleId) => API.get(`/assessments/module/${moduleId}/attempts`),
   runAssignmentTests: (id, source) => API.post(`/assessments/assignment/${id}/run`, { source }),
+  getRemediation:     (moduleId) => API.get(`/assessments/module/${moduleId}/remediation`),
+
+  // Content accuracy (M7) — generated content can be confidently wrong, so the
+  // learner needs a one-click way to pull a bad question out of grading.
+  reportContent:      (data) => API.post('/content/report', data),
+  getContentReports:  (status) => API.get(`/content/reports${status ? `?status=${status}` : ''}`),
+  getVerification:    (slug) => API.get(`/content/verification${slug ? `?slug=${slug}` : ''}`),
 
   // Specializations (M4) — a pathway of whole courses from A to B.
   planSpecialization: (data) => API.post('/roadmaps/specialization', data),

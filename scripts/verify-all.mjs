@@ -15,6 +15,7 @@ const SUITES = [
   { name: 'Assessment engine (V3-V7)',    script: 'scripts/verify-assessment.mjs',    args: [] },
   { name: 'Specialization (V8, V9)',      script: 'scripts/verify-specialization.mjs', args: [] },
   { name: 'Content integrity (V10-V12)',  script: 'scripts/verify-integrity.mjs',     args: [] },
+  { name: 'Accuracy & quarantine (V14-V17)', script: 'scripts/verify-accuracy.mjs',  args: [] },
 ];
 
 const run = (script, args) => new Promise((resolve) => {

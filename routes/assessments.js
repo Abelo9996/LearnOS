@@ -16,10 +16,18 @@ router.use(requireAuth);
 
 const parse = (s, fb) => { try { return s ? JSON.parse(s) : fb; } catch { return fb; } };
 
-function bankItems(moduleId) {
-  return db.prepare('SELECT id, question, choices_json, answer_idx, explanation, difficulty, skill FROM quiz_items WHERE module_id = ?')
+// Items whose independent check disagreed with the stored answer, or that a
+// learner has reported, are never used to grade anyone. They stay in the bank
+// (so they can be reviewed and repaired) but are excluded from papers. An item
+// that could not be verified is still usable — unverified means "unchecked",
+// not "suspect" — but disputed means we have positive reason to distrust it.
+const EXCLUDED = "('disputed','flagged')";
+
+function bankItems(moduleId, { includeUntrusted = false } = {}) {
+  const filter = includeUntrusted ? '' : `AND COALESCE(verification_status,'unverified') NOT IN ${EXCLUDED}`;
+  return db.prepare(`SELECT id, question, choices_json, answer_idx, explanation, difficulty, skill, verification_status FROM quiz_items WHERE module_id = ? ${filter}`)
     .all(moduleId)
-    .map(r => ({ id: r.id, question: r.question, choices: parse(r.choices_json, []), answer_idx: r.answer_idx, explanation: r.explanation, difficulty: r.difficulty, skill: r.skill }));
+    .map(r => ({ id: r.id, question: r.question, choices: parse(r.choices_json, []), answer_idx: r.answer_idx, explanation: r.explanation, difficulty: r.difficulty, skill: r.skill, verification_status: r.verification_status || 'unverified' }));
 }
 
 // Deterministic per-attempt shuffle so a retake draws a different subset without
