@@ -288,3 +288,9 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 @media (min-width: 769px) and (max-width: 1024px) {
   /* Slightly narrower sidebar */
 }
+
+/* The logo doubles as the way back to the landing page, so it needs to read as
+   clickable rather than as decoration. */
+.sidebar-home:hover { background: var(--surface-2) !important; }
+.sidebar-home:hover .sidebar-logo { transform: rotate(-5deg) scale(1.05); }
+.sidebar-home:focus-visible { outline: 2px solid var(--accent-line); outline-offset: -2px; }
