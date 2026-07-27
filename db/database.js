@@ -138,6 +138,30 @@ try { db.exec("ALTER TABLE assignments ADD COLUMN rubric_json TEXT"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN pass_threshold REAL"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN max_attempts INTEGER"); } catch {}
 
+// ── M11: pacing & honest credentials (spec §3.8) ────────────────────────────
+// Coursera's real moat is employer recognition — a Google or Stanford name on
+// the certificate. We have none of that and must never imply we do. What we CAN
+// do is make the credential evidential: exactly what was assessed, the scores,
+// the dates, and whether the questions themselves were independently checked.
+try { db.exec("ALTER TABLE certificates ADD COLUMN evidence_json TEXT"); } catch {}
+try { db.exec("ALTER TABLE certificates ADD COLUMN issuer TEXT DEFAULT 'self-attested'"); } catch {}
+
+// A 115-hour course with no weekly plan is where most online learners quietly
+// stop. A plan turns "someday" into a target date and an hours-per-week budget.
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS learning_plans (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    scope_type TEXT NOT NULL,          -- 'course' | 'roadmap'
+    scope_id TEXT NOT NULL,
+    target_date TEXT,
+    weekly_hours REAL DEFAULT 5,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TEXT DEFAULT (datetime('now'))
+  )`);
+  db.exec("CREATE INDEX IF NOT EXISTS idx_learning_plans_user ON learning_plans(user_id, status)");
+} catch (e) { console.log('learning_plans migration:', e.message); }
+
 // ── M10: retention (spec §3.7) ──────────────────────────────────────────────
 // Passing an assessment once is not mastery. Coursera does not solve this
 // either — a certificate records that you could do something in March, not that
