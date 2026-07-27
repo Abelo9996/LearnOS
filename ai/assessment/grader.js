@@ -9,7 +9,7 @@
  * is involved and a score is reproducible). Programming assignments are graded
  * by running the learner's function against declared input/expected cases.
  */
-import vm from 'node:vm';
+import { Worker } from 'node:worker_threads';
 
 export const DEFAULT_PASS_THRESHOLD = 0.8;
 export const DEFAULT_MAX_ATTEMPTS = 3;
@@ -53,59 +53,49 @@ export function gradeQuiz(items, answers, mode = 'practice', passThreshold = DEF
 /**
  * Run a learner's JavaScript submission against declared test cases.
  *
- * Tests are DATA, never code: {name, fn, args, expected}. We evaluate the
- * learner's own source (which they would otherwise run themselves) in a vm with
- * no require/process access and a hard timeout, then call the named export with
- * the given args and deep-compare the result. Nothing model-authored is executed.
+ * Tests are DATA, never code: {name, fn, args, expected}. Only the learner's own
+ * source runs, and it runs inside a worker thread — a separate V8 isolate with
+ * no reference to the server's scope, which the parent can hard-terminate. That
+ * covers async hangs and event-loop starvation, which a bare vm timeout does not.
  *
- * Note: node:vm is an isolation convenience, not a hardened security boundary —
- * acceptable here because the code being run is the single local user's own.
- *
- * @returns {{ok, score, ratio, passed, total, passedCount, cases, error}}
+ * @returns {Promise<{ok, score, ratio, passed, total, passedCount, cases, error}>}
  */
-export function runCodeTests(source, tests, { timeoutMs = 2000, passThreshold = DEFAULT_PASS_THRESHOLD } = {}) {
+export async function runCodeTests(source, tests, { timeoutMs = 2000, passThreshold = DEFAULT_PASS_THRESHOLD } = {}) {
   const list = Array.isArray(tests) ? tests.filter(t => t && t.fn) : [];
-  if (!list.length) return { ok: false, error: 'No test cases declared', total: 0, passedCount: 0, score: 0, ratio: 0, passed: false, cases: [] };
-  if (!source || !String(source).trim()) return { ok: false, error: 'Empty submission', total: list.length, passedCount: 0, score: 0, ratio: 0, passed: false, cases: [] };
+  const fail = (error, total = list.length) => ({ ok: false, error, total, passedCount: 0, score: 0, ratio: 0, passed: false, cases: [] });
 
-  let context;
-  try {
-    context = vm.createContext(Object.create(null));
-    vm.runInContext(String(source), context, { timeout: timeoutMs });
-  } catch (e) {
-    return { ok: false, error: `Your code failed to run: ${e?.message || e}`, total: list.length, passedCount: 0, score: 0, ratio: 0, passed: false, cases: [] };
-  }
+  if (!list.length) return fail('No test cases declared', 0);
+  if (!source || !String(source).trim()) return fail('Empty submission');
 
-  let passedCount = 0;
-  const cases = list.map((t) => {
-    const label = t.name || t.fn;
-    try {
-      const fn = context[t.fn];
-      if (typeof fn !== 'function') {
-        return { name: label, hidden: !!t.hidden, passed: false, error: `Expected a function named "${t.fn}"` };
-      }
-      const actual = vm.runInContext(
-        `globalThis.__r = ${t.fn}(...${JSON.stringify(t.args ?? [])}); globalThis.__r`,
-        context, { timeout: timeoutMs });
-      const ok = deepEqual(actual, t.expected);
-      if (ok) passedCount++;
-      // Hidden cases report pass/fail only — never the expected value.
-      return t.hidden
-        ? { name: label, hidden: true, passed: ok }
-        : { name: label, hidden: false, passed: ok, expected: t.expected, actual: safe(actual) };
-    } catch (e) {
-      return { name: label, hidden: !!t.hidden, passed: false, error: e?.message || String(e) };
-    }
+  const workerPath = new URL('./sandbox-worker.js', import.meta.url);
+  const result = await new Promise((resolve) => {
+    let settled = false;
+    const done = (v) => { if (!settled) { settled = true; resolve(v); } };
+
+    const worker = new Worker(workerPath, { workerData: { source: String(source), tests: list, timeoutMs } });
+    // Hard wall: terminate the thread outright if it overruns. `timeoutMs` is
+    // per-case, so the overall budget scales with the number of cases.
+    const timer = setTimeout(() => {
+      worker.terminate();
+      done({ ok: true, error: 'Your code timed out', passedCount: 0, cases: list.map(t => ({ name: t.name || t.fn, hidden: !!t.hidden, passed: false, error: 'Timed out' })) });
+    }, timeoutMs * (list.length + 1) + 1000);
+
+    worker.on('message', (msg) => { clearTimeout(timer); done(msg); });
+    worker.on('error', (e) => { clearTimeout(timer); done({ ok: false, error: `Your code failed to run: ${e?.message || e}` }); });
+    worker.on('exit', () => { clearTimeout(timer); done({ ok: false, error: 'Sandbox exited unexpectedly' }); });
   });
 
+  if (!result.ok) return fail(result.error);
+
+  const passedCount = result.passedCount || 0;
   const ratio = passedCount / list.length;
   return {
-    ok: true, error: null,
+    ok: true, error: result.error || null,
     total: list.length, passedCount,
     score: Math.round(ratio * 100),      // V6: score == % of declared tests passed
     ratio,
     passed: ratio >= passThreshold,
-    cases,
+    cases: result.cases || [],
   };
 }
 

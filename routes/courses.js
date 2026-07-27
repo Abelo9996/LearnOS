@@ -37,6 +37,23 @@ router.post('/build', requireAuth, (req, res) => {
   res.json({ ok: true, jobId });
 });
 
+// Deepen an EXISTING thin course in place (readings, quiz items, labs, graded
+// assessments, verified resources) without changing its slug or losing content.
+router.post('/:slug/enrich', requireAuth, (req, res) => {
+  const course = db.prepare('SELECT slug FROM courses WHERE slug = ?').get(req.params.slug);
+  if (!course) return res.status(404).json({ error: true, message: 'Course not found' });
+  const jobId = enqueueJob(req.userId, 'enrich-course', { slug: course.slug });
+  res.json({ ok: true, jobId });
+});
+
+// Depth report for one course — powers the "this course is thin" UI affordance.
+router.get('/:slug/depth', requireAuth, async (req, res) => {
+  const { validateCourseDepth } = await import('../ai/quality/depthFloors.js');
+  const course = db.prepare('SELECT slug FROM courses WHERE slug = ?').get(req.params.slug);
+  if (!course) return res.status(404).json({ error: true, message: 'Course not found' });
+  res.json({ ok: true, ...validateCourseDepth(course.slug) });
+});
+
 router.get('/', (req, res) => {
   const search = req.query.search || '';
   let courses;

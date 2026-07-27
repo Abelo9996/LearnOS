@@ -107,20 +107,40 @@ const tests = [
   { name: 'handles zero', fn: 'add', args: [0, 0], expected: 0 },
   { name: 'hidden case', fn: 'add', args: [10, 5], expected: 15, hidden: true },
 ];
-const allPass = runCodeTests('function add(a,b){return a+b}', tests);
-const halfPass = runCodeTests('function add(a,b){return a>0&&b>0?a+b:0}', tests);
-const broken = runCodeTests('function add(a,b){ throw new Error("nope") }', tests);
-const syntax = runCodeTests('function add(a,b){ return a+ }', tests);
+const allPass = await runCodeTests('function add(a,b){return a+b}', tests);
+const halfPass = await runCodeTests('function add(a,b){return a>0&&b>0?a+b:0}', tests);
+const broken = await runCodeTests('function add(a,b){ throw new Error("nope") }', tests);
+const syntax = await runCodeTests('function add(a,b){ return a+ }', tests);
 
 check('V6a', 'all tests passing scores 100', allPass.score === 100 && allPass.passed === true, `score=${allPass.score}`);
 check('V6b', 'score == % of tests passed', halfPass.score === Math.round((halfPass.passedCount / halfPass.total) * 100), `${halfPass.passedCount}/${halfPass.total} = ${halfPass.score}%`);
 check('V6c', 'hidden cases never leak expected values', allPass.cases.filter(c => c.hidden).every(c => !('expected' in c)));
 check('V6d', 'throwing code fails gracefully', broken.ok === true && broken.score === 0);
 check('V6e', 'syntax errors are reported, not crashed', syntax.ok === false && /failed to run/i.test(syntax.error || ''));
-check('V6f', 'infinite loops are stopped by the timeout', (() => {
-  const r = runCodeTests('function add(a,b){ while(true){} }', tests, { timeoutMs: 300 });
-  return r.score === 0;
-})());
+const looper = await runCodeTests('function add(a,b){ while(true){} }', tests, { timeoutMs: 300 });
+check('V6f', 'infinite loops are stopped by the sandbox', looper.score === 0);
+const asyncHang = await runCodeTests('function add(a,b){ return new Promise(()=>{}) }', tests, { timeoutMs: 300 });
+check('V6g', 'async hangs are hard-killed, not just timed out', asyncHang.score === 0);
+const escape = await runCodeTests('function add(a,b){ return typeof process === "undefined" && typeof require === "undefined" ? a+b : -1 }', tests, { timeoutMs: 1000 });
+check('V6h', 'the sandbox exposes no process/require to submitted code', escape.score === 100, `score=${escape.score}`);
+
+// ── V13: remediation — a failure must come with a diagnosis ─────────────────
+check('V13a', 'a failed graded attempt names the weak skills',
+  Array.isArray(gradedStatus[0]?.weakSkills) && gradedStatus[0].weakSkills.length > 0,
+  `${gradedStatus[0]?.weakSkills?.length || 0} skills`);
+check('V13b', 'a passed attempt carries no remediation', sub3.body.weakSkills === null);
+
+const rem = await api(`/api/assessments/module/${mod.id}/remediation`);
+check('V13c', 'remediation returns what to revisit', rem.status === 200 && Array.isArray(rem.body.reviewLessons),
+  `${rem.body.reviewLessons?.length || 0} lessons`);
+check('V13d', 'remediation returns targeted practice on the weak skills',
+  Array.isArray(rem.body.practice) && rem.body.practice.length > 0 &&
+  rem.body.practice.every(p => rem.body.weakSkills.some(w => w.skill === p.skill)),
+  `${rem.body.practice?.length || 0} items`);
+check('V13e', 'remediation gives concrete advice', typeof rem.body.advice === 'string' && rem.body.advice.length > 20);
+
+const remNone = await api('/api/assessments/module/does-not-exist/remediation');
+check('V13f', 'remediation on an unknown module 404s cleanly', remNone.status === 404);
 
 // ── V7: rubric scoring ──────────────────────────────────────────────────────
 const rubric = [
