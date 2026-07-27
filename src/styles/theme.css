@@ -256,12 +256,32 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
 @keyframes labelFadeIn { from { opacity: 0; transform: translateX(-4px); } to { opacity: 1; transform: translateX(0); } }
 
 /* ── W-01: Responsive breakpoints ── */
-/* Mobile: ≤768px — sidebar hidden, single-column layouts */
+/* Mobile: ≤768px — sidebar replaced by a bottom tab bar, single-column layouts */
 @media (max-width: 768px) {
+  /* Nothing may push the page sideways: a horizontally scrolling app on a
+     phone feels broken even when every screen technically fits. */
+  html, body { max-width: 100%; overflow-x: hidden; }
+
   /* Force single-column on common grid patterns */
   .stagger { grid-template-columns: 1fr !important; }
+  /* Multi-column grids collapse rather than overflowing. `.keep-grid` opts out
+     for layouts that are deliberately compact on phones (icon grids etc.) —
+     without it this rule also flattened the mobile "More" sheet. */
+  [style*="grid-template-columns"]:not(.keep-grid) { grid-template-columns: 1fr !important; }
+
   /* Compact header */
   header > * { max-width: 100% !important; }
+
+  /* Rows laid out with flex must wrap instead of running off-screen — this is
+     what was pushing the document to 576px on a 390px viewport. */
+  [style*="display: flex"]:not(.no-wrap) { flex-wrap: wrap; }
+
+  /* Wide content keeps its own scroller rather than widening the page. */
+  pre, table { max-width: 100%; overflow-x: auto; }
+  img, iframe, video, canvas { max-width: 100%; }
+
+  /* Comfortable touch targets. */
+  button, .ui-btn, a[role="button"] { min-height: 34px; }
 }
 
 /* Tablet: 769-1024px */

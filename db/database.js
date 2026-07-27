@@ -138,6 +138,26 @@ try { db.exec("ALTER TABLE assignments ADD COLUMN rubric_json TEXT"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN pass_threshold REAL"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN max_attempts INTEGER"); } catch {}
 
+// ── M9: reach — translation (spec §3.9) ─────────────────────────────────────
+// Coursera localises a subset of its catalogue because human translation costs
+// money per course per language. We generate content, so any course can be
+// translated into any language on demand. Translations live ALONGSIDE the
+// original — never overwriting it — so a bad translation cannot destroy the
+// source of truth.
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS translations (
+    id TEXT PRIMARY KEY,
+    target_type TEXT NOT NULL,     -- 'lesson'
+    target_id TEXT NOT NULL,
+    language TEXT NOT NULL,
+    title TEXT,
+    body_md TEXT,
+    created_at TEXT DEFAULT (datetime('now')),
+    UNIQUE(target_type, target_id, language)
+  )`);
+  db.exec("CREATE INDEX IF NOT EXISTS idx_translations_lookup ON translations(target_type, target_id, language)");
+} catch (e) { console.log('translations migration:', e.message); }
+
 // ── M11: pacing & honest credentials (spec §3.8) ────────────────────────────
 // Coursera's real moat is employer recognition — a Google or Stanford name on
 // the certificate. We have none of that and must never imply we do. What we CAN

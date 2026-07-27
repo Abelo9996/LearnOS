@@ -312,7 +312,22 @@ function AppShell() {
   const go = (s) => setScreen(s);
   const toggleSidebar = () => setSidebarCollapsed((c) => !c);
 
-  const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
+  // Must react to resize/rotation — computing this once at first render meant a
+  // phone turned sideways (or any window resize) kept the wrong layout until a
+  // full reload.
+  const [isMobile, setIsMobile] = React.useState(
+    typeof window !== 'undefined' ? window.innerWidth <= 768 : false
+  );
+  React.useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
+  }, []);
+
   const sw = isMobile ? 0 : (sidebarCollapsed ? 64 : 240);
   const tk = ACCENT_TOKENS['#7c3aed'];
 
@@ -327,20 +342,128 @@ function AppShell() {
   }, [density, sw, tk.accent, tk.soft, tk.line, tk.grad]);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', overflowX: 'hidden' }}>
       {!isMobile && <Sidebar screen={screen} setScreen={go} collapsed={sidebarCollapsed} onToggle={toggleSidebar} counts={navCounts} />}
       <main style={{
         flex: 1,
-        width: isMobile ? '100vw' : `calc(100vw - ${sw}px)`,
+        width: isMobile ? '100%' : `calc(100vw - ${sw}px)`,
+        maxWidth: '100%',
+        minWidth: 0,               // lets flex children shrink instead of forcing sideways scroll
         display: 'flex', flexDirection: 'column', minHeight: '100vh',
+        // Leave room for the mobile tab bar so the last item isn't sitting under it.
+        paddingBottom: isMobile ? 'calc(58px + env(safe-area-inset-bottom, 0px))' : 0,
         transition: 'width var(--dur-normal) var(--ease-smooth)',
       }}>
         <TopBar setScreen={go} onToggleSidebar={toggleSidebar} collapsed={sidebarCollapsed} />
-        <div style={{ flex: 1, minHeight: 0 }}>
+        <div style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
           <ScreenRouter screen={screen} setScreen={go} />
         </div>
       </main>
+      {/* Without this there is literally no way to navigate on a phone — the
+          sidebar is hidden and nothing replaces it. */}
+      {isMobile && <MobileNav screen={screen} setScreen={go} counts={navCounts} />}
     </div>
+  );
+}
+
+/* ── Mobile navigation ──────────────────────────────────────────────────────
+   A phone has no room for the sidebar, so it gets a bottom tab bar with the
+   five destinations people actually move between, plus "More" for the rest.
+   Bottom-anchored because that is where thumbs are. */
+const MOBILE_PRIMARY = ['dashboard', 'roadmaps', 'courses', 'assignments', 'cards'];
+
+function MobileNav({ screen, setScreen, counts = {} }) {
+  const [moreOpen, setMoreOpen] = React.useState(false);
+  const allItems = NAV.flatMap(g => g.items);
+  const primary = MOBILE_PRIMARY.map(id => allItems.find(i => i.id === id)).filter(Boolean);
+  const rest = allItems.filter(i => !MOBILE_PRIMARY.includes(i.id));
+
+  const countFor = (id) => (id === 'assignments' ? counts.assignments : id === 'cards' ? counts.cards : 0);
+
+  const Tab = ({ item, active, onClick, label, icon }) => (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      aria-current={active ? 'page' : undefined}
+      style={{
+        flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: 3, padding: '7px 2px', background: 'none', border: 0, cursor: 'pointer',
+        color: active ? 'var(--brand)' : 'var(--muted)', position: 'relative',
+      }}
+    >
+      <span style={{ display: 'inline-flex', position: 'relative' }}>
+        {React.cloneElement(I[icon] || I.home, { size: 19 })}
+        {countFor(item?.id) > 0 && (
+          <span style={{
+            position: 'absolute', top: -4, right: -7, minWidth: 15, height: 15, padding: '0 3px',
+            borderRadius: 999, background: 'var(--brand)', color: 'oklch(0.16 0.02 270)',
+            fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          }}>{countFor(item.id) > 99 ? '99+' : countFor(item.id)}</span>
+        )}
+      </span>
+      <span style={{ fontSize: 9.5, fontWeight: active ? 600 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100%' }}>
+        {label}
+      </span>
+    </button>
+  );
+
+  return (
+    <>
+      {moreOpen && (
+        <div
+          onClick={() => setMoreOpen(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 9996, background: 'oklch(0.12 0.02 270 / 0.6)', backdropFilter: 'blur(2px)' }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="keep-grid"
+            style={{
+              position: 'absolute', left: 0, right: 0, bottom: 'calc(58px + env(safe-area-inset-bottom, 0px))',
+              background: 'var(--surface)', borderTop: '1px solid var(--border)',
+              borderRadius: '14px 14px 0 0', padding: 12,
+              display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
+            }}
+          >
+            {rest.map(item => (
+              <button key={item.id}
+                onClick={() => { setScreen(item.id); setMoreOpen(false); }}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '12px 6px',
+                  borderRadius: 10, cursor: 'pointer',
+                  background: screen === item.id ? 'color-mix(in oklch, var(--brand) 14%, transparent)' : 'var(--surface-2)',
+                  border: `1px solid ${screen === item.id ? 'var(--brand)' : 'var(--border)'}`,
+                  color: screen === item.id ? 'var(--brand)' : 'var(--ink-2)',
+                }}>
+                {React.cloneElement(I[item.icon] || I.home, { size: 18 })}
+                <span style={{ fontSize: 11, textAlign: 'center', lineHeight: 1.2 }}>{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <nav
+        aria-label="Main"
+        style={{
+          position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 9997,
+          display: 'flex', alignItems: 'stretch',
+          background: 'color-mix(in oklch, var(--surface) 92%, transparent)',
+          backdropFilter: 'blur(12px)',
+          borderTop: '1px solid var(--border)',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          height: 'calc(58px + env(safe-area-inset-bottom, 0px))',
+        }}
+      >
+        {primary.map(item => (
+          <Tab key={item.id} item={item} icon={item.icon}
+            label={item.id === 'cards' ? 'Review' : item.label}
+            active={screen === item.id}
+            onClick={() => { setMoreOpen(false); setScreen(item.id); }} />
+        ))}
+        <Tab item={null} icon="more" label="More" active={moreOpen || rest.some(r => r.id === screen)}
+          onClick={() => setMoreOpen(o => !o)} />
+      </nav>
+    </>
   );
 }
 
