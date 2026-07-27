@@ -18,6 +18,7 @@
     "factcheck": "node scripts/factcheck.mjs",
     "verify:accuracy": "node scripts/verify-accuracy.mjs",
     "verify:labs": "node scripts/verify-labs.mjs",
+    "verify:retention": "node scripts/verify-retention.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

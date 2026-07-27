@@ -17,6 +17,7 @@ const SUITES = [
   { name: 'Content integrity (V10-V12)',  script: 'scripts/verify-integrity.mjs',     args: [] },
   { name: 'Accuracy & quarantine (V14-V17)', script: 'scripts/verify-accuracy.mjs',  args: [] },
   { name: 'Executable labs (V18-V21)',    script: 'scripts/verify-labs.mjs',      args: [] },
+  { name: 'Retention (V22-V26)',          script: 'scripts/verify-retention.mjs', args: [] },
 ];
 
 const run = (script, args) => new Promise((resolve) => {
