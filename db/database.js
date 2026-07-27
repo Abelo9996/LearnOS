@@ -138,6 +138,37 @@ try { db.exec("ALTER TABLE assignments ADD COLUMN rubric_json TEXT"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN pass_threshold REAL"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN max_attempts INTEGER"); } catch {}
 
+// ── M7: factual grounding & accuracy (spec §3.5) ────────────────────────────
+// We now generate content at volume, and depth floors measure quantity, not
+// truth. A course of 116 confidently-wrong lessons is worse than 6 shallow
+// correct ones, and correctness is the one axis where expert-authored material
+// decisively beats generated material. Every quiz item therefore carries a
+// verification state, and anything disputed or reported is kept out of graded
+// assessment until it is resolved.
+try { db.exec("ALTER TABLE quiz_items ADD COLUMN verification_status TEXT DEFAULT 'unverified'"); } catch {}
+try { db.exec("ALTER TABLE quiz_items ADD COLUMN verification_note TEXT"); } catch {}
+try { db.exec("ALTER TABLE quiz_items ADD COLUMN verified_at TEXT"); } catch {}
+// Which verified sources a generated lesson was grounded in, so a learner can
+// check the claim rather than trusting it.
+try { db.exec("ALTER TABLE module_lessons ADD COLUMN sources_json TEXT"); } catch {}
+
+// Learner-reported errors. The person doing the course is the last line of
+// defence against a plausible-sounding mistake.
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS content_reports (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    target_type TEXT NOT NULL,      -- 'quiz_item' | 'lesson'
+    target_id TEXT NOT NULL,
+    reason TEXT NOT NULL,           -- 'wrong_answer' | 'factual_error' | 'unclear' | 'dead_link' | 'other'
+    detail TEXT,
+    status TEXT NOT NULL DEFAULT 'open',   -- open | resolved | dismissed
+    created_at TEXT DEFAULT (datetime('now')),
+    resolved_at TEXT
+  )`);
+  db.exec("CREATE INDEX IF NOT EXISTS idx_content_reports_target ON content_reports(target_type, target_id)");
+} catch (e) { console.log('content_reports migration:', e.message); }
+
 // ── M4: specialization roadmaps (spec §3.3) ─────────────────────────────────
 // A Coursera Specialization sequences 3-6 whole COURSES into one credential.
 // Ours must do the same: a roadmap is a pathway from the learner's measured
