@@ -19,6 +19,7 @@
     "verify:accuracy": "node scripts/verify-accuracy.mjs",
     "verify:labs": "node scripts/verify-labs.mjs",
     "verify:retention": "node scripts/verify-retention.mjs",
+    "verify:plans": "node scripts/verify-plans.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

@@ -114,9 +114,20 @@ router.patch('/:id', (req, res) => {
         const has = db.prepare('SELECT COUNT(*) as c FROM certificates WHERE user_id = ? AND title = ?').get(req.userId, rm.title).c;
         if (!has) {
           const cid = 'ce-' + Date.now();
-          db.prepare('INSERT INTO certificates (id, user_id, title, mastery, verified, id_short) VALUES (?, ?, ?, ?, 1, ?)')
+          // `verified` means "this instance verified the work was actually done"
+          // — internally checkable, never externally accredited. The evidence
+          // record is what the credential actually rests on, so it is captured
+          // at issue time rather than reconstructed later.
+          const evidence = {
+            roadmap_id: sess.roadmap_id,
+            nodes: db.prepare('SELECT title, mastery, status FROM roadmap_nodes WHERE roadmap_id = ?').all(sess.roadmap_id),
+            averageMastery: avg.m,
+            issuedFor: 'All modules in this roadmap reached the mastery threshold.',
+          };
+          db.prepare('INSERT INTO certificates (id, user_id, title, mastery, verified, id_short, evidence_json, issuer) VALUES (?, ?, ?, ?, 1, ?, ?, ?)')
             .run(cid, req.userId, rm.title, avg.m,
-              'LOS-' + sess.roadmap_id.slice(-3).toUpperCase() + '-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9999)).padStart(4, '0'));
+              'LOS-' + sess.roadmap_id.slice(-3).toUpperCase() + '-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9999)).padStart(4, '0'),
+              JSON.stringify(evidence), 'self-attested');
           logActivity(req.userId, { kind: 'cert', text: `Earned certificate: ${rm.title}`, sub: 'Roadmap completed', xp: 200, agent: 'CE' });
           awardXP(req.userId, 200, { silent: true });
           try { awardBadge(req.userId, 'Roadmap complete', 'ribbon'); } catch {}
