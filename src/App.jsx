@@ -8,7 +8,8 @@ import Dashboard from './screens/Dashboard';
 import Session from './screens/Session';
 import Roadmap from './screens/Roadmap';
 import Courses from './screens/Courses';
-import { Schedule, Assignments, Flashcards, Certificates, Community, Feed, Starred, Settings, AgentsPage } from './screens/Extras';
+import { Schedule, Assignments, Flashcards, Certificates, Feed, Starred, Settings, AgentsPage } from './screens/Extras';
+import Share from './screens/Share';
 import Onboarding from './screens/Onboarding';
 
 const ACCENT_TOKENS = {
@@ -32,9 +33,9 @@ const NAV = [
     { id: 'agents',      label: 'Agents',       icon: 'spark' },
     { id: 'certificates',label: 'Certificates', icon: 'ribbon' },
   ]},
-  { group: 'COMMUNITY', items: [
-    { id: 'community',   label: 'Community',    icon: 'people',   tag: 'NEW' },
-    { id: 'feed',        label: 'Feed',         icon: 'rss' },
+  { group: 'LIBRARY', items: [
+    { id: 'share',       label: 'Share',        icon: 'people' },
+    { id: 'feed',        label: 'Activity',     icon: 'rss' },
     { id: 'starred',     label: 'Starred',      icon: 'star' },
   ]},
   { group: 'ANALYTICS', items: [
@@ -512,7 +513,7 @@ function ScreenRouter({ screen, setScreen }) {
     case 'assignments':  return wrap(<Assignments />);
     case 'cards':        return wrap(<Flashcards />);
     case 'certificates': return wrap(<Certificates />);
-    case 'community':    return wrap(<Community />);
+    case 'share':        return wrap(<Share />);
     case 'feed':         return wrap(<Feed />);
     case 'starred':      return wrap(<Starred />);
     case 'agents':       return wrap(<AgentsPage setScreen={setScreen} />);

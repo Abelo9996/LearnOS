@@ -46,7 +46,6 @@ export default function Courses() {
   const [tagFilter, setTagFilter] = React.useState(null);
   const [starred, setStarred]   = React.useState({});   // slug → bool
   const [enrolled, setEnrolled] = React.useState({});   // slug → bool
-  const [contributors, setContributors] = React.useState([]);
   const [selectedCourse, setSelectedCourse] = React.useState(null);
 
   // Course-detail state. These MUST live at the top level of the component:
@@ -106,12 +105,10 @@ export default function Courses() {
   React.useEffect(() => {
     const loadAll = async () => {
       try {
-        const [rows, starredRows, leaders] = await Promise.all([
+        const [rows, starredRows] = await Promise.all([
           API.getCourses(),
           API.getStarred().catch(() => []),
-          API.getLeaderboard().catch(() => []),
         ]);
-        setContributors((leaders || []).filter(l => !l.me).slice(0, 5));
         const parsed = (rows || []).map(c => ({
           ...c,
           tags: typeof c.tags === 'string' ? JSON.parse(c.tags || '[]') : (c.tags || []),
@@ -447,7 +444,6 @@ export default function Courses() {
             </Card>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <TopContributorsCard contributors={contributors} />
           </div>
         </div>
       </PageScroll>
@@ -526,7 +522,6 @@ export default function Courses() {
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <FeaturedThisWeek courses={courses} onSelect={setSelectedCourse} />
-          <TopContributorsCard contributors={contributors} />
         </div>
       </div>
     </PageScroll>
@@ -682,26 +677,6 @@ function FeaturedThisWeek({ courses = [], onSelect }) {
   );
 }
 
-function TopContributorsCard({ contributors = [] }) {
-  if (contributors.length === 0) return null;
-  return (
-    <Card pad={false} style={{ padding: 16 }}>
-      <SectionHead title="Top Contributors" subtitle="From the community" />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {contributors.map((c, i) => (
-          <div key={c.name} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Avatar name={c.name} size={28} />
-            <div style={{ flex: 1, fontSize: 12.5, color: 'var(--ink)', fontWeight: 500 }}>
-              {c.name}
-              {i === 0 && <span style={{ marginLeft: 6, color: 'oklch(0.78 0.16 85)' }}>{React.cloneElement(I.bolt, { size: 12 })}</span>}
-            </div>
-            <div className="mono" style={{ fontSize: 11, color: 'var(--brand)' }}>{c.contributions} contributions</div>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
 
 
 // AI course generator — the Curriculum agent designs a full Coursera-grade
