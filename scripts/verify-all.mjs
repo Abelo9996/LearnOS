@@ -19,6 +19,7 @@ const SUITES = [
   { name: 'Executable labs (V18-V21)',    script: 'scripts/verify-labs.mjs',      args: [] },
   { name: 'Retention (V22-V26)',          script: 'scripts/verify-retention.mjs', args: [] },
   { name: 'Pacing & credentials (V27-V30)', script: 'scripts/verify-plans.mjs',   args: [] },
+  { name: 'Reach: mobile & i18n (V31-V34)', script: 'scripts/verify-reach.mjs',   args: [] },
 ];
 
 const run = (script, args) => new Promise((resolve) => {

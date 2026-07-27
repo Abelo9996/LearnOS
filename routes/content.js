@@ -11,6 +11,7 @@ import { Router } from 'express';
 import db from '../db/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import { verificationSummary, STATUS } from '../ai/quality/factCheck.js';
+import { translateLesson, getTranslation, courseTranslationStatus } from '../ai/quality/translate.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -79,6 +80,37 @@ router.patch('/reports/:id', (req, res) => {
       .run(STATUS.UNVERIFIED, report.target_id, STATUS.FLAGGED);
   }
   res.json({ ok: true });
+});
+
+/**
+ * Translation (M9). Coursera localises a subset of its catalogue; we can
+ * translate any lesson into any language on demand, and cache the result so it
+ * is only paid for once.
+ */
+router.get('/lesson/:id/translation', async (req, res) => {
+  const language = String(req.query.language || '').trim();
+  if (!language) return res.status(400).json({ error: true, message: 'language required' });
+  const cached = getTranslation('lesson', req.params.id, language);
+  if (cached) return res.json({ ok: true, cached: true, translation: cached });
+
+  const exists = db.prepare('SELECT id FROM module_lessons WHERE id = ?').get(req.params.id);
+  if (!exists) return res.status(404).json({ error: true, message: 'Lesson not found' });
+
+  try {
+    const t = await translateLesson({ userId: req.userId, lessonId: req.params.id, language });
+    if (!t) return res.status(502).json({ error: true, message: 'Translation produced nothing' });
+    res.json({ ok: true, cached: !!t.cached, translation: t });
+  } catch (e) {
+    // Degrade honestly: the original is always still readable.
+    res.status(e.code === 'NO_KEY' ? 400 : 502).json({ error: true, code: e.code || null, message: e.message });
+  }
+});
+
+/** GET /api/content/course/:slug/translation-status?language=… */
+router.get('/course/:slug/translation-status', (req, res) => {
+  const language = String(req.query.language || '').trim();
+  if (!language) return res.status(400).json({ error: true, message: 'language required' });
+  res.json({ ok: true, language, ...courseTranslationStatus(req.params.slug, language) });
 });
 
 /** GET /api/content/verification — how much of the catalog has been checked. */
