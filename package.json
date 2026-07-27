@@ -12,6 +12,8 @@
     "verify:pipeline": "node scripts/verify-pipeline.mjs",
     "verify:assessment": "node scripts/verify-assessment.mjs",
     "verify:specialization": "node scripts/verify-specialization.mjs",
+    "verify:integrity": "node scripts/verify-integrity.mjs",
+    "verify": "node scripts/verify-all.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

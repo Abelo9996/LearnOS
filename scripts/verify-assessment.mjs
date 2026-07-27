@@ -32,8 +32,15 @@ if (!mod) {
 }
 console.log(`Using module: ${mod.title} (${mod.n} bank items)\n`);
 
-// Clean prior attempts so limits are exercised from zero.
+// Reset to a clean slate so the run is repeatable: attempts back to zero AND the
+// linked node back to un-mastered. Without the node reset a second run would find
+// mastery already at 1 from the first run and could not observe the transition.
 db.prepare('DELETE FROM quiz_attempts WHERE module_id = ?').run(mod.id);
+const linkedNode = db.prepare('SELECT id FROM roadmap_nodes WHERE course_slug = ? AND title = ? LIMIT 1').get(mod.course_slug, mod.title);
+if (linkedNode) {
+  db.prepare("UPDATE roadmap_nodes SET mastery = 0, status = 'active' WHERE id = ?").run(linkedNode.id);
+  db.prepare('DELETE FROM mastery_events WHERE node_id = ?').run(linkedNode.id);
+}
 
 const answerKey = (ids) => {
   const rows = db.prepare(`SELECT id, answer_idx FROM quiz_items WHERE id IN (${ids.map(() => '?').join(',')})`).all(...ids);
