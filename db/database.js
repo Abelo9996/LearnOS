@@ -138,6 +138,14 @@ try { db.exec("ALTER TABLE assignments ADD COLUMN rubric_json TEXT"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN pass_threshold REAL"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN max_attempts INTEGER"); } catch {}
 
+// ── M8: executable labs (spec §3.6) ─────────────────────────────────────────
+// Hands-on practice is the most-valued part of a Coursera program and was the
+// thing we most obviously faked — our labs were instructions to go do something
+// elsewhere. A lab now carries runnable starter code and its own test cases.
+try { db.exec("ALTER TABLE module_lessons ADD COLUMN lab_language TEXT"); } catch {}
+try { db.exec("ALTER TABLE module_lessons ADD COLUMN starter_code TEXT"); } catch {}
+try { db.exec("ALTER TABLE module_lessons ADD COLUMN lab_tests_json TEXT"); } catch {}
+
 // ── M7: factual grounding & accuracy (spec §3.5) ────────────────────────────
 // We now generate content at volume, and depth floors measure quantity, not
 // truth. A course of 116 confidently-wrong lessons is worse than 6 shallow

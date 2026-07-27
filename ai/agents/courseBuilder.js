@@ -167,8 +167,26 @@ const assessmentSchema = {
         description: { type: 'string' },
         steps: { type: 'array', items: { type: 'string' } },
         minutes: { type: 'integer' },
+        // A lab the learner can actually RUN, when the topic admits code.
+        language: { type: 'string', enum: ['javascript', 'python', 'none'] },
+        starter_code: { type: 'string' },
+        tests: {
+          type: 'array',
+          items: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              name: { type: 'string' },
+              fn: { type: 'string' },
+              args: { type: 'array' },
+              expected: {},
+              hidden: { type: 'boolean' },
+            },
+            required: ['name', 'fn', 'args', 'expected', 'hidden'],
+          },
+        },
       },
-      required: ['title', 'description', 'steps', 'minutes'],
+      required: ['title', 'description', 'steps', 'minutes', 'language', 'starter_code', 'tests'],
     },
     graded: {
       type: 'object',
@@ -214,6 +232,7 @@ const ASSESSMENT_SYSTEM = `You are the Assessment agent for LearnOS writing the 
 Produce ALL THREE:
 - "quiz_items": exactly 10 practice questions with 4 choices each, the correct "answer_idx" (0-based), and an "explanation" that teaches why the answer is right and why the tempting distractor is wrong. Vary difficulty across easy/medium/hard. Tag each with the "skill" it tests.
 - "lab": a hands-on exercise the learner actually performs, with 4-8 concrete steps. This is the "doing" half of the module.
+  Whenever the topic admits code, make the lab RUNNABLE: set "language" to "javascript" or "python", give "starter_code" that defines the required function(s) with a clear TODO body the learner completes, and 3-6 "tests" as data ({name, fn, args, expected, hidden}) that check the finished function. Mark 1-2 tests hidden. "expected" must be a plain JSON value the function returns — not a description. If the topic genuinely has no code (a design or writing exercise), set "language" to "none", "starter_code" to "" and "tests" to [].
 - "graded": the assessment that counts, with a 4-7 step task list and a 3-5 criterion rubric whose weights sum to 1.
 
 "minutes" fields are honest time estimates. Returning fewer than 10 quiz items, or omitting the lab or the graded assessment, is a failure.`;
@@ -468,7 +487,8 @@ export async function enrichCourse({ userId, slug, onProgress = () => {} }) {
           });
         }
         if (!hasLab && a.lab?.title) {
-          add(a.lab.title, `# ${a.lab.title}\n\n${a.lab.description || ''}\n\n## Steps\n\n${(a.lab.steps || []).map((s, k) => `${k + 1}. ${s}`).join('\n')}`, 'lab', { minutes: a.lab.minutes || 45 });
+          const lid = add(a.lab.title, `# ${a.lab.title}\n\n${a.lab.description || ''}\n\n## Steps\n\n${(a.lab.steps || []).map((s, k) => `${k + 1}. ${s}`).join('\n')}`, 'lab', { minutes: a.lab.minutes || 45 });
+          attachLabCode(lid, a.lab);
         }
         if (!hasGraded && a.graded?.title && Array.isArray(a.graded.tasks) && a.graded.tasks.length) {
           const g = a.graded;
@@ -678,11 +698,12 @@ export async function persistRichCourse(userId, c, level = 'intermediate') {
       resourceCount++;
     }
 
-    // 3. Hands-on lab — the "doing" half.
+    // 3. Hands-on lab — the "doing" half, runnable where the topic allows it.
     if (m.lab && m.lab.title) {
       const steps = (m.lab.steps || []).map((s, k) => `${k + 1}. ${s}`).join('\n');
-      addLesson(m.lab.title, `# ${m.lab.title}\n\n${m.lab.description || ''}\n\n## Steps\n\n${steps}`, 'lab',
+      const lid = addLesson(m.lab.title, `# ${m.lab.title}\n\n${m.lab.description || ''}\n\n## Steps\n\n${steps}`, 'lab',
         { minutes: m.lab.minutes || 45 });
+      attachLabCode(lid, m.lab);
     }
 
     // 4. Practice quiz — ungraded, drawn from the item bank below.
@@ -784,6 +805,22 @@ function createCompanionRoadmap(userId, slug, title, level, pathway) {
 }
 
 function safeHost(url) { try { return new URL(url).hostname; } catch { return null; } }
+
+// Attach runnable code to a lab lesson, but only when it is actually runnable:
+// a language we support, starter code to edit, and tests shaped as data.
+function attachLabCode(lessonId, lab) {
+  if (!lessonId || !lab) return;
+  const lang = lab.language;
+  if (lang !== 'javascript' && lang !== 'python') return;
+  const tests = Array.isArray(lab.tests)
+    ? lab.tests.filter(t => t && typeof t.fn === 'string' && Array.isArray(t.args) && t.expected !== undefined)
+    : [];
+  if (!lab.starter_code && !tests.length) return;
+  try {
+    db.prepare('UPDATE module_lessons SET lab_language = ?, starter_code = ?, lab_tests_json = ? WHERE id = ?')
+      .run(lang, lab.starter_code || '', JSON.stringify(tests), lessonId);
+  } catch { /* the lab still reads fine without a runner */ }
+}
 
 // A staged build makes one LLM call per module, so it runs as a background job
 // with real progress rather than blocking an HTTP request for minutes.

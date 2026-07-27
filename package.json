@@ -17,6 +17,7 @@
     "deepen": "node scripts/deepen-courses.mjs",
     "factcheck": "node scripts/factcheck.mjs",
     "verify:accuracy": "node scripts/verify-accuracy.mjs",
+    "verify:labs": "node scripts/verify-labs.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

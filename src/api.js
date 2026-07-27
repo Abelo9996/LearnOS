@@ -135,6 +135,11 @@ const API = {
   runAssignmentTests: (id, source) => API.post(`/assessments/assignment/${id}/run`, { source }),
   getRemediation:     (moduleId) => API.get(`/assessments/module/${moduleId}/remediation`),
 
+  // Executable labs (M8)
+  getLab:             (lessonId) => API.get(`/assessments/lab/${lessonId}`),
+  runLab:             (lessonId, data) => API.post(`/assessments/lab/${lessonId}/run`, data),
+  getRuntimes:        () => API.get('/assessments/runtimes'),
+
   // Content accuracy (M7) — generated content can be confidently wrong, so the
   // learner needs a one-click way to pull a bad question out of grading.
   reportContent:      (data) => API.post('/content/report', data),

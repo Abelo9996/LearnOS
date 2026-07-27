@@ -6,6 +6,7 @@ import API from '../api.js';
 import { useToast, useModal } from '../App';
 import MarkdownText from '../components/Markdown';
 import ModuleQuiz from '../components/ModuleQuiz.jsx';
+import LabRunner from '../components/LabRunner.jsx';
 
 // Extract a YouTube video id so lecture videos can be embedded inline.
 function youtubeId(url) {
@@ -267,6 +268,9 @@ export default function Courses() {
               {lesson.body_md ? (
                 <div style={{ fontSize: 14.5, lineHeight: 1.75 }}><MarkdownText text={lesson.body_md} /></div>
               ) : (!lesson.url && <div style={{ color: 'var(--muted)', fontSize: 14 }}>No lesson content yet.</div>)}
+
+              {/* Labs are runnable where the topic allows it (M8). */}
+              {lesson.kind === 'lab' && <LabRunner lessonId={lesson.id} />}
 
               {/* Assessment lessons open the real two-tier quiz engine (M3). */}
               {(lesson.kind === 'practice_quiz' || lesson.kind === 'graded_quiz') && (() => {

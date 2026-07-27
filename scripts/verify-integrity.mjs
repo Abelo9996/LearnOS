@@ -55,10 +55,18 @@ const urls = [
 ];
 const unique = [...new Set(urls)];
 console.log(`\nChecking ${unique.length} shipped URLs…`);
+// A single failed request is not proof a link is dead — with ~90 URLs checked at
+// once, one transient network blip would fail the whole suite. Retry before
+// declaring anything broken.
+const reachableWithRetry = async (u, attempts = 3) => {
+  for (let i = 0; i < attempts; i++) {
+    try { if (await checkUrlReachable(u)) return true; } catch { /* retry */ }
+    if (i < attempts - 1) await new Promise(r => setTimeout(r, 400 * (i + 1)));
+  }
+  return false;
+};
 const dead = [];
-await Promise.all(unique.map(async (u) => {
-  try { if (!(await checkUrlReachable(u))) dead.push(u); } catch { dead.push(u); }
-}));
+await Promise.all(unique.map(async (u) => { if (!(await reachableWithRetry(u))) dead.push(u); }));
 check('V10', 'every shipped resource URL is reachable', dead.length === 0,
   dead.length ? `${dead.length} dead: ${dead.slice(0, 3).join(', ')}` : `${unique.length} verified`);
 
