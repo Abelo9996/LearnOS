@@ -10,6 +10,7 @@ import { Router } from 'express';
 import db, { logActivity, awardXP, awardBadge } from '../db/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import { gradeQuiz, runCodeTests, DEFAULT_PASS_THRESHOLD, DEFAULT_MAX_ATTEMPTS } from '../ai/assessment/grader.js';
+import { runLabWithTests, availableLanguages } from '../ai/assessment/labRunner.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -271,6 +272,53 @@ router.get('/module/:moduleId/remediation', (req, res) => {
     reviewLessons,
     practice,
     advice: `Revisit ${reviewLessons.length} lesson${reviewLessons.length === 1 ? '' : 's'} covering ${weak.slice(0, 3).map(w => w.skill).join(', ')}, then retry the practice quiz before spending another graded attempt.`,
+  });
+});
+
+/** GET /api/assessments/runtimes — which lab languages this machine can run. */
+router.get('/runtimes', async (_req, res) => {
+  res.json({ ok: true, runtimes: await availableLanguages() });
+});
+
+/**
+ * POST /api/assessments/lab/:lessonId/run  { source, language }
+ * Runs a lab and, when the lab declares test cases, grades against them.
+ */
+router.post('/lab/:lessonId/run', async (req, res) => {
+  const lesson = db.prepare("SELECT id, title, kind, lab_language, lab_tests_json FROM module_lessons WHERE id = ?").get(req.params.lessonId);
+  if (!lesson) return res.status(404).json({ error: true, message: 'Lab not found' });
+
+  const language = req.body?.language || lesson.lab_language || 'javascript';
+  const tests = parse(lesson.lab_tests_json, []);
+  const out = await runLabWithTests({ source: req.body?.source, language, tests });
+
+  // Passing a lab's tests is real practice and worth logging, but a lab is
+  // formative — it never counts toward a grade the way a graded assessment does.
+  if (out.tests?.passed) {
+    try {
+      awardXP(req.userId, 15);
+      logActivity(req.userId, { kind: 'session', text: `Lab passed: ${lesson.title}`, sub: `${out.tests.passedCount}/${out.tests.total} tests`, xp: 15, agent: 'AS' });
+    } catch {}
+  }
+  res.json({ ok: true, ...out });
+});
+
+/** GET /api/assessments/lab/:lessonId — starter code + visible cases. */
+router.get('/lab/:lessonId', (req, res) => {
+  const lesson = db.prepare("SELECT id, title, body_md, lab_language, starter_code, lab_tests_json, estimated_minutes FROM module_lessons WHERE id = ?").get(req.params.lessonId);
+  if (!lesson) return res.status(404).json({ error: true, message: 'Lab not found' });
+  const tests = parse(lesson.lab_tests_json, []);
+  res.json({
+    ok: true,
+    lab: {
+      id: lesson.id, title: lesson.title, body_md: lesson.body_md,
+      language: lesson.lab_language || 'javascript',
+      starter_code: lesson.starter_code || '',
+      estimated_minutes: lesson.estimated_minutes,
+      // Hidden cases are announced but never described.
+      tests: tests.filter(t => !t.hidden).map(t => ({ name: t.name || t.fn, fn: t.fn, args: t.args, expected: t.expected })),
+      hiddenTestCount: tests.filter(t => t.hidden).length,
+    },
   });
 });
 
