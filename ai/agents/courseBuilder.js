@@ -326,6 +326,16 @@ export async function buildCourse({ userId, topic, level, onProgress = () => {} 
 // predates the depth model — is brought up to the floors without losing what it
 // already has or changing its slug.
 
+const expandSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    body_md: { type: 'string' },
+    minutes: { type: 'integer' },
+  },
+  required: ['body_md', 'minutes'],
+};
+
 const extendSchema = {
   type: 'object',
   additionalProperties: false,
@@ -400,15 +410,20 @@ export async function enrichCourse({ userId, slug, onProgress = () => {} }) {
     ].join('\n');
 
     // Fill only what's missing, and append — never destroy existing content.
+    // IDs must be unique BY CONSTRUCTION, not derived from a positional counter:
+    // enrichment is re-runnable, and a count-based id collides with rows a
+    // previous pass already inserted (which aborted whole modules mid-run).
     let order = lessons.length;
+    const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
     const add = (title, body, kind, opts = {}) => {
       const mins = Math.max(1, Number(opts.minutes) || 10);
+      const id = `ml-${m.id}-e${uid()}`;
       db.prepare(`INSERT INTO module_lessons (id, module_id, title, body_md, kind, order_idx, url, estimated_minutes, is_graded, pass_threshold, max_attempts)
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(`ml-${m.id}-e${order}`, m.id, title, body || '', kind, order, opts.url || null, mins,
+        .run(id, m.id, title, body || '', kind, order, opts.url || null, mins,
           opts.graded ? 1 : 0, opts.graded ? 0.8 : null, opts.graded ? 3 : null);
       order++;
-      return `ml-${m.id}-e${order - 1}`;
+      return id;
     };
 
     if (readings < 3 || resources < FLOORS.resourcesPerModule) {
@@ -447,7 +462,7 @@ export async function enrichCourse({ userId, slug, onProgress = () => {} }) {
             try {
               db.prepare(`INSERT INTO quiz_items (id, course_slug, module_id, lesson_id, question, choices_json, answer_idx, explanation, difficulty, skill)
                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-                .run(`qi-${m.id}-e${k}`, slug, m.id, quizLesson, q.question, JSON.stringify(q.choices),
+                .run(`qi-${m.id}-e${uid()}${k}`, slug, m.id, quizLesson, q.question, JSON.stringify(q.choices),
                   Math.max(0, Math.min(q.choices.length - 1, Number(q.answer_idx) || 0)), q.explanation || null, q.difficulty || 'medium', q.skill || null);
             } catch { /* skip malformed */ }
           });
@@ -466,6 +481,44 @@ export async function enrichCourse({ userId, slug, onProgress = () => {} }) {
           } catch { /* assignment is a bonus, lesson already exists */ }
         }
       } catch (e) { console.warn(`[enrich] assessment for ${m.title}: ${e?.message || e}`); }
+    }
+
+    // Existing readings that are below the floor must be EXPANDED, not just
+    // supplemented — otherwise a deepened course still serves its original
+    // 400-character stubs alongside the new material.
+    const thin = db.prepare("SELECT id, title, body_md FROM module_lessons WHERE module_id = ? AND kind = 'reading' AND LENGTH(COALESCE(body_md,'')) < ?").all(m.id, FLOORS.readingChars);
+    for (const t of thin) {
+      try {
+        const ex = (await complete({
+          userId, agentCode: 'CR', schema: expandSchema, maxTokens: 4000,
+          system: `You are the Curriculum agent rewriting a lesson that is too thin to teach anything. Expand it into at least 450 words (${FLOORS.readingChars}+ characters) of real instruction in Markdown: headings, worked intuition, a concrete example or derivation, common pitfalls, and why it matters. Keep the original's topic and any correct claims; deepen it, don't replace the subject.`,
+          messages: `${context}\n\nCurrent lesson "${t.title}":\n${t.body_md || ''}\n\nRewrite it in full.`,
+        })).json;
+        if (ex?.body_md && ex.body_md.length > (t.body_md || '').length) {
+          db.prepare('UPDATE module_lessons SET body_md = ?, estimated_minutes = ?, updated_at = datetime(\'now\') WHERE id = ?')
+            .run(ex.body_md, Math.max(1, Number(ex.minutes) || 12), t.id);
+        }
+      } catch (e) { console.warn(`[enrich] expanding "${t.title}": ${e?.message || e}`); }
+    }
+
+    // Resource top-up, same as a fresh build: models cite URLs that don't exist,
+    // so a module can finish enrichment with nothing that survived verification.
+    const haveRes = db.prepare("SELECT COUNT(*) c FROM module_lessons WHERE module_id = ? AND url IS NOT NULL AND url != '' AND kind NOT IN ('lab','exercise','programming','project')").get(m.id).c;
+    if (haveRes < FLOORS.resourcesPerModule) {
+      try {
+        const extra = (await complete({
+          userId, agentCode: 'RE', schema: topUpSchema, maxTokens: 2000,
+          system: TOPUP_SYSTEM,
+          messages: `Course: ${course.title} (${lvl})\nModule: ${m.title}\nObjectives: ${objectives.join('; ')}\n\nSuggest resources with URLs you are confident exist.`,
+        })).json;
+        const reach = await verifyReachable(extra?.resources);
+        const known = new Set(db.prepare('SELECT url FROM module_lessons WHERE module_id = ? AND url IS NOT NULL').all(m.id).map(r => r.url));
+        for (const r of (extra?.resources || [])) {
+          if (!reach.has(r.url) || known.has(r.url)) continue;
+          add(r.title, `${r.summary || ''}\n\n_Source: ${r.source || safeHost(r.url)}_`, r.kind || 'article', { url: r.url, minutes: r.minutes || 15 });
+          known.add(r.url);
+        }
+      } catch (e) { console.warn(`[enrich] resource top-up for ${m.title}: ${e?.message || e}`); }
     }
 
     const mins = db.prepare('SELECT COALESCE(SUM(estimated_minutes),0) s FROM module_lessons WHERE module_id = ?').get(m.id).s;
