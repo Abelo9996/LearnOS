@@ -5,6 +5,7 @@ import { useUser } from '../UserContext.jsx';
 import API from '../api.js';
 import { useToast, useModal } from '../App';
 import MarkdownText from '../components/Markdown';
+import ModuleQuiz from '../components/ModuleQuiz.jsx';
 
 // Extract a YouTube video id so lecture videos can be embedded inline.
 function youtubeId(url) {
@@ -24,7 +25,13 @@ const LESSON_KIND = {
   reading:  { label: 'Reading',       color: 'var(--brand)',         icon: 'book' },
   exercise: { label: 'Exercise',      color: 'oklch(0.74 0.18 25)',  icon: 'check' },
   project:  { label: 'Project',       color: 'var(--brand-3)',       icon: 'spark' },
+  lab:          { label: 'Hands-on lab',  color: 'oklch(0.76 0.16 145)', icon: 'spark' },
+  practice_quiz:{ label: 'Practice quiz', color: 'var(--brand-2)',       icon: 'check' },
+  graded_quiz:  { label: 'Graded',        color: 'oklch(0.74 0.18 25)',  icon: 'check' },
 };
+
+// "12 min" the way Coursera labels every item.
+const mins = (n) => (n ? (n >= 60 ? `${Math.round(n / 60)} h` : `${n} min`) : null);
 
 export default function Courses() {
   const { add: toast } = useToast();
@@ -261,6 +268,34 @@ export default function Courses() {
                 <div style={{ fontSize: 14.5, lineHeight: 1.75 }}><MarkdownText text={lesson.body_md} /></div>
               ) : (!lesson.url && <div style={{ color: 'var(--muted)', fontSize: 14 }}>No lesson content yet.</div>)}
 
+              {/* Assessment lessons open the real two-tier quiz engine (M3). */}
+              {(lesson.kind === 'practice_quiz' || lesson.kind === 'graded_quiz') && (() => {
+                const isGraded = lesson.kind === 'graded_quiz';
+                const mid = courseModules.find(m => (m.lessons || []).some(l => l.id === lesson.id))?.id;
+                return (
+                  <div style={{ marginTop: 20, padding: 18, borderRadius: 12, background: 'var(--surface)', border: `1px solid color-mix(in oklch, ${meta.color} 30%, var(--border))` }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
+                      {isGraded ? 'This one counts' : 'Practice — no pressure'}
+                    </div>
+                    <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 5, lineHeight: 1.6 }}>
+                      {isGraded
+                        ? 'A graded assessment: limited attempts, 80% to pass, and passing is what advances your mastery and unlocks the next module.'
+                        : 'Unlimited attempts and every answer is explained. Nothing here affects your grade.'}
+                    </div>
+                    <div style={{ marginTop: 14 }}>
+                      <Btn variant={isGraded ? 'primary' : 'outline'} disabled={!mid}
+                        onClick={() => mid && openModal(
+                          <ModuleQuiz moduleId={mid} mode={isGraded ? 'graded' : 'practice'} title={lesson.title}
+                            onClose={closeModal}
+                            onDone={() => { API.getCourseProgress(c.slug).then(setProgress).catch(() => {}); }} />
+                        )}>
+                        {isGraded ? 'Start graded assessment' : 'Start practice quiz'}
+                      </Btn>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Footer: prev / complete+next */}
               <div style={{ marginTop: 26, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Btn variant="ghost" disabled={!prev} onClick={() => prev && setSelectedLesson(prev)} icon={React.cloneElement(I.chevronL, { size: 14 })}>Previous</Btn>
@@ -391,7 +426,12 @@ export default function Courses() {
                             <div style={{ flex: 1 }}>
                               <div style={{ fontSize: 12.5, color: isCompleted ? 'var(--muted)' : 'var(--ink-2)', textDecoration: isCompleted ? 'line-through' : 'none' }}>{lesson.title}</div>
                             </div>
-                            <Tag tone={lesson.kind === 'exercise' ? 'accent' : lesson.kind === 'video' ? 'cyan' : 'neutral'}>{lesson.kind}</Tag>
+                            {/* Per-item time, the way Coursera labels every item */}
+                            {mins(lesson.estimated_minutes) && (
+                              <span className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', flexShrink: 0 }}>{mins(lesson.estimated_minutes)}</span>
+                            )}
+                            {lesson.is_graded ? <Tag tone="accent">graded</Tag> : null}
+                            <Tag tone={lesson.kind === 'exercise' || lesson.kind === 'lab' ? 'accent' : lesson.kind === 'video' ? 'cyan' : 'neutral'}>{(LESSON_KIND[lesson.kind]?.label || lesson.kind).toLowerCase()}</Tag>
                             {enrolled[c.slug] && <Btn variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedLesson(lesson); }}>Open</Btn>}
                           </div>
                         );

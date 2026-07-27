@@ -127,6 +127,19 @@ const API = {
   // takes minutes but produces a course with real depth.
   buildCourseAI:      (data) => API.post('/courses/build', data),
 
+  // Assessments (M3) — practice is unlimited and explained; graded costs an
+  // attempt, has a pass bar, and moves mastery.
+  getModuleQuiz:      (moduleId, mode, count) => API.get(`/assessments/module/${moduleId}/quiz?mode=${mode || 'practice'}${count ? `&count=${count}` : ''}`),
+  submitModuleQuiz:   (moduleId, data) => API.post(`/assessments/module/${moduleId}/submit`, data),
+  getModuleAttempts:  (moduleId) => API.get(`/assessments/module/${moduleId}/attempts`),
+  runAssignmentTests: (id, source) => API.post(`/assessments/assignment/${id}/run`, { source }),
+
+  // Specializations (M4) — a pathway of whole courses from A to B.
+  planSpecialization: (data) => API.post('/roadmaps/specialization', data),
+  getPlacement:       (rmId) => API.get(`/roadmaps/${rmId}/placement`),
+  submitPlacement:    (rmId, answers) => API.post(`/roadmaps/${rmId}/placement/submit`, { answers }),
+  buildPathwayCourse: (rmId, nodeId, level) => API.post(`/roadmaps/${rmId}/nodes/${nodeId}/build`, { level }),
+
   // ── AI ─────────────────────────────────────────────────────────────────────
   postChat:            (data) => API.post('/ai/chat', data),
   getAIStatus:         () => API.get('/ai/status'),
