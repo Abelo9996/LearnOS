@@ -120,6 +120,12 @@ const API = {
   voteThread:          (id, value) => API.post(`/community/threads/${id}/vote`, { value }),
   replyToThread:       (id, body) => API.post(`/community/threads/${id}/replies`, { body }),
   getLeaderboard:      () => API.get('/community/leaderboard'),
+
+  // Course sharing (M12) — a course is a portable file, which is how a
+  // single-user self-hosted tool can genuinely take part in a commons.
+  getExportableCourses: () => API.get('/share/exportable'),
+  exportCourse:        (slug) => API.get(`/share/course/${slug}`),
+  importCourse:        (bundle) => API.post('/share/import', { bundle }),
   getEnrollments:     () => API.get('/users/enrollments'),
   createCourse:       (data) => API.post('/courses', data),
   generateCourseAI:   (data) => API.post('/courses/generate', data),

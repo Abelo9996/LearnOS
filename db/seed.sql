@@ -10,14 +10,12 @@ VALUES ('user-1', 'Alex Learner', 'you@localhost',
 INSERT INTO user_settings (user_id, theme, density, font_size, local_only)
 VALUES ('user-1', 'dark', 'regular', 14, 0);
 
--- Demo community members — they author the sample community content below so
--- the feed and leaderboard read as a real community, not the local user. They
--- have no credentials (there is no login anyway) and exist only as example data.
-INSERT INTO users (id, name, email, role, avatar_hue, level, xp) VALUES
-  ('demo-priya', 'Priya Sharma', 'priya@community.learnos.dev', 'user', 295, 9, 6200),
-  ('demo-maya',  'Maya Chen',    'maya@community.learnos.dev',  'user', 200, 7, 4100),
-  ('demo-devin', 'Devin Park',   'devin@community.learnos.dev', 'user', 25,  5, 2600),
-  ('demo-sam',   'Sam Okafor',   'sam@community.learnos.dev',   'user', 155, 4, 1800);
+-- NOTE: this file used to seed four invented "community members" who authored
+-- fake threads so the app would look socially active. LearnOS is single-user and
+-- self-hosted — there is no one else — so that was simply fabricated data
+-- dressed up as a community. It has been removed. Sharing now happens the way it
+-- actually can for a local open-source tool: courses are exported and imported
+-- as files (see routes/share.js).
 
 -- API keys are added in Settings → API Keys (OpenRouter), or via the
 -- OPENROUTER_API_KEY env var. No key is seeded — add your own to go live.
@@ -154,21 +152,6 @@ INSERT INTO schedule_events (id, user_id, title, event_type, agent, day_of_week,
   ('ev-8', 'user-1','Cross-validation',          'session',  'TU', 3, 13,  1.25),
   ('ev-9', 'user-1','Office hours · Maya Chen',  'live',     'TU', 4, 10,  1),
   ('ev-10','user-1','Project · Build a classifier','project','CR',5, 11,  1.5);
-
--- Community threads + replies (authored by the demo members above). Real rows
--- in the database — the feed, thread views, and leaderboard read straight from
--- these. votes/replies_count are denormalized counters on the thread.
-INSERT INTO community_threads (id, user_id, title, body, tag, votes, replies_count) VALUES
-  ('t-1','demo-priya','Best way to build intuition for backprop?','I struggle with understanding backprop beyond the chain rule. Any tips?','question',86,23),
-  ('t-2','demo-sam','Errata: chapter 4 has a typo on page 12','The formula in eq 4.2 has a missing subscript.','errata',14,4),
-  ('t-3','demo-devin','Just forked the LLM course — adding examples','Added 12 new worked examples covering RAG patterns.','show',41,11),
-  ('t-4','demo-maya','Study group — Foundations of ML, Tuesdays 7pm UTC','Anyone want to join a weekly study group?','group',142,38),
-  ('t-5','demo-priya','Anyone else struggling with measure theory?','The jump from probability to measure theory is rough.','question',33,19);
-
-INSERT INTO community_replies (id, thread_id, user_id, body) VALUES
-  ('r-1','t-1','demo-maya','I found that visualizing the computation graph helps a lot. Try drawing out each node for a small network.'),
-  ('r-2','t-1','demo-devin','The 3Blue1Brown series on neural networks is excellent for building the geometric intuition.'),
-  ('r-3','t-4','demo-sam','Count me in! What platform are we using for sessions?');
 
 -- ── Course syllabi: modules + readable lessons ───────────────────────────────
 -- Without these every catalog course opened to "This course has no modules yet"
