@@ -60,6 +60,8 @@ const API = {
   // ── Activity ──────────────────────────────────────────────────────────────
   getActivity:  () => API.get('/activity'),
   postActivity: (data) => API.post('/activity', data),
+  getUnreadNotifs: () => API.get('/activity/unread-count'),
+  markNotifsSeen:  () => API.post('/activity/seen', {}),
 
   // ── Assignments ───────────────────────────────────────────────────────────
   getAssignments:   () => API.get('/assignments'),

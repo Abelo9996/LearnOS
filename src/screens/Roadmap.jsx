@@ -334,10 +334,17 @@ function ViewToggle({ view, setView }) {
 }
 
 function RoadmapGraph({ nodes, edges, selected, setSelected, highlightedIds = [] }) {
-  const W = 1080, H = 380, padX = 90, padY = 80;
-  const colW = (W - padX * 2) / 5;
-  const rowH = (H - padY * 2);
-  const pos = (n) => ({ x: padX + n.col * colW, y: padY + n.row * rowH });
+  // Layout scales to the actual graph: a fixed 5-column grid rendered nodes in
+  // deeper columns (e.g. manually added ones) off the right edge of the canvas.
+  const maxCol = Math.max(0, ...nodes.map(n => n.col || 0));
+  const maxRow = Math.max(0, ...nodes.map(n => n.row || 0));
+  const W = 1080, H = Math.max(380, 220 + maxRow * 150), padX = 90, padY = 80;
+  const colW = maxCol > 0 ? (W - padX * 2) / maxCol : 0;
+  const rowH = maxRow > 0 ? (H - padY * 2) / maxRow : 0;
+  const pos = (n) => ({
+    x: maxCol > 0 ? padX + (n.col || 0) * colW : W / 2,
+    y: maxRow > 0 ? padY + (n.row || 0) * rowH : H / 2,
+  });
 
   return (
     <div style={{ padding: '18px 22px' }}>
@@ -680,6 +687,11 @@ function AddNodeModal({ roadmapId, nodes, onAdded, onCancel }) {
   const [objective, setObjective] = React.useState('');
   const [objectives, setObjectives] = React.useState([]);
   const [submitting, setSubmitting] = React.useState(false);
+  // Preselect the deepest node so consecutive adds chain into a connected path
+  // instead of floating unconnected in the graph.
+  const deepest = nodes.length ? nodes.reduce((a, b) => ((b.col || 0) > (a.col || 0) ? b : a)) : null;
+  const [prereqs, setPrereqs] = React.useState(deepest ? [deepest.id] : []);
+  const togglePrereq = (id) => setPrereqs(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
   const inp = { width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13 };
   const addObj = () => { if (objective.trim()) { setObjectives(o => [...o, objective.trim()]); setObjective(''); } };
   const removeObj = (i) => setObjectives(o => o.filter((_, idx) => idx !== i));
@@ -687,7 +699,12 @@ function AddNodeModal({ roadmapId, nodes, onAdded, onCancel }) {
     if (!title.trim()) return;
     setSubmitting(true);
     try {
-      await API.createRoadmapNode(roadmapId, { title: title.trim(), objectives });
+      // Place the node one column after its deepest prerequisite, stacked
+      // below any nodes already in that column.
+      const chosen = nodes.filter(n => prereqs.includes(n.id));
+      const col = chosen.length ? Math.max(...chosen.map(n => n.col || 0)) + 1 : undefined;
+      const row = col !== undefined ? nodes.filter(n => (n.col || 0) === col).length : undefined;
+      await API.createRoadmapNode(roadmapId, { title: title.trim(), objectives, prereqs, col, row });
       onAdded();
     } catch { /* parent shows toast */ }
     finally { setSubmitting(false); }
@@ -718,6 +735,20 @@ function AddNodeModal({ roadmapId, nodes, onAdded, onCancel }) {
             </ul>
           )}
         </div>
+        {nodes.length > 0 && (
+          <div>
+            <label className="cap" style={{ display: 'block', marginBottom: 4 }}>Connects after (prerequisites)</label>
+            <div className="scroll" style={{ maxHeight: 140, overflowY: 'auto', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--surface)', padding: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {nodes.map(n => (
+                <label key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '5px 8px', borderRadius: 6, cursor: 'pointer', fontSize: 12.5, color: prereqs.includes(n.id) ? 'var(--ink)' : 'var(--ink-2)', background: prereqs.includes(n.id) ? 'var(--accent-soft)' : 'transparent' }}>
+                  <input type="checkbox" checked={prereqs.includes(n.id)} onChange={() => togglePrereq(n.id)} style={{ accentColor: 'var(--brand)' }} />
+                  {n.title}
+                </label>
+              ))}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>The new module is drawn after these in the concept graph and unlocks once they are mastered.</div>
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
           <Btn variant="outline" onClick={onCancel}>Cancel</Btn>
           <Btn variant="primary" disabled={!title.trim() || submitting} onClick={submit}>{submitting ? 'Adding…' : 'Add module'}</Btn>

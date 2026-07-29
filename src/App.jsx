@@ -23,7 +23,6 @@ const NAV = [
   { group: 'LEARN', items: [
     { id: 'dashboard',   label: 'Dashboard',    icon: 'home' },
     { id: 'roadmaps',    label: 'Roadmaps',     icon: 'graph' },
-    { id: 'session',     label: 'Sessions',     icon: 'cap',      badge: 'NOW' },
     { id: 'courses',     label: 'Courses',      icon: 'book' },
     { id: 'assignments', label: 'Assignments',  icon: 'check' },
     { id: 'cards',       label: 'Spaced review',icon: 'card' },
@@ -327,7 +326,10 @@ function AppShell({ onExitToLanding }) {
   }, [toast]);
 
   React.useEffect(() => {
-    const label = NAV.flatMap(g => g.items).find(i => i.id === screen)?.label || 'Dashboard';
+    // 'session' is reachable from roadmaps/courses/dashboard but is
+    // intentionally not a sidebar destination, so it needs its own label here.
+    const label = NAV.flatMap(g => g.items).find(i => i.id === screen)?.label
+      || (screen === 'session' ? 'Session' : 'Dashboard');
     document.title = `${label} · LearnOS`;
   }, [screen]);
 
@@ -891,7 +893,6 @@ function TopBar({ setScreen, onToggleSidebar, collapsed }) {
   const [notifs, setNotifs]                       = React.useState([]);
   const [notifsLoading, setNotifsLoading]         = React.useState(false);
   const [unread, setUnread]                       = React.useState(0);
-  const [lastSeen, setLastSeen]                   = React.useState(() => localStorage.getItem('learnos_last_seen') || new Date(0).toISOString());
   const menuRef  = React.useRef(null);
   const notifRef = React.useRef(null);
 
@@ -902,27 +903,25 @@ function TopBar({ setScreen, onToggleSidebar, collapsed }) {
     session:    { icon: '▸', color: 'var(--brand-3)', label: 'Session' },
   };
 
-  // Load unread count on mount
+  // Unread count is tracked server-side (users.notifications_seen_at), so it
+  // is consistent across reloads and browsers. Refreshed on mount + every 60s.
   React.useEffect(() => {
-    API.getActivity().then(rows => {
-      const count = (rows || []).filter(a => a.created_at > lastSeen).length;
-      setUnread(count);
-    }).catch(() => {});
-  }, [lastSeen]);
+    let alive = true;
+    const tick = () => API.getUnreadNotifs().then(r => { if (alive) setUnread(r?.count || 0); }).catch(() => {});
+    tick();
+    const interval = setInterval(tick, 60000);
+    return () => { alive = false; clearInterval(interval); };
+  }, []);
 
   const openNotifs = () => {
     if (showNotifs) { setShowNotifs(false); return; }
     setShowNotifs(true);
-    const now = new Date().toISOString();
-    setLastSeen(now);
-    localStorage.setItem('learnos_last_seen', now);
     setUnread(0);
-    if (notifs.length === 0) {
-      setNotifsLoading(true);
-      API.getActivity().then(rows => {
-        setNotifs((rows || []).slice(0, 8));
-      }).catch(() => {}).finally(() => setNotifsLoading(false));
-    }
+    API.markNotifsSeen().catch(() => {});
+    setNotifsLoading(true);
+    API.getActivity().then(rows => {
+      setNotifs((rows || []).slice(0, 8));
+    }).catch(() => {}).finally(() => setNotifsLoading(false));
   };
 
   React.useEffect(() => {

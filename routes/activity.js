@@ -9,6 +9,21 @@ router.get('/', (req, res) => {
   res.json(activity);
 });
 
+// Unread notification count, tracked server-side so it survives reloads,
+// browser switches, and cleared localStorage.
+router.get('/unread-count', (req, res) => {
+  const count = db.prepare(
+    "SELECT COUNT(*) as c FROM activity_log WHERE user_id = ? AND created_at > COALESCE((SELECT notifications_seen_at FROM users WHERE id = ?), '1970-01-01')"
+  ).get(req.userId, req.userId).c;
+  res.json({ count });
+});
+
+// Mark all notifications as seen (called when the bell dropdown opens).
+router.post('/seen', (req, res) => {
+  db.prepare("UPDATE users SET notifications_seen_at = datetime('now') WHERE id = ?").run(req.userId);
+  res.json({ ok: true });
+});
+
 router.post('/', (req, res) => {
   const { kind, text, sub, xp, agent } = req.body;
   if (!kind || !text) return res.status(400).json({ error: true, message: 'kind and text required' });
