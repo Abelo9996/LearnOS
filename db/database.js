@@ -71,6 +71,7 @@ initSchema();
 // Migration: add auth columns to existing DBs (silently ignored if already present)
 try { db.exec("ALTER TABLE users ADD COLUMN password_hash TEXT"); } catch {}
 try { db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'"); } catch {}
+try { db.exec("ALTER TABLE users ADD COLUMN notifications_seen_at TEXT"); } catch {}
 try { db.exec("CREATE TABLE IF NOT EXISTS revoked_tokens (jti TEXT PRIMARY KEY, expires_at TEXT NOT NULL)"); } catch {}
 
 // Community tables must exist before the example seed (which now populates them
