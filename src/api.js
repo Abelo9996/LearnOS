@@ -40,6 +40,7 @@ const API = {
   getRoadmaps:  () => API.get('/roadmaps'),
   getRoadmap:   (id) => API.get(`/roadmaps/${id}`),
   patchRoadmap: (id, data) => API.patch(`/roadmaps/${id}`, data),
+  deleteRoadmap: (id) => API.del(`/roadmaps/${id}`),
   patchNode:    (rid, nid, data) => API.patch(`/roadmaps/${rid}/nodes/${nid}`, data),
 
   // ── Node resources (RE agent) ─────────────────────────────────────────────
