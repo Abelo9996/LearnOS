@@ -142,7 +142,7 @@ npm start
 npm run dev
 ```
 
-Open **http://localhost:3000** — there's no login. LearnOS runs as a single local user (it's *your* machine), and the database auto-seeds with example data on first boot. No `.env` is required for local dev; see [`.env.example`](.env.example) for all configurable options.
+Open **http://localhost:3000** — there's no login. LearnOS runs as a single local user (it's *your* machine) and starts completely from scratch: no example data, no demo courses. Generate your first roadmap or course and everything grows from there. No `.env` is required for local dev; see [`.env.example`](.env.example) for all configurable options.
 
 ### 3. Start Learning
 
@@ -168,7 +168,7 @@ LearnOS/
 ├── server.js             # Express 5 entry point — API + static SPA
 ├── routes/               # REST endpoints (courses, roadmaps, sessions, …)
 ├── middleware/           # local-user resolver, logger, url-safety (SSRF guard)
-├── db/                   # better-sqlite3 — schema.sql, seed.sql, database.js
+├── db/                   # better-sqlite3 — schema.sql, database.js
 ├── ai/
 │   ├── llm.js            # provider-agnostic LLM layer (Claude) + metering
 │   ├── jobs.js           # async AI job runner

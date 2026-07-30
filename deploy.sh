@@ -81,7 +81,6 @@ fi
 step "Starting LearnOS"
 echo ""
 echo -e "  ${bold}Open  http://localhost:3001${reset}"
-echo -e "  Dev login:   ${cyan}alex@learnos.dev${nc} / ${cyan}learnos123${nc}"
 echo -e "  Fresh start: ${yellow}./deploy.sh --reset${nc}"
 echo -e "  Dev mode:    ${yellow}./deploy.sh --dev${nc}"
 echo -e "  Stop:        ${yellow}./deploy.sh --stop${nc}"
