@@ -219,10 +219,22 @@ registerJobHandler('build-pathway-course', async ({ userId, input, jobId }) => {
   if (!node) throw new Error('Node not found');
   if (node.course_slug) return { slug: node.course_slug, alreadyBuilt: true };
 
+  // The course must know the pathway it serves — an "OOP" course in a C++
+  // specialization is a C++ OOP course, not a generic tour of Java and Python.
+  const rm = db.prepare('SELECT title, goal FROM roadmaps WHERE id = ?').get(node.roadmap_id);
+  const siblings = db.prepare("SELECT title FROM roadmap_nodes WHERE roadmap_id = ? AND node_kind = 'course' ORDER BY id").all(node.roadmap_id).map(n => n.title);
+  const position = siblings.indexOf(node.title);
+  const pathwayContext = rm ? [
+    `This course is part of the specialization "${rm.title}"${rm.goal ? ` toward the learner's goal: "${rm.goal}"` : ''}.`,
+    siblings.length > 1 ? `Course sequence: ${siblings.map((t, i) => `${i + 1}. ${t}${i === position ? ' (THIS COURSE)' : ''}`).join(' → ')}.` : null,
+    'Anchor every example, code sample and idiom to that goal — never drift to a different language, tool or domain.',
+  ].filter(Boolean).join(' ') : undefined;
+
   db.prepare("UPDATE roadmap_nodes SET build_status = 'building' WHERE id = ?").run(node.id);
   try {
     const res = await buildCourse({
       userId, topic: node.course_topic || node.title, level: input?.level || 'intermediate',
+      pathwayContext,
       onProgress: (p, m) => setJobProgress(jobId, p, m),
     });
     db.prepare("UPDATE roadmap_nodes SET course_slug = ?, build_status = 'built' WHERE id = ?").run(res.slug, node.id);

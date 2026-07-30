@@ -95,6 +95,8 @@ Requirements:
 - Each module: a clear title, a 1-2 sentence summary, and 3-5 measurable objectives.
 - "capstone": a substantial final project synthesizing the whole course into something the learner builds and can show off.
 
+If a "Pathway context" is provided (the specialization this course belongs to and the learner's end goal), anchor the whole course to it: module topics, examples and terminology must serve that goal. An "OOP" course inside a C++ pathway is a C++ OOP course — never drift to a different language or domain.
+
 Calibrate scope and rigor to the requested level. Return only the structured object.`;
 
 // ── Stage 2: per-module content ──────────────────────────────────────────────
@@ -228,8 +230,16 @@ const assessmentSchema = {
 const READINGS_SYSTEM = `You are the Curriculum agent for LearnOS writing the TEACHING CONTENT of one module. This module must be as substantial as a week of a top university course. Thin output is a failure.
 
 Produce:
-- "readings": 3-4 original lessons that actually TEACH. Each body_md must be at least 450 words (${FLOORS.readingChars}+ characters) of real instruction in Markdown: headings, worked intuition, a concrete example or derivation, common pitfalls, and why it matters. Do not summarize — teach. Never use placeholder text.
-- "resources": 4-6 REAL, canonical external resources at long-stable URLs. Diversify "kind" across lecture videos (prefer YouTube: MIT OCW, Stanford, 3Blue1Brown, conference talks), papers (arXiv), canonical books, high-signal blogs, docs and key repos. NEVER invent a URL — omit anything you are not confident exists; a verifier drops dead links, and a module with no surviving resources is a failure.
+- "readings": 3-4 original lessons that actually TEACH. Each body_md must be at least 450 words (${FLOORS.readingChars}+ characters) of real instruction in Markdown. Do not summarize — teach. Never use placeholder text.
+- "resources": 5-7 REAL, canonical external resources at long-stable URLs — and AT LEAST 2 must be kind "video" (YouTube lecture videos: MIT OCW, Stanford, 3Blue1Brown, StatQuest, freeCodeCamp, Computerphile, conference talks — only videos famous enough that you are certain of the exact URL). Diversify the rest across papers (arXiv), canonical books, high-signal blogs, docs and key repos. NEVER invent a URL — omit anything you are not confident exists; a verifier drops dead links, and a module with no surviving resources is a failure.
+
+Readings must be VISUALLY STRUCTURED, never a wall of text:
+- A ### heading every 150-250 words; no paragraph longer than 4 sentences.
+- At least one fenced code block per reading: a worked, runnable example for code topics, or a text diagram (flow, tree, timeline, before/after) for non-code topics.
+- At least one Markdown table per reading (comparison, decision guide, or summary — | Col | Col | rows).
+- Bold the key terms on first use. End every reading with a "**Key takeaways**" bullet list of 3-5 points.
+
+If the course context names a target language, tool, or domain (e.g. a C++ pathway), EVERY example, code block, and idiom must use that language/tool — never substitute another one.
 
 "minutes" fields are honest time estimates for a learner at the stated level.`;
 
@@ -249,16 +259,17 @@ Produce ALL THREE:
  * Build a full course through the staged pipeline.
  * @param {function(number,string)} onProgress called with (0..1, message)
  */
-export async function buildCourse({ userId, topic, level, onProgress = () => {} }) {
+export async function buildCourse({ userId, topic, level, pathwayContext, onProgress = () => {} }) {
   const lvl = LEVELS.includes(level) ? level : 'intermediate';
 
   onProgress(0.02, 'Designing the course blueprint…');
+  const ctxLine = pathwayContext ? `\nPathway context: ${pathwayContext}` : '';
   const bp = (await complete({
     userId, agentCode: 'CR',
     schema: blueprintSchema,
     maxTokens: 4000,
     system: BLUEPRINT_SYSTEM,
-    messages: `Topic: ${topic}\nTarget level: ${lvl}\nDesign the blueprint.`,
+    messages: `Topic: ${topic}\nTarget level: ${lvl}${ctxLine}\nDesign the blueprint.`,
   })).json;
 
   if (!bp || !bp.title || !Array.isArray(bp.modules) || !bp.modules.length) {
@@ -277,12 +288,13 @@ export async function buildCourse({ userId, topic, level, onProgress = () => {} 
   const buildModule = async (m, i) => {
     const context = [
       `Course: ${bp.title} (${lvl})`,
+      pathwayContext ? `Pathway context: ${pathwayContext}` : null,
       `Course outcomes: ${(bp.outcomes || []).join('; ')}`,
       `This module (${i + 1} of ${N}): ${m.title}`,
       `Module summary: ${m.summary}`,
       `Module objectives: ${(m.objectives || []).join('; ')}`,
       i > 0 ? `Already covered: ${bp.modules.slice(0, i).map(x => x.title).join('; ')}` : 'This is the first module.',
-    ].join('\n');
+    ].filter(Boolean).join('\n');
 
     const tick = (msg) => onProgress(0.05 + 0.85 * (finished / N), msg);
     try {
@@ -618,28 +630,60 @@ async function verifyReachable(resources) {
   return ok;
 }
 
+// Lecture videos carry a course visually, but they are also the resource kind
+// the model most often hallucinates — so verified-video count gets its own
+// floor and its own dedicated top-up ask.
+const VIDEOS_PER_MODULE = 2;
+
 async function topUpResources({ userId, bp, modules, level, onProgress }) {
   await mapWithConcurrency(modules, MODULE_CONCURRENCY, async (m) => {
     const have = await verifyReachable(m.resources);
     m.resources = (m.resources || []).filter(r => have.has(r.url));
-    if (m.resources.length >= FLOORS.resourcesPerModule) return;
 
-    onProgress(0.92, `Finding working resources for “${m.title}”…`);
-    try {
-      const extra = (await complete({
-        userId, agentCode: 'RE',
-        schema: topUpSchema,
-        maxTokens: 2000,
-        system: TOPUP_SYSTEM,
-        messages: `Course: ${bp.title} (${level})\nModule: ${m.title}\nSummary: ${m.summary || ''}\nObjectives: ${(m.objectives || []).join('; ')}\n\nSuggest resources with URLs you are confident exist.`,
-      })).json;
-      const okExtra = await verifyReachable(extra?.resources);
-      const seen = new Set(m.resources.map(r => r.url));
-      for (const r of (extra?.resources || [])) {
-        if (okExtra.has(r.url) && !seen.has(r.url)) { m.resources.push(r); seen.add(r.url); }
+    if (m.resources.length < FLOORS.resourcesPerModule) {
+      onProgress(0.92, `Finding working resources for “${m.title}”…`);
+      try {
+        const extra = (await complete({
+          userId, agentCode: 'RE',
+          schema: topUpSchema,
+          maxTokens: 2000,
+          system: TOPUP_SYSTEM,
+          messages: `Course: ${bp.title} (${level})\nModule: ${m.title}\nSummary: ${m.summary || ''}\nObjectives: ${(m.objectives || []).join('; ')}\n\nSuggest resources with URLs you are confident exist.`,
+        })).json;
+        const okExtra = await verifyReachable(extra?.resources);
+        const seen = new Set(m.resources.map(r => r.url));
+        for (const r of (extra?.resources || [])) {
+          if (okExtra.has(r.url) && !seen.has(r.url)) { m.resources.push(r); seen.add(r.url); }
+        }
+      } catch (e) {
+        console.warn(`[courseBuilder] resource top-up failed for ${m.title}: ${e?.message || e}`);
       }
-    } catch (e) {
-      console.warn(`[courseBuilder] resource top-up failed for ${m.title}: ${e?.message || e}`);
+    }
+
+    // Dedicated video pass: hallucinated video URLs get dropped by the oEmbed
+    // verifier, so ask specifically for famous lecture videos until the module
+    // has enough that actually exist.
+    const videos = m.resources.filter(r => r.kind === 'video').length;
+    if (videos < VIDEOS_PER_MODULE) {
+      onProgress(0.94, `Finding lecture videos for “${m.title}”…`);
+      try {
+        const extra = (await complete({
+          userId, agentCode: 'RE',
+          schema: topUpSchema,
+          maxTokens: 2000,
+          system: TOPUP_SYSTEM,
+          messages: `Course: ${bp.title} (${level})\nModule: ${m.title}\nObjectives: ${(m.objectives || []).join('; ')}\n\nSuggest 6-8 LECTURE VIDEOS ONLY (kind "video", YouTube) covering this module. Only include videos famous enough that you are certain of the exact URL — well-known channels: MIT OpenCourseWare, Stanford, 3Blue1Brown, StatQuest, freeCodeCamp, Computerphile, Fireship, CppCon, conference keynotes. A verifier checks each video actually exists.`,
+        })).json;
+        const okExtra = await verifyReachable((extra?.resources || []).filter(r => r?.kind === 'video'));
+        const seen = new Set(m.resources.map(r => r.url));
+        for (const r of (extra?.resources || [])) {
+          if (r?.kind === 'video' && okExtra.has(r.url) && !seen.has(r.url)) {
+            m.resources.push(r); seen.add(r.url);
+          }
+        }
+      } catch (e) {
+        console.warn(`[courseBuilder] video top-up failed for ${m.title}: ${e?.message || e}`);
+      }
     }
   });
 }
@@ -690,18 +734,24 @@ export async function persistRichCourse(userId, c, level = 'intermediate') {
       return id;
     };
 
-    // 1. Readings — the substance.
-    for (const r of (m.readings || [])) {
-      if (!r || !r.body_md) continue;
-      addLesson(r.title || m.title, r.body_md, 'reading', { minutes: r.minutes || 12 });
-    }
-
-    // 2. Verified external resources — embeddable media.
-    for (const r of (m.resources || [])) {
-      if (!r || !r.url || !reachable.has(r.url)) continue;
-      const body = `${r.summary || ''}\n\n_Source: ${r.source || safeHost(r.url)}_`;
-      addLesson(r.title, body, r.kind || 'article', { url: r.url, minutes: r.minutes || 15 });
-      resourceCount++;
+    // 1+2. Readings interleaved with verified external resources. All-text-then-
+    // all-links read like a wall of prose with an appendix; alternating a lecture
+    // video or article after each reading paces the module like a real course.
+    // Videos come first in the rotation so each module leads with one early.
+    const readings = (m.readings || []).filter(r => r && r.body_md);
+    const extRes = (m.resources || [])
+      .filter(r => r && r.url && reachable.has(r.url))
+      .sort((a, b) => (b.kind === 'video' ? 1 : 0) - (a.kind === 'video' ? 1 : 0));
+    const steps = Math.max(readings.length, extRes.length);
+    for (let k = 0; k < steps; k++) {
+      const rd = readings[k];
+      if (rd) addLesson(rd.title || m.title, rd.body_md, 'reading', { minutes: rd.minutes || 12 });
+      const r = extRes[k];
+      if (r) {
+        const body = `${r.summary || ''}\n\n_Source: ${r.source || safeHost(r.url)}_`;
+        addLesson(r.title, body, r.kind || 'article', { url: r.url, minutes: r.minutes || 15 });
+        resourceCount++;
+      }
     }
 
     // 3. Hands-on lab — the "doing" half, runnable where the topic allows it.

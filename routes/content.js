@@ -123,4 +123,25 @@ router.get('/verification', (req, res) => {
   res.json({ ok: true, summary, disputed });
 });
 
+/**
+ * GET /api/content/reader/:lessonId — readable in-app view of an external
+ * resource lesson. The URL is looked up server-side from the lesson row (never
+ * taken from the client), fetched behind the SSRF guard, reduced to Markdown,
+ * and cached. Returns {ok:false} when the site resists extraction — the UI
+ * falls back to the open-original card.
+ */
+router.get('/reader/:lessonId', async (req, res) => {
+  const lesson = db.prepare('SELECT id, title, url, kind FROM module_lessons WHERE id = ?').get(req.params.lessonId);
+  if (!lesson || !lesson.url) return res.status(404).json({ error: true, message: 'No external resource on this lesson' });
+  if (lesson.kind === 'video') return res.json({ ok: false, reason: 'video' }); // videos embed natively
+  try {
+    const { fetchReadable } = await import('../ai/reader.js');
+    const out = await fetchReadable(lesson.url);
+    if (!out) return res.json({ ok: false, reason: 'not_extractable' });
+    res.json({ ok: true, title: out.title || lesson.title, source: out.source, markdown: out.markdown, cached: !!out.cached });
+  } catch (e) {
+    res.json({ ok: false, reason: e.message || 'fetch_failed' });
+  }
+});
+
 export default router;
