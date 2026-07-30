@@ -8,8 +8,8 @@ import db from '../db/database.js';
  */
 const LOCAL_USER_ID = process.env.LEARNOS_LOCAL_USER || 'user-1';
 
-// Ensure the local user (and its settings row) exists once at boot. The seed
-// normally creates `user-1`; this covers a fresh DB started without seed data.
+// Ensure the local user (and its settings row) exists once at boot. There is
+// no seed data — every install starts from scratch with a fresh level-1 user.
 function ensureLocalUser() {
   const exists = db.prepare('SELECT id FROM users WHERE id = ?').get(LOCAL_USER_ID);
   if (!exists) {
@@ -20,6 +20,13 @@ function ensureLocalUser() {
   db.prepare(
     "INSERT OR IGNORE INTO user_settings (user_id, theme, density, font_size, local_only) VALUES (?, 'dark', 'regular', 14, 0)"
   ).run(LOCAL_USER_ID);
+  // Per-agent model routing is app config (the Settings page lists agents from
+  // it), so default rows must exist even on a from-scratch database.
+  const routing = db.prepare('INSERT OR IGNORE INTO agent_routing (user_id, agent_code, model) VALUES (?, ?, ?)');
+  routing.run(LOCAL_USER_ID, 'TU', 'anthropic/claude-sonnet-4.6');
+  for (const code of ['PR', 'CR', 'AS', 'RE', 'AN', 'CE']) {
+    routing.run(LOCAL_USER_ID, code, 'anthropic/claude-haiku-4.5');
+  }
 }
 ensureLocalUser();
 

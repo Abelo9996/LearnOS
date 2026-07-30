@@ -92,7 +92,6 @@ curl https://learnos.example.com/api/health
 | `OPENROUTER_API_KEY` | Optional | *(empty)* | Server-wide OpenRouter key (users can otherwise add one in-app) |
 | `LEARNOS_DEFAULT_MODEL` | Optional | `anthropic/claude-haiku-4.5` | Default OpenRouter model slug when no per-agent routing is set |
 | `LEARNOS_ENC_KEY` | Optional | *(derived)* | 32-byte base64/hex key to encrypt in-app API keys at rest |
-| `LEARNOS_SEED` | Optional | *(unset)* | Set to `1` to seed example roadmaps/courses on first boot |
 
 ## Data & Persistence
 
