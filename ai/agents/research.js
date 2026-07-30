@@ -17,7 +17,8 @@ const dnsLookup = promisify(dns.lookup);
 
 // ── SSRF protection (§3.14) ──────────────────────────────────────────────────
 // Rejects URLs that resolve to private/internal IPs before any fetch.
-function isPublicUrl(u) {
+// Exported for reuse by the reader-mode fetcher (ai/reader.js).
+export function isPublicUrl(u) {
   try {
     const parsed = new URL(u);
     if (!/^https?:$/.test(parsed.protocol)) return false;
@@ -31,7 +32,7 @@ function isPublicUrl(u) {
   } catch { return false; }
 }
 
-async function resolvesToPublicIp(hostname) {
+export async function resolvesToPublicIp(hostname) {
   try {
     // With { all: true }, dns.lookup resolves to an ARRAY of {address, family}.
     // This was destructured as `{ address }` (→ undefined), so the loop threw

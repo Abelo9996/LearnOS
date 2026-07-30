@@ -402,6 +402,20 @@ try {
   db.exec("CREATE INDEX IF NOT EXISTS idx_node_resources_status ON node_resources(status)");
 } catch (e) { console.log('node_resources migration:', e.message); }
 
+// ── Migration: reader_cache ──────────────────────────────────────────────────
+// Extracted readable text of external resources, so articles/docs render inside
+// the lesson viewer instead of only as outbound links. Keyed by URL.
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS reader_cache (
+    url TEXT PRIMARY KEY,
+    title TEXT,
+    content_md TEXT,
+    source TEXT,
+    ok INTEGER DEFAULT 1,
+    fetched_at TEXT DEFAULT (datetime('now'))
+  )`);
+} catch (e) { console.log('reader_cache migration:', e.message); }
+
 // ── Migration: node_lessons (P10) ────────────────────────────────────────────
 // Each node has an optional concept body (Markdown) — the actual lesson text a
 // learner reads before opening a tutor session.

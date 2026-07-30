@@ -154,6 +154,7 @@ const API = {
   reportContent:      (data) => API.post('/content/report', data),
   getContentReports:  (status) => API.get(`/content/reports${status ? `?status=${status}` : ''}`),
   getVerification:    (slug) => API.get(`/content/verification${slug ? `?slug=${slug}` : ''}`),
+  getReader:          (lessonId) => API.get(`/content/reader/${lessonId}`),
 
   // Specializations (M4) — a pathway of whole courses from A to B.
   planSpecialization: (data) => API.post('/roadmaps/specialization', data),

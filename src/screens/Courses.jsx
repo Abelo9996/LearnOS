@@ -34,6 +34,39 @@ const LESSON_KIND = {
 // "12 min" the way Coursera labels every item.
 const mins = (n) => (n ? (n >= 60 ? `${Math.round(n / 60)} h` : `${n} min`) : null);
 
+/* In-app reader view for external article/docs/paper resources: the server
+   fetches the page (SSRF-guarded, cached) and reduces it to Markdown so the
+   reference is studied here instead of only as an outbound link. Falls back
+   silently to the open-original card when the site resists extraction. */
+function ResourceReader({ lessonId }) {
+  const [state, setState] = React.useState({ status: 'loading' });
+  React.useEffect(() => {
+    let alive = true;
+    setState({ status: 'loading' });
+    API.getReader(lessonId)
+      .then(r => { if (alive) setState(r?.ok ? { status: 'ok', ...r } : { status: 'none' }); })
+      .catch(() => { if (alive) setState({ status: 'none' }); });
+    return () => { alive = false; };
+  }, [lessonId]);
+
+  if (state.status === 'loading') return (
+    <div style={{ padding: '18px 0', textAlign: 'center', color: 'var(--muted)', fontSize: 12.5 }}>Loading a readable view…</div>
+  );
+  if (state.status !== 'ok') return null;
+  return (
+    <div style={{ marginBottom: 18, border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <span className="cap">Reader view</span>
+        <span className="mono" style={{ fontSize: 10.5, color: 'var(--muted)' }}>{state.source}</span>
+        <span className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', marginLeft: 'auto' }}>extracted — open the original for full fidelity</span>
+      </div>
+      <div style={{ padding: '16px 20px', fontSize: 14, lineHeight: 1.7, maxHeight: '60vh', overflowY: 'auto' }} className="scroll">
+        <MarkdownText text={state.markdown} />
+      </div>
+    </div>
+  );
+}
+
 export default function Courses() {
   const { add: toast } = useToast();
   const { open: openModal, close: closeModal } = useModal();
@@ -261,6 +294,9 @@ export default function Courses() {
                   <span style={{ color: meta.color, flexShrink: 0 }}>{React.cloneElement(I.open || I.arrowR, { size: 16 })}</span>
                 </a>
               )}
+
+              {/* Readable in-app rendering of the external reference */}
+              {lesson.url && !vid && <ResourceReader lessonId={lesson.id} />}
 
               {lesson.body_md ? (
                 <div style={{ fontSize: 14.5, lineHeight: 1.75 }}><MarkdownText text={lesson.body_md} /></div>

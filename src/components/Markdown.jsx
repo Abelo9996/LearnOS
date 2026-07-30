@@ -143,6 +143,43 @@ export default function MarkdownText({ text, citationMap }) {
       continue;
     }
 
+    // Table: | Col | Col | header, |---|---| separator, then | a | b | rows.
+    if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
+      flushList();
+      const parseRow = (l) => l.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+      const header = parseRow(line);
+      i += 2;
+      const rows = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i]) && !/^\s*\|[\s:|-]+\|\s*$/.test(lines[i])) {
+        rows.push(parseRow(lines[i])); i++;
+      }
+      i--; // the for-loop increments past the last row
+      const cellPad = '7px 12px';
+      elements.push(
+        <div key={`t-${i}`} style={{ overflowX: 'auto', margin: '10px 0', border: '1px solid var(--border)', borderRadius: 8 }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 13 }}>
+            <thead>
+              <tr>
+                {header.map((h, k) => (
+                  <th key={k} style={{ textAlign: 'left', padding: cellPad, background: 'var(--surface-2)', color: 'var(--ink)', fontWeight: 600, borderBottom: '1px solid var(--border)', whiteSpace: 'nowrap' }}>{formatInline(h, citationMap)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, ri) => (
+                <tr key={ri}>
+                  {r.map((c, k) => (
+                    <td key={k} style={{ padding: cellPad, color: 'var(--ink-2)', borderBottom: ri < rows.length - 1 ? '1px solid var(--border)' : 0, lineHeight: 1.5, verticalAlign: 'top' }}>{formatInline(c, citationMap)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
     // Blockquote >
     if (/^\s*>\s?/.test(line)) {
       flushList();
