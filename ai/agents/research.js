@@ -60,6 +60,26 @@ async function resolvesToPublicIp(hostname) {
 
 const RESOURCE_KINDS = ['video', 'paper', 'book', 'blog', 'article', 'website', 'docs', 'repo'];
 
+// YouTube/Vimeo return HTTP 200 with a "video unavailable" page for nonexistent
+// video IDs, so a plain reachability check happily verifies hallucinated links.
+// Their oEmbed endpoints return a real 404 for missing videos — use those.
+async function videoActuallyExists(url) {
+  let oembed = null;
+  if (/youtube\.com\/(watch|embed|shorts)|youtu\.be\//i.test(url)) {
+    oembed = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+  } else if (/vimeo\.com\/\d+/i.test(url)) {
+    oembed = `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url)}`;
+  }
+  if (!oembed) return null; // not a host we can oEmbed-check
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    const resp = await fetch(oembed, { redirect: 'follow', signal: controller.signal, headers: { 'User-Agent': 'LearnOS-Verifier/1.0' } });
+    clearTimeout(timeout);
+    return resp.ok;
+  } catch { clearTimeout(timeout); return false; }
+}
+
 // Standalone reachability check (SSRF-safe HEAD/GET) reused by the course
 // generator so AI-authored courses only ever link to resources that resolve.
 export async function checkUrlReachable(url, kind = 'article') {
@@ -68,6 +88,8 @@ export async function checkUrlReachable(url, kind = 'article') {
   try { hostname = new URL(url).hostname; } catch { return false; }
   if (!await resolvesToPublicIp(hostname)) return false;
   if (kind === 'video' && !/youtube\.com|youtu\.be|vimeo\.com|ted\.com|ocw\.mit\.edu|bilibili\.com/i.test(url)) return false;
+  const videoCheck = await videoActuallyExists(url);
+  if (videoCheck !== null) return videoCheck;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 8000);
   try {
@@ -185,6 +207,12 @@ export async function verifyResource({ resourceId }) {
     const hostname = new URL(r.url).hostname;
     if (!await resolvesToPublicIp(hostname)) return reject('private_target');
   } catch { return reject('private_target'); }
+
+  // Video hosts serve HTTP 200 for missing videos — the oEmbed endpoint is the
+  // only honest signal, so it decides alone for those URLs.
+  const videoCheck = await videoActuallyExists(r.url);
+  if (videoCheck === false) return reject('video_not_found');
+  if (videoCheck === true) return accept();
 
   // Reachability check.
   let resp;
