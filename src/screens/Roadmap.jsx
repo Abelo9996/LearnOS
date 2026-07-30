@@ -135,6 +135,18 @@ export default function Roadmap({ onOpenSession, onOpenCourse }) {
     }
   };
 
+  const handleDeleteRoadmap = async () => {
+    if (!roadmap) return;
+    if (!confirm(`Delete roadmap "${roadmap.title}"? Its modules and progress are removed. Past sessions are kept as history.`)) return;
+    try {
+      await API.deleteRoadmap(roadmap.id);
+      toast('Roadmap deleted', 'info');
+      const rows = await loadAllRoadmaps();
+      if (rows && rows.length > 0) await loadRoadmap(rows[0].id);
+      else { setRoadmap(null); setLoading(false); }
+    } catch { toast('Could not delete roadmap', 'error'); }
+  };
+
   // F-09: Delete node handler
   const handleDeleteNode = React.useCallback(async (nodeId) => {
     if (!roadmap?.id) return;
@@ -260,6 +272,12 @@ export default function Roadmap({ onOpenSession, onOpenCourse }) {
                 </button>
               );
             })}
+            <button onClick={() => openModal(<GenerateModal onGenerate={handleGenerate} onCancel={closeModal} />)} style={{
+              display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 10, cursor: 'pointer',
+              border: '1px dashed var(--border)', background: 'transparent', color: 'var(--muted)', fontSize: 12.5, fontWeight: 600,
+            }}>
+              {React.cloneElement(I.plus, { size: 13 })} New roadmap
+            </button>
           </div>
         </div>
       )}
@@ -270,6 +288,10 @@ export default function Roadmap({ onOpenSession, onOpenCourse }) {
         actions={
           <>
             <ViewToggle view={view} setView={setView} />
+            <Btn variant="ghost" onClick={() => openModal(
+              <EditRoadmapModal roadmap={r} onCancel={closeModal} onSaved={() => { closeModal(); loadAllRoadmaps(); loadRoadmap(r.id); toast('Roadmap updated', 'success'); }} />
+            )}>Rename</Btn>
+            <Btn variant="ghost" style={{ color: 'var(--bad)' }} onClick={handleDeleteRoadmap}>Delete</Btn>
             <Btn variant="outline" icon={I.spark} onClick={() => openModal(<GenerateModal onGenerate={handleGenerate} onCancel={closeModal} />)}>Generate</Btn>
             <Btn variant="outline" icon={I.plus} onClick={() => openModal(<AddNodeModal roadmapId={r.id} nodes={nodes} onAdded={() => { closeModal(); loadRoadmap(r.id); toast('Node added!', 'success'); }} onCancel={closeModal} />)}>Add node</Btn>
             <Btn variant="primary" size="md" icon={I.play} onClick={handleResume}>
@@ -391,6 +413,40 @@ function GenerateModal({ onGenerate, onCancel }) {
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
           <Btn variant="outline" onClick={onCancel}>Cancel</Btn>
           <Btn variant="primary" icon={I.spark} onClick={submit}>Generate roadmap</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditRoadmapModal({ roadmap, onSaved, onCancel }) {
+  const [title, setTitle] = React.useState(roadmap.title || '');
+  const [subtitle, setSubtitle] = React.useState(roadmap.subtitle || '');
+  const [saving, setSaving] = React.useState(false);
+  const inp = { width: '100%', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13 };
+  const save = async () => {
+    if (!title.trim()) return;
+    setSaving(true);
+    try {
+      await API.patchRoadmap(roadmap.id, { title: title.trim(), subtitle: subtitle.trim() });
+      onSaved();
+    } catch { setSaving(false); }
+  };
+  return (
+    <div style={{ minWidth: 440 }}>
+      <h3 className="display" style={{ fontSize: 22, marginBottom: 14 }}>Rename roadmap</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div>
+          <label className="cap" style={{ display: 'block', marginBottom: 4 }}>Title</label>
+          <input autoFocus value={title} onChange={e => setTitle(e.target.value)} style={inp} onKeyDown={e => { if (e.key === 'Enter') save(); }} />
+        </div>
+        <div>
+          <label className="cap" style={{ display: 'block', marginBottom: 4 }}>Subtitle</label>
+          <input value={subtitle} onChange={e => setSubtitle(e.target.value)} placeholder="Optional description" style={inp} onKeyDown={e => { if (e.key === 'Enter') save(); }} />
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+          <Btn variant="outline" onClick={onCancel}>Cancel</Btn>
+          <Btn variant="primary" disabled={!title.trim() || saving} onClick={save}>{saving ? 'Saving…' : 'Save'}</Btn>
         </div>
       </div>
     </div>

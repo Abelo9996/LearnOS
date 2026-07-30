@@ -91,6 +91,26 @@ router.patch('/:id', (req, res) => {
   res.json({ ok: true, roadmap: db.prepare('SELECT * FROM roadmaps WHERE id = ?').get(req.params.id) });
 });
 
+// Delete a roadmap and its content. Sessions are kept as history but detached
+// (sessions.roadmap_id has no ON DELETE action, so they must be unlinked first
+// or the FK blocks the delete).
+router.delete('/:id', (req, res) => {
+  const r = db.prepare('SELECT id FROM roadmaps WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+  if (!r) return res.status(404).json({ error: true, message: 'Roadmap not found' });
+  const tx = db.transaction(() => {
+    const nodeIds = db.prepare('SELECT id FROM roadmap_nodes WHERE roadmap_id = ?').all(r.id).map(n => n.id);
+    db.prepare('UPDATE sessions SET roadmap_id = NULL, roadmap_node_id = NULL WHERE roadmap_id = ?').run(r.id);
+    db.prepare('DELETE FROM node_objectives WHERE roadmap_id = ?').run(r.id);
+    db.prepare('DELETE FROM node_resources WHERE roadmap_id = ?').run(r.id);
+    for (const nid of nodeIds) db.prepare('DELETE FROM node_lessons WHERE node_id = ?').run(nid);
+    db.prepare('DELETE FROM roadmap_edges WHERE roadmap_id = ?').run(r.id);
+    db.prepare('DELETE FROM roadmap_nodes WHERE roadmap_id = ?').run(r.id);
+    db.prepare('DELETE FROM roadmaps WHERE id = ?').run(r.id);
+  });
+  tx();
+  res.json({ ok: true });
+});
+
 // NOTE: Roadmaps are personal learning instances and are intentionally NOT
 // forkable. Sharing/forking happens at the Course level (a course is the
 // shareable template; a roadmap is your private progress through one).
