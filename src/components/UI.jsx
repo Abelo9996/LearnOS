@@ -105,6 +105,51 @@ export function Btn({ children, variant = 'ghost', size = 'sm', icon, iconRight,
   );
 }
 
+/* ── ConfirmModal ─────────────────────────────────────────────────────────────
+   In-app replacement for the browser's native confirm() popup. Render it via
+   useModal().open(<ConfirmModal … />): spring entrance comes from the modal
+   shell, the icon pops in, and both buttons carry hover lift. `onConfirm` may
+   be async — the confirm button shows a busy state until it settles. */
+export function ConfirmModal({ title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false, onConfirm, onCancel }) {
+  const [busy, setBusy] = React.useState(false);
+  const color = danger ? 'oklch(0.62 0.19 25)' : 'var(--brand)';
+  const go = async () => {
+    setBusy(true);
+    try { await onConfirm?.(); } finally { setBusy(false); }
+  };
+  return (
+    <div style={{ minWidth: 360, maxWidth: 440 }}>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+        <span style={{
+          width: 42, height: 42, flexShrink: 0, borderRadius: 12,
+          background: `color-mix(in oklch, ${color} 16%, transparent)`,
+          border: `1px solid color-mix(in oklch, ${color} 40%, transparent)`,
+          color, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 20, fontWeight: 700, fontFamily: 'var(--font-display)',
+          animation: 'confirmIconPop var(--dur-slow) var(--ease-spring)',
+        }}>{danger ? '!' : '?'}</span>
+        <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
+          <div className="display" style={{ fontSize: 19, color: 'var(--ink)', lineHeight: 1.3 }}>{title}</div>
+          {message && <div style={{ fontSize: 13.5, color: 'var(--muted)', marginTop: 7, lineHeight: 1.6 }}>{message}</div>}
+        </div>
+      </div>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 22 }}>
+        <Btn variant="outline" size="md" onClick={onCancel} disabled={busy}>{cancelLabel}</Btn>
+        <Btn
+          variant="primary" size="md" onClick={go} disabled={busy}
+          className={danger ? 'confirm-danger-btn' : ''}
+          style={danger ? {
+            background: 'linear-gradient(135deg, oklch(0.62 0.19 25), oklch(0.55 0.2 15))',
+            color: 'oklch(0.97 0.01 25)',
+            boxShadow: '0 0 0 1px oklch(0.62 0.19 25 / 0.5), 0 4px 18px oklch(0.62 0.19 25 / 0.3)',
+          } : undefined}>
+          {busy ? 'Working…' : confirmLabel}
+        </Btn>
+      </div>
+    </div>
+  );
+}
+
 /* ── Progress / Ring / Bar ───────────────────────────────────────────────── */
 export function ProgressBar({ value, height = 6, gradient = true, track = 'var(--surface-3)' }) {
   const v = Math.max(0, Math.min(1, value));

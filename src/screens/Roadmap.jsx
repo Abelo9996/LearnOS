@@ -1,6 +1,6 @@
 import React from 'react';
 import { I } from '../components/Icons';
-import { Card, Btn, ProgressBar, Ring, Tag, Avatar, AgentChip, PageScroll, PageHeader, SectionHead } from '../components/UI';
+import { Card, Btn, ProgressBar, Ring, Tag, Avatar, AgentChip, PageScroll, PageHeader, SectionHead, ConfirmModal } from '../components/UI';
 // All roadmap data loaded from API
 import API from '../api.js';
 import { useToast, useModal } from '../App';
@@ -135,16 +135,27 @@ export default function Roadmap({ onOpenSession, onOpenCourse }) {
     }
   };
 
-  const handleDeleteRoadmap = async () => {
+  const handleDeleteRoadmap = () => {
     if (!roadmap) return;
-    if (!confirm(`Delete roadmap "${roadmap.title}"? Its modules and progress are removed. Past sessions are kept as history.`)) return;
-    try {
-      await API.deleteRoadmap(roadmap.id);
-      toast('Roadmap deleted', 'info');
-      const rows = await loadAllRoadmaps();
-      if (rows && rows.length > 0) await loadRoadmap(rows[0].id);
-      else { setRoadmap(null); setLoading(false); }
-    } catch { toast('Could not delete roadmap', 'error'); }
+    openModal(
+      <ConfirmModal
+        danger
+        title="Delete this roadmap?"
+        message={`"${roadmap.title}" and all of its modules and progress will be removed. Past sessions are kept as history. This cannot be undone.`}
+        confirmLabel="Delete roadmap"
+        onCancel={closeModal}
+        onConfirm={async () => {
+          try {
+            await API.deleteRoadmap(roadmap.id);
+            closeModal();
+            toast('Roadmap deleted', 'info');
+            const rows = await loadAllRoadmaps();
+            if (rows && rows.length > 0) await loadRoadmap(rows[0].id);
+            else { setRoadmap(null); setLoading(false); }
+          } catch { closeModal(); toast('Could not delete roadmap', 'error'); }
+        }}
+      />
+    );
   };
 
   // F-09: Delete node handler
@@ -812,13 +823,21 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, open
           )}
           {isLocked && <Btn variant="ghost" size="md" onClick={() => toast('Complete prerequisites to unlock this module', 'info')}>Locked</Btn>}
           {/* F-09: Delete node button (not for done/active nodes to prevent accidental data loss) */}
-          {!isActive && !isDone && (
-            <Btn variant="ghost" size="md" icon={I.trash || I.x} onClick={() => {
-              if (confirm(`Delete "${node.title}" from this roadmap? This cannot be undone.`)) {
-                // Need access to onDelete — handled via parent
-                window.dispatchEvent(new CustomEvent('roadmap-delete-node', { detail: { nodeId: node.id } }));
-              }
-            }} style={{ color: 'var(--bad)' }}>Delete</Btn>
+          {!isActive && !isDone && openModal && (
+            <Btn variant="ghost" size="md" icon={I.trash || I.x} onClick={() => openModal(
+              <ConfirmModal
+                danger
+                title="Delete this module?"
+                message={`"${node.title}" will be removed from the roadmap, along with its objectives and resources. This cannot be undone.`}
+                confirmLabel="Delete module"
+                onCancel={closeModal}
+                onConfirm={() => {
+                  closeModal();
+                  // Deletion is handled by the parent via this event.
+                  window.dispatchEvent(new CustomEvent('roadmap-delete-node', { detail: { nodeId: node.id } }));
+                }}
+              />
+            )} style={{ color: 'var(--bad)' }}>Delete</Btn>
           )}
         </div>
       </div>

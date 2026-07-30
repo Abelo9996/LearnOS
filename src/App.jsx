@@ -104,17 +104,18 @@ function ModalProvider({ children }) {
           position: 'fixed', inset: 0, zIndex: 9998,
           background: 'oklch(0 0 0 / 0.5)', backdropFilter: 'blur(4px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          animation: 'backdropIn var(--dur-fast) ease-out',
         }} onClick={(e) => { if (e.target === e.currentTarget) close(); }}>
           <div style={{
             background: 'var(--bg-window)', border: '1px solid var(--border)',
             borderRadius: 16, padding: 28, maxWidth: 560, width: '90%',
             boxShadow: '0 30px 80px oklch(0 0 0 / 0.5)',
-            animation: 'pageEnter var(--dur-normal) var(--ease-out)',
+            animation: 'modalPop var(--dur-normal) var(--ease-spring)',
             position: 'relative',
           }}>
-            <button onClick={close} style={{
+            <button onClick={close} className="modal-close" style={{
               position: 'absolute', top: 16, right: 16, background: 'none', border: 0,
-              color: 'var(--muted)', cursor: 'pointer', fontSize: 18, padding: 4,
+              color: 'var(--muted)', cursor: 'pointer', fontSize: 16, padding: 6, lineHeight: 1,
             }}>✕</button>
             {modal}
           </div>
