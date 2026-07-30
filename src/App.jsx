@@ -366,14 +366,18 @@ function AppShell({ onExitToLanding }) {
   }, [density, sw, tk.accent, tk.soft, tk.line, tk.grad]);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', overflowX: 'hidden' }}>
+    // Fixed viewport shell: the sidebar and top bar are locked; only each
+    // screen's own PageScroll area scrolls. minHeight here (instead of height)
+    // made inner 100% chains collapse, so the whole body scrolled — dragging
+    // the sidebar with it.
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       {!isMobile && <Sidebar screen={screen} setScreen={go} collapsed={sidebarCollapsed} onToggle={toggleSidebar} counts={navCounts} onExitToLanding={onExitToLanding} />}
       <main style={{
         flex: 1,
         width: isMobile ? '100%' : `calc(100vw - ${sw}px)`,
         maxWidth: '100%',
         minWidth: 0,               // lets flex children shrink instead of forcing sideways scroll
-        display: 'flex', flexDirection: 'column', minHeight: '100vh',
+        display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0,
         // Leave room for the mobile tab bar so the last item isn't sitting under it.
         paddingBottom: isMobile ? 'calc(58px + env(safe-area-inset-bottom, 0px))' : 0,
         transition: 'width var(--dur-normal) var(--ease-smooth)',
@@ -615,7 +619,7 @@ function Sidebar({ screen, setScreen, collapsed, onToggle, counts = {}, onExitTo
       borderRight: '1px solid var(--border)',
       background: 'oklch(from var(--bg) calc(l - 0.005) c h)',
       display: 'flex', flexDirection: 'column',
-      position: 'sticky', top: 0, height: '100vh',
+      height: '100%',
       transition: 'width var(--dur-normal) var(--ease-smooth)',
       overflow: 'hidden',
     }}>

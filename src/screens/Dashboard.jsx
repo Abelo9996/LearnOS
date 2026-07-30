@@ -239,7 +239,7 @@ function UpcomingSessionsCard({ onOpenSession, setScreen, sessions }) {
       <SectionHead title="Recent Sessions" action={<a href="#" onClick={(e) => { e.preventDefault(); setScreen('schedule'); }} className="hover-underline" style={{ color: 'var(--brand)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>View schedule</a>} />
       {sessions.length === 0 ? (
         <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-          No sessions yet — start one from the Sessions section.
+          No sessions yet — open a module on your roadmap to start one.
         </div>
       ) : (
         <div className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
