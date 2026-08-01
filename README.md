@@ -94,7 +94,8 @@ All agents run through a single LLM layer ([`ai/llm.js`](ai/llm.js)) that talks 
 - 🧑‍🏫 **Personal AI Tutor** — Live Socratic tutoring sessions that adapt to your understanding
 - 📝 **Smart Assignments** — Auto-generated with rubrics and AI grading
 - 🃏 **Flashcards** — Spaced-repetition review generated from your material
-- 📚 **Courses & Community** — Create courses, star favorites, and browse community content
+- 📚 **Courses** — Generate full courses with readings, labs and question banks; star what you keep coming back to
+- 🤝 **Sharing** — A course is a portable file. Export it, send it, import it whole. Optionally publish to a registry so others can find it — LearnOS works completely without one
 - 🏅 **Certificates & Badges** — Mastery-verified certificates and achievement badges
 - 📅 **Study Schedule** — Plan and track your learning cadence
 - 📊 **Learning Analytics** — Daily stats, streaks, XP, and activity history
@@ -108,7 +109,7 @@ All agents run through a single LLM layer ([`ai/llm.js`](ai/llm.js)) that talks 
 | Phase | Status | Description |
 |---|---|---|
 | **Foundation** | ✅ Done | Roadmaps, tutor, assignments, flashcards, analytics, profiling |
-| **Community** | ✅ Done | Profiles, courses, starring, community, certificates, badges |
+| **Sharing** | ✅ Done | Courses as portable files, publish/browse via an optional registry, certificates, badges |
 | **Hardening** | ✅ Done | SSRF guard, upload validation, rate limiting, CI |
 | **Scale** | 🔨 Building | Cohort learning, richer course library, streaming responses |
 | **Reach** | 🔮 Vision | Multi-language, mobile, accreditation & employer verification |
@@ -183,6 +184,31 @@ LearnOS/
 ```
 
 Frontend talks to the backend via a `/api` proxy in dev ([`vite.config.js`](vite.config.js)) and same-origin in production.
+
+## 🤝 Sharing courses
+
+A course you generate is not trapped in your install. **Share → Export** writes the
+whole thing — modules, readings, resources, labs, and the question bank — to a single
+`.learnos.json` file. Anyone with that file gets the entire course by dropping it into
+their own LearnOS. No server, no account, no network involved.
+
+That is the baseline, and it is enough on its own. On top of it, LearnOS can talk to a
+**course registry**: a small optional service (see
+[LearnOSWeb](https://github.com/Abelo9996/LearnOSWeb)) where instances publish courses
+for each other to find. Publishing claims a handle — no account, no email — and the
+registry issues a token that stays on your machine and never reaches the browser; it
+authorises exactly one thing, updating what you published.
+
+The registry is a convenience and never a dependency. Switch it off in
+**Settings → Community** and LearnOS contacts nothing at all; leave it on and it still
+works normally when the registry is down, saying so plainly instead of breaking. Nothing
+imported is trusted either: URLs are re-checked against the same SSRF policy as any other
+outside content, and imported questions arrive **unverified** no matter what the exporter
+believed, because verification is evidence your instance gathered — not a claim that
+travels with a file.
+
+There is no forum, no leaderboard, and no member directory, because a single-user local
+app cannot honestly host one.
 
 ## 🔒 Security
 
