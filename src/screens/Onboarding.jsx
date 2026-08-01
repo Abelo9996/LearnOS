@@ -4,6 +4,28 @@ import { Btn } from '../components/UI';
 import API from '../api';
 
 const GOAL_CHIPS = ['Machine Learning', 'Generative AI', 'Data Science', 'Web development'];
+
+/**
+ * Turn a provider failure into something a person can act on.
+ * The raw form is a JSON blob ("OpenRouter 401: {"error":{"message":...}}"),
+ * which tells a learner nothing about what to actually do next.
+ */
+function explainKeyError(e) {
+  const raw = String(e?.message || '');
+  if (/401|unauthor|user not found|invalid api key/i.test(raw)) {
+    return 'OpenRouter rejected that key. Check you pasted the whole thing — it starts with "sk-or-v1-".';
+  }
+  if (/402|insufficient credit|requires more credits/i.test(raw)) {
+    return 'That key is valid but has no credit left. Add credit at openrouter.ai, then test again.';
+  }
+  if (/403|limit exceeded/i.test(raw)) {
+    return 'That key has hit its spending limit. Raise the limit on the key at openrouter.ai, then test again.';
+  }
+  if (/429|rate limit/i.test(raw)) return 'OpenRouter is rate-limiting this key right now. Wait a moment and test again.';
+  if (/cannot reach the server/i.test(raw)) return 'Cannot reach the LearnOS server — is it still running?';
+  if (/fetch|network|ENOTFOUND|ETIMEDOUT/i.test(raw)) return 'Could not reach OpenRouter. Check your internet connection.';
+  return raw.replace(/\s*\{.*$/s, '') || 'That key could not be verified.';
+}
 const STYLE_CHIPS = ['Visual examples', 'Hands-on projects', 'Theory first', 'Quick sprints'];
 
 export default function Onboarding({ onComplete }) {
@@ -14,6 +36,11 @@ export default function Onboarding({ onComplete }) {
   const [level, setLevel] = React.useState('beginner');
   const [hours, setHours] = React.useState(5);
   const [styles, setStyles] = React.useState([]);
+  const [apiKey, setApiKey] = React.useState('');
+  const [model, setModel] = React.useState('anthropic/claude-sonnet-4.6');
+  const [keyState, setKeyState] = React.useState('idle');   // idle | testing | ok | bad
+  const [keyMsg, setKeyMsg] = React.useState('');
+  const [skipKey, setSkipKey] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
   const [jobStatus, setJobStatus] = React.useState(null); // null | { jobId }
   const [error, setError] = React.useState(null);
@@ -25,6 +52,30 @@ export default function Onboarding({ onComplete }) {
 
   const canSubmit = goal.trim().length >= 3;
   const canPassIntro = name.trim().length >= 1;
+
+  // A key that is merely stored is not a key that works. Save it, then make a
+  // real call — otherwise the first thing the learner discovers is a silent
+  // fallback to a template roadmap, which is exactly what this step exists to
+  // prevent.
+  const saveAndTestKey = async () => {
+    if (!apiKey.trim()) return;
+    setKeyState('testing'); setKeyMsg('');
+    let createdId = null;
+    try {
+      const saved = await API.createApiKey({ provider: 'openrouter', encrypted_key: apiKey.trim(), model });
+      createdId = saved?.key?.id || null;
+      const ping = await API.pingAI();
+      setKeyState('ok');
+      setKeyMsg(`Connected — replied using ${ping.model || model}.`);
+      setSkipKey(false);
+    } catch (e) {
+      // A key that failed its test must not be left configured: the app would
+      // then look connected while every AI call quietly failed.
+      if (createdId) await API.deleteApiKey(createdId).catch(() => {});
+      setKeyState('bad');
+      setKeyMsg(explainKeyError(e));
+    }
+  };
 
   // F-02: Exponential backoff poll delays: 1s, 2s, 3s, 5s, 5s, ... up to ~5 min total
   const pollDelay = (i) => {
@@ -130,6 +181,8 @@ export default function Onboarding({ onComplete }) {
           <StepDot n={3} />
           <div style={{ width: 28, height: 2, background: step >= 4 ? 'var(--brand)' : 'var(--border)', borderRadius: 999 }} />
           <StepDot n={4} />
+          <div style={{ width: 28, height: 2, background: step >= 5 ? 'var(--brand)' : 'var(--border)', borderRadius: 999 }} />
+          <StepDot n={5} />
         </div>
 
         {/* Step 1 — Who you are.
@@ -139,7 +192,7 @@ export default function Onboarding({ onComplete }) {
             roadmap is pitched at someone with that experience. */}
         {step === 1 && (
           <div style={{ animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
-            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 1 of 4</div>
+            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 1 of 5</div>
             <h2 className="display" style={{ fontSize: 20, marginBottom: 6 }}>First — what should we call you?</h2>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
               This stays on your machine. LearnOS has no accounts and no sign-up — it is
@@ -189,7 +242,7 @@ export default function Onboarding({ onComplete }) {
         {/* Step 2 — Goal */}
         {step === 2 && (
           <div style={{ animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
-            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 2 of 4</div>
+            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 2 of 5</div>
             <h2 className="display" style={{ fontSize: 20, marginBottom: 6 }}>What do you want to learn?</h2>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
               Describe your learning goal — be as specific or broad as you like.
@@ -226,7 +279,7 @@ export default function Onboarding({ onComplete }) {
         {/* Step 3 — Level + time */}
         {step === 3 && (
           <div style={{ animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
-            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 3 of 4</div>
+            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 3 of 5</div>
             <h2 className="display" style={{ fontSize: 20, marginBottom: 6 }}>Your level &amp; time</h2>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
               This helps the Curriculum agent calibrate the roadmap depth and pace.
@@ -268,7 +321,7 @@ export default function Onboarding({ onComplete }) {
         {/* Step 4 — Style */}
         {step === 4 && (
           <div style={{ animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
-            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 4 of 4</div>
+            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 4 of 5</div>
             <h2 className="display" style={{ fontSize: 20, marginBottom: 6 }}>How do you learn best?</h2>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
               Select one or more. This shapes how the Tutor agent presents material.
@@ -291,12 +344,105 @@ export default function Onboarding({ onComplete }) {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <Btn variant="outline" onClick={() => setStep(3)}>← Back</Btn>
-              <Btn variant="primary" icon={I.spark} onClick={handleSubmit}>Generate my roadmap →</Btn>
+              <Btn variant="primary" onClick={() => setStep(5)}>Continue →</Btn>
             </div>
           </div>
         )}
 
         {/* Submitting / polling state */}
+
+        {/* Step 5 — Connect the AI.
+            Without a key, generateRoadmap silently falls back to a generic
+            template. That fallback used to happen invisibly: the learner
+            finished onboarding believing they had a personalised roadmap when
+            they had a canned one. Asking here — and saying plainly what
+            skipping costs — is the honest version. */}
+        {step === 5 && (
+          <div style={{ animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
+            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 5 of 5</div>
+            <h2 className="display" style={{ fontSize: 20, marginBottom: 6 }}>Connect your AI</h2>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18, lineHeight: 1.6 }}>
+              LearnOS runs on your own OpenRouter key. It is encrypted and stored on this
+              machine — there is no LearnOS server to send it to.{' '}
+              <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand)' }}>
+                Get a key →
+              </a>
+            </div>
+
+            <label className="cap" style={{ display: 'block', marginBottom: 6, fontSize: 10.5 }}>OpenRouter API key</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+              <input
+                type="password"
+                autoFocus
+                value={apiKey}
+                onChange={e => { setApiKey(e.target.value); setKeyState('idle'); setKeyMsg(''); }}
+                placeholder="sk-or-v1-…"
+                onKeyDown={e => { if (e.key === 'Enter' && apiKey.trim() && keyState !== 'testing') saveAndTestKey(); }}
+                style={{
+                  flex: 1, padding: '12px 16px', background: 'var(--surface)',
+                  border: `1px solid ${keyState === 'ok' ? 'var(--good)' : keyState === 'bad' ? 'var(--bad)' : 'var(--border)'}`,
+                  borderRadius: 10, color: 'var(--ink)', fontSize: 13.5, outline: 'none', fontFamily: 'var(--font-mono)',
+                }}
+              />
+              <Btn variant="outline" disabled={!apiKey.trim() || keyState === 'testing'} onClick={saveAndTestKey}>
+                {keyState === 'testing' ? 'Testing…' : keyState === 'ok' ? 'Re-test' : 'Test'}
+              </Btn>
+            </div>
+
+            <label className="cap" style={{ display: 'block', marginBottom: 6, fontSize: 10.5 }}>Model</label>
+            <select
+              value={model}
+              onChange={e => { setModel(e.target.value); if (keyState === 'ok') setKeyState('idle'); }}
+              style={{
+                width: '100%', padding: '11px 14px', background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 10, color: 'var(--ink)', fontSize: 13.5, outline: 'none', marginBottom: 12,
+              }}
+            >
+              <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6 — best quality (recommended)</option>
+              <option value="anthropic/claude-haiku-4.5">Claude Haiku 4.5 — faster and cheaper</option>
+              <option value="openai/gpt-4o">GPT-4o</option>
+              <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
+            </select>
+
+            {keyMsg && (
+              <div style={{
+                padding: '10px 12px', borderRadius: 9, fontSize: 12.5, lineHeight: 1.5, marginBottom: 14,
+                background: 'var(--surface-2)',
+                border: `1px solid color-mix(in oklch, ${keyState === 'ok' ? 'var(--good)' : 'var(--bad)'} 40%, var(--border))`,
+                color: keyState === 'ok' ? 'var(--good)' : 'var(--bad)',
+              }}>
+                {keyState === 'ok' ? '✓ ' : '✕ '}{keyMsg}
+              </div>
+            )}
+
+            {/* Skipping is allowed, but never silently. */}
+            {keyState !== 'ok' && (
+              <label style={{
+                display: 'flex', gap: 10, alignItems: 'flex-start', padding: 12, borderRadius: 10, cursor: 'pointer',
+                background: skipKey ? 'var(--surface-2)' : 'transparent',
+                border: `1px solid ${skipKey ? 'var(--border-strong)' : 'var(--border)'}`, marginBottom: 20,
+              }}>
+                <input type="checkbox" checked={skipKey} onChange={e => setSkipKey(e.target.checked)} style={{ marginTop: 2 }} />
+                <span style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.55 }}>
+                  Continue without a key — I understand LearnOS will build a{' '}
+                  <strong style={{ color: 'var(--ink)' }}>generic starter roadmap from a template</strong>, not one
+                  personalised to my goal, and that course generation, tutoring and grading stay unavailable
+                  until I add a key in Settings.
+                </span>
+              </label>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <Btn variant="outline" onClick={() => setStep(4)}>← Back</Btn>
+              <div style={{ flex: 1 }} />
+              <Btn variant="primary" icon={I.spark} disabled={keyState !== 'ok' && !skipKey} onClick={handleSubmit}>
+                {keyState === 'ok' ? 'Generate my roadmap →' : 'Continue with a template →'}
+              </Btn>
+            </div>
+          </div>
+        )}
+
+
         {submitting && (
           <div style={{ animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
             <div style={{ textAlign: 'center', padding: '40px 0' }}>

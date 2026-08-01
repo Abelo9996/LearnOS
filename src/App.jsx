@@ -176,8 +176,15 @@ function AppRoot() {
     }
   }
 
-  function handleOnboardingComplete() {
+  // The generator falls back to a canned template when no key is configured, and
+  // that used to be dropped on the floor here — the learner arrived at a generic
+  // roadmap believing it was built for them. Carry the source through so the app
+  // can say which one they got.
+  function handleOnboardingComplete(roadmapId, meta) {
     remember(true);
+    if (meta?.source === 'template') {
+      try { localStorage.setItem('learnos_roadmap_source', 'template'); } catch {}
+    }
     setVersion(v => v + 1);
     setPhase('app');
   }
