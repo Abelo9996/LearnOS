@@ -264,13 +264,21 @@ export function Avatar({ name = '?', size = 32, hue, ring }) {
 /* ── Page header ──────────────────────────────────────────────────────────── */
 export function PageHeader({ eyebrow, title, subtitle, actions }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, marginBottom: 24 }}>
-      <div style={{ minWidth: 0 }}>
+    // The actions row must not be allowed to squeeze the title. Without
+    // flexShrink:0 on the actions (and a flex basis on the title), a screen with
+    // several buttons — one of which can contain a whole module name — collapsed
+    // the heading to one word per line. Actions wrap onto their own line instead.
+    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, marginBottom: 24, flexWrap: 'wrap' }}>
+      <div style={{ minWidth: 260, flex: '1 1 320px' }}>
         {eyebrow && <div className="cap" style={{ marginBottom: 8 }}>{eyebrow}</div>}
-        <div className="display" style={{ fontSize: 34, lineHeight: 1.05, color: 'var(--ink)' }}>{title}</div>
+        <div className="display" style={{ fontSize: 34, lineHeight: 1.05, color: 'var(--ink)', overflowWrap: 'anywhere' }}>{title}</div>
         {subtitle && <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 8, maxWidth: 640 }}>{subtitle}</div>}
       </div>
-      {actions && <div style={{ display: 'flex', gap: 8 }}>{actions}</div>}
+      {actions && (
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center' }}>
+          {actions}
+        </div>
+      )}
     </div>
   );
 }

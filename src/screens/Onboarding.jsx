@@ -2,6 +2,7 @@ import React from 'react';
 import { I } from '../components/Icons';
 import { Btn } from '../components/UI';
 import API from '../api';
+import { generatePathway } from '../lib/generatePathway.js';
 
 const GOAL_CHIPS = ['Machine Learning', 'Generative AI', 'Data Science', 'Web development'];
 
@@ -42,7 +43,7 @@ export default function Onboarding({ onComplete }) {
   const [keyMsg, setKeyMsg] = React.useState('');
   const [skipKey, setSkipKey] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
-  const [jobStatus, setJobStatus] = React.useState(null); // null | { jobId }
+  const [jobStatus, setJobStatus] = React.useState(null); // null | { message } — live progress from the job
   const [error, setError] = React.useState(null);
   const [pollProgress, setPollProgress] = React.useState(0);
 
@@ -77,14 +78,6 @@ export default function Onboarding({ onComplete }) {
     }
   };
 
-  // F-02: Exponential backoff poll delays: 1s, 2s, 3s, 5s, 5s, ... up to ~5 min total
-  const pollDelay = (i) => {
-    if (i < 1) return 1000;
-    if (i < 2) return 2000;
-    if (i < 3) return 3000;
-    return 5000;
-  };
-
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
@@ -105,28 +98,22 @@ export default function Onboarding({ onComplete }) {
       };
       await API.postIntake({ goal: goal.trim(), answers: profile });
 
-      // Kick off roadmap generation
-      const { jobId } = await API.genRoadmap(goal.trim(), profile);
-      setJobStatus({ jobId });
-
-      // F-02: Poll up to ~5 minutes with exponential backoff
-      let result = null;
-      let elapsed = 0;
-      for (let i = 0; i < 60; i++) {
-        const delay = pollDelay(i);
-        await new Promise(r => setTimeout(r, delay));
-        elapsed += delay;
-        setPollProgress(Math.min(100, Math.round((elapsed / 300000) * 100)));
-        const job = await API.getJob(jobId).catch(() => null);
-        if (job?.status === 'done') { result = job.result; break; }
-        if (job?.status === 'failed') throw new Error(job.error || 'Generation failed');
-      }
+      // Generate through the SAME path the Roadmaps page uses. Onboarding used
+      // to call genRoadmap directly, so the very first roadmap a learner got
+      // behaved differently from every one they made afterwards.
+      const result = await generatePathway({
+        goal: goal.trim(), level, profile,
+        onProgress: (pct, msg) => {
+          if (typeof pct === 'number') setPollProgress(Math.round(pct * 100));
+          if (msg) setJobStatus({ message: msg });
+        },
+      });
       if (!result?.roadmapId) throw new Error('Generation timed out — try again from Roadmaps');
 
       // F-02: Only mark onboarded AFTER successful generation
       await API.patchUserSettings({ onboarded_at: new Date().toISOString() }).catch(() => {});
 
-      onComplete(result.roadmapId, { source: result.source || 'ai' });
+      onComplete(result.roadmapId, { source: result.source });
     } catch (e) {
       // F-02: On error, do NOT set onboarded_at — user stays on intake with retry
       setError(e.message || 'Something went wrong');
@@ -455,7 +442,7 @@ export default function Onboarding({ onComplete }) {
                 ))}
               </div>
               <h2 className="display" style={{ fontSize: 20, marginBottom: 8 }}>
-                {jobStatus ? 'Curriculum agent is designing your roadmap…' : 'Setting up your profile…'}
+                {jobStatus?.message || 'Setting up your profile…'}
               </h2>
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>
                 This usually takes 30–90 seconds. We'll take you to your roadmap when it's ready.
