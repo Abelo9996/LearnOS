@@ -111,6 +111,9 @@ router.patch('/config', (req, res) => {
       return res.status(400).json({ error: true, message: 'Handle must be 3-32 characters: lowercase letters, numbers and dashes.' });
     }
     fields.push('registry_handle = ?'); vals.push(h || null);
+    // Handle and token are one credential. Keeping a token for a handle we no
+    // longer claim would be a secret we can never use and never see.
+    if (!h) { fields.push('registry_token = ?'); vals.push(null); }
   }
   if (enabled !== undefined) { fields.push('registry_enabled = ?'); vals.push(enabled ? 1 : 0); }
   if (!fields.length) return res.status(400).json({ error: true, message: 'Nothing to update' });
