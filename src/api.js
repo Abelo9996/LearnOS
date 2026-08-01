@@ -121,17 +121,6 @@ const API = {
   patchAgentRouting: (code, data) => API.patch(`/users/agent-routing/${code}`, data),
   getAgents:        () => API.get('/users/agents'),
 
-  // ── Community ─────────────────────────────────────────────────────────────
-  getCommunityThreads: (params) => {
-    const qs = new URLSearchParams(params).toString();
-    return API.get('/community/threads' + (qs ? '?' + qs : ''));
-  },
-  getCommunityThread:  (id) => API.get(`/community/threads/${id}`),
-  createCommunityThread: (data) => API.post('/community/threads', data),
-  voteThread:          (id, value) => API.post(`/community/threads/${id}/vote`, { value }),
-  replyToThread:       (id, body) => API.post(`/community/threads/${id}/replies`, { body }),
-  getLeaderboard:      () => API.get('/community/leaderboard'),
-
   // Course sharing (M12) — a course is a portable file, which is how a
   // single-user self-hosted tool can genuinely take part in a commons.
   getExportableCourses: () => API.get('/share/exportable'),
