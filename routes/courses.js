@@ -115,7 +115,11 @@ router.post('/', requireAuth, (req, res) => {
   // NOTE: this INSERT previously listed 12 columns but supplied only 11 values,
   // so every course creation threw a SQLite arity error and 500'd.
   db.prepare('INSERT OR REPLACE INTO courses (slug, title, blurb, author, verified, rating, stars, forks, hours, version, tags, thumbnail_url) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)')
-    .run(slug, title, blurb || '', author || 'You', rating || 0, stars || 0, forks || 0, hours || 0, 'v1.0', tags || '[]', thumbnail_url || null);
+    // `tags` arrives as an array from the UI. Binding an array is not a type
+    // error in better-sqlite3 — it expands into extra parameters and fails with
+    // "Too many parameter values were provided", so it must be serialised here.
+    .run(slug, title, blurb || '', author || 'You', rating || 0, stars || 0, forks || 0, hours || 0, 'v1.0',
+      Array.isArray(tags) ? JSON.stringify(tags) : (tags || '[]'), thumbnail_url || null);
 
   // Build real modules + a starter lesson from the bundled roadmap syllabus.
   // Previously `syllabus` was read off the body and silently discarded, so
