@@ -8,3 +8,6 @@ logs/
 .env
 *.log
 .DS_Store
+
+# Throwaway screenshots from local UI verification
+/*.png
