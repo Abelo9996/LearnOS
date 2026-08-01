@@ -129,6 +129,17 @@ try { db.exec("ALTER TABLE assignments ADD COLUMN rubric_json TEXT"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN pass_threshold REAL"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN max_attempts INTEGER"); } catch {}
 
+// ── Community registry (opt-in, opt-out) ────────────────────────────────────
+// Where this instance publishes to, who it publishes as, and whether it talks
+// to a registry at all. registry_enabled defaults on but is genuinely
+// respected everywhere — a self-hosted app must be able to reach nothing.
+// registry_token authorises updating and unlisting your own published work; it
+// is issued once by the registry and never sent to the browser.
+try { db.exec("ALTER TABLE user_settings ADD COLUMN registry_url TEXT"); } catch {}
+try { db.exec("ALTER TABLE user_settings ADD COLUMN registry_handle TEXT"); } catch {}
+try { db.exec("ALTER TABLE user_settings ADD COLUMN registry_token TEXT"); } catch {}
+try { db.exec("ALTER TABLE user_settings ADD COLUMN registry_enabled INTEGER DEFAULT 1"); } catch {}
+
 // ── Notifications ───────────────────────────────────────────────────────────
 // Notifications used to BE the activity log: unread-count counted every row in
 // activity_log since you last looked, so finishing a practice quiz or ticking a
