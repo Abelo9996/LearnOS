@@ -3,7 +3,6 @@ import { I } from './components/Icons';
 import { Btn, Avatar } from './components/UI';
 import API, { timeAgo } from './api.js';
 import { UserProvider, useUser } from './UserContext.jsx';
-import Landing from './screens/Landing';
 import Dashboard from './screens/Dashboard';
 import Session from './screens/Session';
 import Roadmap from './screens/Roadmap';
@@ -129,59 +128,50 @@ function useToast() { return React.useContext(ToastContext); }
 function useModal() { return React.useContext(ModalContext); }
 
 // ── App entry ───────────────────────────────────────────────────────────────
-// No login: a cleaned-up Landing is the front door, then straight into the app.
-// (First run with an empty library drops into onboarding.)
+// No login and no front door: LearnOS opens directly into the app. The public
+// landing page lives in the separate LearnOSWeb repo, because nobody browses a
+// marketing site on localhost. A first run with an empty library drops into
+// onboarding instead.
 function AppRoot() {
-  // The landing page is a front door, not a toll gate. Someone who has already
-  // been inside should reopen straight into their dashboard — being shown the
-  // marketing page every single load is friction for the person who uses this
-  // daily, which is the only person there is.
-  const [phase, setPhase] = React.useState(() => {
-    try { return localStorage.getItem('learnos_entered') === '1' ? 'app' : 'landing'; }
-    catch { return 'landing'; }
-  });
+  // The app is the entry point. LearnOS runs on your own machine, so there is
+  // nobody to market to here — the landing page now lives in the LearnOSWeb
+  // repo, which is where a public site belongs. Opening LearnOS opens LearnOS.
+  //
+  // 'checking' exists so a returning learner never flashes the onboarding
+  // wizard while we ask the API whether they have any data yet.
+  const [phase, setPhase] = React.useState('checking');
   const [version, setVersion] = React.useState(0);
 
   // Does this user still need onboarding? (no roadmaps + never onboarded)
-  // NOTE: the API calls intentionally do NOT swallow errors. An unreachable or
-  // throttled API must never be mistaken for "this user has no data" — that
-  // would drop an existing learner back into the onboarding wizard.
-  const checkOnboarding = async () => {
-    try {
-      const [roadmaps, settings] = await Promise.all([
-        API.getRoadmaps(),
-        API.getUserSettings(),
-      ]);
-      const hasRoadmaps = Array.isArray(roadmaps) && roadmaps.length > 0;
-      const hasOnboarded = settings && settings.onboarded_at;
-      if (!hasRoadmaps && !hasOnboarded) {
-        setPhase('onboarding');
-        return true;
+  // NOTE: the API calls intentionally do NOT swallow errors into a "no data"
+  // conclusion. An unreachable or throttled API must never be mistaken for
+  // "this user is new" — that would drop an existing learner back into the
+  // onboarding wizard and, worse, let them overwrite their own setup.
+  React.useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const [roadmaps, settings] = await Promise.all([
+          API.getRoadmaps(),
+          API.getUserSettings(),
+        ]);
+        if (!alive) return;
+        const hasRoadmaps = Array.isArray(roadmaps) && roadmaps.length > 0;
+        const hasOnboarded = settings && settings.onboarded_at;
+        setPhase(!hasRoadmaps && !hasOnboarded ? 'onboarding' : 'app');
+      } catch {
+        // Server down or slow: show the app, which surfaces its own errors.
+        if (alive) setPhase('app');
       }
-    } catch { /* API failed — fall through to the app, never force onboarding */ }
-    return false;
-  };
-
-  const remember = (entered) => {
-    try { localStorage.setItem('learnos_entered', entered ? '1' : '0'); } catch {}
-  };
-
-  async function handleEnterApp() {
-    setPhase('loading');
-    const needsOnboarding = await checkOnboarding();
-    if (!needsOnboarding) {
-      remember(true);
-      setVersion(v => v + 1);
-      setPhase('app');
-    }
-  }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   // The generator falls back to a canned template when no key is configured, and
   // that used to be dropped on the floor here — the learner arrived at a generic
   // roadmap believing it was built for them. Carry the source through so the app
   // can say which one they got.
   function handleOnboardingComplete(roadmapId, meta) {
-    remember(true);
     if (meta?.source === 'template') {
       try { localStorage.setItem('learnos_roadmap_source', 'template'); } catch {}
     }
@@ -189,24 +179,13 @@ function AppRoot() {
     setPhase('app');
   }
 
-  // Going back out to the landing page must be possible — it holds the project's
-  // "what is this / open source" story, which someone may well want to reread or
-  // show to another person.
-  function handleExitToLanding() {
-    remember(false);
-    setPhase('landing');
-  }
-
   React.useEffect(() => {
-    document.title = phase === 'landing' ? 'LearnOS — Open-source AI University'
-      : phase === 'onboarding' ? 'Get started · LearnOS'
-      : 'LearnOS';
+    document.title = phase === 'onboarding' ? 'Get started · LearnOS' : 'LearnOS';
   }, [phase]);
 
-  if (phase === 'loading') return <AppLoader />;
-  if (phase === 'landing') return <Landing onEnterApp={handleEnterApp} />;
+  if (phase === 'checking') return <AppLoader />;
   if (phase === 'onboarding') return <Onboarding onComplete={handleOnboardingComplete} />;
-  return <App key={version} onExitToLanding={handleExitToLanding} />;
+  return <App key={version} />;
 }
 
 function AppLoader() {
@@ -244,7 +223,7 @@ export default AppRoot;
 // must live below the providers in the tree (you cannot read a context in the
 // same component that renders its Provider — useContext returns the default
 // null and destructuring `{ add }` throws).
-function App({ onExitToLanding }) {
+function App() {
   const [me, setMe] = React.useState(null);
 
   React.useEffect(() => {
@@ -268,13 +247,13 @@ function App({ onExitToLanding }) {
   return (
     <UserProvider user={me}>
       <ToastProvider><ModalProvider>
-        <AppShell onExitToLanding={onExitToLanding} />
+        <AppShell />
       </ModalProvider></ToastProvider>
     </UserProvider>
   );
 }
 
-function AppShell({ onExitToLanding }) {
+function AppShell() {
   const [screen, setScreen]               = React.useState('dashboard');
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
   const [density, setDensity]             = React.useState('regular');
@@ -379,7 +358,7 @@ function AppShell({ onExitToLanding }) {
     // made inner 100% chains collapse, so the whole body scrolled — dragging
     // the sidebar with it.
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      {!isMobile && <Sidebar screen={screen} setScreen={go} collapsed={sidebarCollapsed} onToggle={toggleSidebar} counts={navCounts} onExitToLanding={onExitToLanding} />}
+      {!isMobile && <Sidebar screen={screen} setScreen={go} collapsed={sidebarCollapsed} onToggle={toggleSidebar} counts={navCounts} onHome={() => go('dashboard')} />}
       <main style={{
         flex: 1,
         width: isMobile ? '100%' : `calc(100vw - ${sw}px)`,
@@ -397,7 +376,7 @@ function AppShell({ onExitToLanding }) {
       </main>
       {/* Without this there is literally no way to navigate on a phone — the
           sidebar is hidden and nothing replaces it. */}
-      {isMobile && <MobileNav screen={screen} setScreen={go} counts={navCounts} onExitToLanding={onExitToLanding} />}
+      {isMobile && <MobileNav screen={screen} setScreen={go} counts={navCounts} />}
     </div>
   );
 }
@@ -408,7 +387,7 @@ function AppShell({ onExitToLanding }) {
    Bottom-anchored because that is where thumbs are. */
 const MOBILE_PRIMARY = ['dashboard', 'roadmaps', 'courses', 'assignments', 'cards'];
 
-function MobileNav({ screen, setScreen, counts = {}, onExitToLanding }) {
+function MobileNav({ screen, setScreen, counts = {} }) {
   const [moreOpen, setMoreOpen] = React.useState(false);
   const allItems = NAV.flatMap(g => g.items);
   const primary = MOBILE_PRIMARY.map(id => allItems.find(i => i.id === id)).filter(Boolean);
@@ -460,18 +439,6 @@ function MobileNav({ screen, setScreen, counts = {}, onExitToLanding }) {
               display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
             }}
           >
-            {onExitToLanding && (
-              <button key="__about"
-                onClick={() => { setMoreOpen(false); onExitToLanding(); }}
-                style={{
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, padding: '12px 6px',
-                  borderRadius: 10, cursor: 'pointer', background: 'var(--surface-2)',
-                  border: '1px solid var(--border)', color: 'var(--ink-2)',
-                }}>
-                {React.cloneElement(I.home, { size: 18 })}
-                <span style={{ fontSize: 11, textAlign: 'center', lineHeight: 1.2 }}>About</span>
-              </button>
-            )}
             {rest.map(item => (
               <button key={item.id}
                 onClick={() => { setScreen(item.id); setMoreOpen(false); }}
@@ -617,7 +584,7 @@ function ProgressPopup({ onClose }) {
 }
 
 /* ── Sidebar ──────────────────────────────────────────────────────────────── */
-function Sidebar({ screen, setScreen, collapsed, onToggle, counts = {}, onExitToLanding }) {
+function Sidebar({ screen, setScreen, collapsed, onToggle, counts = {}, onHome }) {
   const { open: openModal, close: closeModal } = useModal();
   const user = useUser();
   const w = collapsed ? 64 : 240;
@@ -631,11 +598,12 @@ function Sidebar({ screen, setScreen, collapsed, onToggle, counts = {}, onExitTo
       transition: 'width var(--dur-normal) var(--ease-smooth)',
       overflow: 'hidden',
     }}>
-      {/* Logo — also the way back out to the landing page. */}
+      {/* Logo doubles as "go home" — the landing page it used to open now lives
+          in the separate LearnOSWeb repo. */}
       <button
-        onClick={() => onExitToLanding && onExitToLanding()}
-        title="About LearnOS"
-        aria-label="About LearnOS"
+        onClick={() => onHome && onHome()}
+        title="Dashboard"
+        aria-label="Dashboard"
         className="sidebar-home"
         style={{
           padding: collapsed ? '16px 0' : '16px 18px',
