@@ -23,13 +23,17 @@ export function CommunityBrowse({ onImported }) {
 
   const load = React.useCallback(() => {
     setLoading(true); setError('');
+    let isDefault = false;
     API.getRegistryConfig()
       .then(cfg => {
-        setConfig(cfg);
+        setConfig(cfg); isDefault = !!cfg.isDefault;
         if (!cfg.enabled) { setError('DISABLED'); setLoading(false); return null; }
         return API.browseRegistry({ q }).then(r => setCourses(r.courses || []));
       })
-      .catch(e => setError(e.message || 'Could not reach the registry.'))
+      // On a fresh clone the default address is a registry on this machine that
+      // nobody has started. That is the expected state, not a fault, and saying
+      // "could not reach" makes a working install look broken on day one.
+      .catch(e => setError(isDefault ? 'NO_LOCAL_REGISTRY' : (e.message || 'Could not reach the registry.')))
       .finally(() => setLoading(false));
   }, [q]);
 
@@ -59,6 +63,26 @@ export function CommunityBrowse({ onImported }) {
         <div style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.65, marginTop: 8 }}>
           LearnOS is not contacting any registry. Export and import by file still work — turn the
           registry back on in Settings if you want to browse published courses.
+        </div>
+      </Card>
+    );
+  }
+
+  if (error === 'NO_LOCAL_REGISTRY') {
+    return (
+      <Card style={{ marginBottom: 20 }}>
+        <SectionHead title="Community courses" subtitle="No registry connected yet" />
+        <div style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.65, marginTop: 8 }}>
+          Nothing to browse yet — LearnOS is looking for a registry on this machine and none is
+          running. That is the normal starting state: a registry is an optional server people run to
+          publish courses to each other, and LearnOS is complete without one.
+          <div style={{ marginTop: 10 }}>
+            Point it at one in <strong style={{ color: 'var(--ink-2)', fontWeight: 500 }}>Settings → Community</strong>, or
+            skip it entirely and share courses as files below.
+          </div>
+          <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+            <Btn variant="outline" size="sm" onClick={load}>Check again</Btn>
+          </div>
         </div>
       </Card>
     );
