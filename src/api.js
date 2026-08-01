@@ -107,6 +107,9 @@ const API = {
   patchUserSettings: (data) => API.patch('/users/settings', data),
   getApiKeys:       () => API.get('/users/apikeys'),
   createApiKey:     (data) => API.post('/users/apikeys', data),
+  // Verifies a key by making a real model call, so onboarding can confirm the
+  // key WORKS rather than merely that it was stored.
+  pingAI:           () => API.post('/ai/ping', {}),
   deleteApiKey:     (id) => API.del(`/users/apikeys/${id}`),
   patchApiKey:      (id, data) => API.patch(`/users/apikeys/${id}`, data),
   getAgentRouting:  () => API.get('/users/agent-routing'),
