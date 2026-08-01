@@ -62,6 +62,11 @@ const API = {
   getActivity:  () => API.get('/activity'),
   postActivity: (data) => API.post('/activity', data),
   getUnreadNotifs: () => API.get('/activity/unread-count'),
+  // Real notifications — milestones, unlocks, work needing attention — as
+  // opposed to the activity log, which is the full history of everything.
+  getNotifications:    () => API.get('/activity/notifications'),
+  dismissNotification: (id) => API.post(`/activity/notifications/${id}/dismiss`, {}),
+  clearNotifications:  () => API.post('/activity/notifications/clear', {}),
   markNotifsSeen:  () => API.post('/activity/seen', {}),
 
   // ── Assignments ───────────────────────────────────────────────────────────

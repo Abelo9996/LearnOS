@@ -17,7 +17,7 @@
  * Each module therefore yields ~8-10 real lessons instead of ~2, and the result
  * is validated against ai/quality/depthFloors.js before it is called done.
  */
-import db, { logActivity } from '../../db/database.js';
+import db, { logActivity, notify } from '../../db/database.js';
 import { complete } from '../llm.js';
 import { checkUrlReachable } from './research.js';
 import { validateCourseDepth, FLOORS } from '../quality/depthFloors.js';
@@ -823,6 +823,17 @@ export async function persistRichCourse(userId, c, level = 'intermediate') {
   db.prepare('INSERT OR IGNORE INTO enrollments (user_id, course_slug, progress, status) VALUES (?, ?, 0, ?)').run(userId, slug, 'enrolled');
 
   const rmId = createCompanionRoadmap(userId, slug, c.title, level, pathway);
+
+  // A build takes minutes; the learner has almost certainly gone elsewhere, so
+  // finishing is exactly the kind of thing a notification is for.
+  try {
+    notify(userId, {
+      kind: 'job', priority: 'normal',
+      title: `Course ready — ${c.title}`,
+      body: `${c.modules.length} modules · ${lessonCount} lessons · ${itemCount} practice questions.`,
+      actionScreen: 'courses', actionId: slug,
+    });
+  } catch {}
 
   try {
     logActivity(userId, { kind: 'session', text: `AI-built course: ${c.title}`,

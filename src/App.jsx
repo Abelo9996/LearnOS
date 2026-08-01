@@ -908,11 +908,15 @@ function TopBar({ setScreen, onToggleSidebar, collapsed }) {
   const menuRef  = React.useRef(null);
   const notifRef = React.useRef(null);
 
+  // Notification kinds — deliberately few. If something doesn't fit one of
+  // these, it belongs in the activity log, not in the bell.
   const kindMeta = {
-    quiz:       { icon: '✓', color: 'var(--good)',    label: 'Quiz' },
-    assignment: { icon: '↑', color: 'var(--brand)',   label: 'Assignment' },
-    cert:       { icon: '🎓', color: 'oklch(0.78 0.16 85)', label: 'Certificate' },
-    session:    { icon: '▸', color: 'var(--brand-3)', label: 'Session' },
+    milestone:     { icon: '🏆', color: 'oklch(0.78 0.16 85)', label: 'Milestone' },
+    unlock:        { icon: '🔓', color: 'var(--brand-3)',      label: 'Unlocked' },
+    action_needed: { icon: '!',  color: 'var(--bad)',          label: 'Needs you' },
+    job:           { icon: '✓',  color: 'var(--good)',         label: 'Ready' },
+    review:        { icon: '↻',  color: 'var(--brand)',        label: 'Review' },
+    content:       { icon: '⚑',  color: 'oklch(0.74 0.18 80)', label: 'Content' },
   };
 
   // Unread count is tracked server-side (users.notifications_seen_at), so it
@@ -928,12 +932,32 @@ function TopBar({ setScreen, onToggleSidebar, collapsed }) {
   const openNotifs = () => {
     if (showNotifs) { setShowNotifs(false); return; }
     setShowNotifs(true);
-    setUnread(0);
-    API.markNotifsSeen().catch(() => {});
     setNotifsLoading(true);
-    API.getActivity().then(rows => {
-      setNotifs((rows || []).slice(0, 8));
+    API.getNotifications().then(r => {
+      setNotifs(r?.notifications || []);
+      // Only mark read once they have actually been shown.
+      API.markNotifsSeen().then(() => setUnread(0)).catch(() => {});
     }).catch(() => {}).finally(() => setNotifsLoading(false));
+  };
+
+  // A notification that cannot take you anywhere is just a nag.
+  const openNotif = (n) => {
+    setShowNotifs(false);
+    if (n.action_id && n.action_screen === 'courses') {
+      try { localStorage.setItem('learnos_open_course', n.action_id); } catch {}
+    }
+    if (n.action_screen) setScreen(n.action_screen);
+  };
+
+  const dismissNotif = async (e, id) => {
+    e.stopPropagation();
+    setNotifs(prev => prev.filter(x => x.id !== id));
+    await API.dismissNotification(id).catch(() => {});
+  };
+
+  const clearAllNotifs = async () => {
+    setNotifs([]); setUnread(0);
+    await API.clearNotifications().catch(() => {});
   };
 
   React.useEffect(() => {
@@ -974,26 +998,52 @@ function TopBar({ setScreen, onToggleSidebar, collapsed }) {
           <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 1000, width: 360, maxHeight: 480, background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: 'var(--shadow-md)', animation: 'pageEnter var(--dur-fast) var(--ease-out)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
             <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
               <div className="display" style={{ fontSize: 14 }}>Notifications</div>
-              <button onClick={() => setShowNotifs(false)} style={{ background: 'none', border: 0, color: 'var(--brand)', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Close</button>
+              <div style={{ display: 'flex', gap: 12 }}>
+                {notifs.length > 0 && (
+                  <button onClick={clearAllNotifs} style={{ background: 'none', border: 0, color: 'var(--muted)', fontSize: 12, cursor: 'pointer' }}>Clear all</button>
+                )}
+                <button onClick={() => setShowNotifs(false)} style={{ background: 'none', border: 0, color: 'var(--brand)', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>Close</button>
+              </div>
             </div>
             <div className="scroll" style={{ flex: 1, overflowY: 'auto' }}>
               {notifsLoading ? (
                 <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Loading…</div>
               ) : notifs.length === 0 ? (
-                <div style={{ padding: 24, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>No activity yet.</div>
+                <div style={{ padding: '28px 24px', textAlign: 'center' }}>
+                  <div style={{ fontSize: 13, color: 'var(--ink-2)' }}>You're all caught up</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>
+                    You'll hear from us when something needs you — a module unlocks, a build finishes,
+                    or review comes due. Everything else is in Activity.
+                  </div>
+                </div>
               ) : notifs.map((n, i) => {
-                const m = kindMeta[n.kind] || kindMeta.session;
+                const m = kindMeta[n.kind] || kindMeta.job;
+                const isUnread = !n.read_at;
                 return (
-                  <div key={n.id || i} style={{ display: 'flex', gap: 10, padding: '10px 16px', borderTop: i === 0 ? 0 : '1px solid var(--border)', cursor: 'pointer', transition: 'background var(--dur-fast)' }}
-                    onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                    onClick={() => setShowNotifs(false)}>
-                    <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 8, background: `color-mix(in oklch, ${m.color} 18%, transparent)`, color: m.color, border: `1px solid color-mix(in oklch, ${m.color} 40%, transparent)`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>{m.icon}</span>
+                  <div key={n.id} className="list-row" style={{
+                    display: 'flex', gap: 10, padding: '11px 16px',
+                    borderTop: i === 0 ? 0 : '1px solid var(--border)', cursor: 'pointer',
+                    background: isUnread ? 'color-mix(in oklch, var(--brand) 6%, transparent)' : 'transparent',
+                  }} onClick={() => openNotif(n)}>
+                    <span style={{
+                      width: 30, height: 30, flexShrink: 0, borderRadius: 8,
+                      background: `color-mix(in oklch, ${m.color} 18%, transparent)`, color: m.color,
+                      border: `1px solid color-mix(in oklch, ${m.color} 40%, transparent)`,
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700,
+                    }}>{m.icon}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12.5, color: 'var(--ink)', lineHeight: 1.4 }}>{n.text}</div>
-                      {n.sub && <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>{n.sub}</div>}
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                        <div style={{ fontSize: 12.5, color: 'var(--ink)', lineHeight: 1.4, fontWeight: isUnread ? 600 : 400 }}>{n.title}</div>
+                        {n.count > 1 && <span className="mono" style={{ fontSize: 10, color: m.color }}>×{n.count}</span>}
+                      </div>
+                      {n.body && <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 3, lineHeight: 1.45 }}>{n.body}</div>}
+                      <div className="mono" style={{ fontSize: 10, color: 'var(--faint)', marginTop: 4 }}>
+                        {m.label} · {timeAgo(n.updated_at || n.created_at)}
+                      </div>
                     </div>
-                    <span className="mono" style={{ fontSize: 10, color: 'var(--muted)', flexShrink: 0, marginTop: 2 }}>{timeAgo(n.created_at)}</span>
+                    <button onClick={(e) => dismissNotif(e, n.id)} title="Dismiss"
+                      className="row-reveal"
+                      style={{ background: 'none', border: 0, color: 'var(--muted)', cursor: 'pointer', fontSize: 13, padding: 2, alignSelf: 'flex-start' }}>✕</button>
                   </div>
                 );
               })}
