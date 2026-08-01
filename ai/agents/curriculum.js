@@ -29,7 +29,21 @@ export async function generateRoadmap({ userId, goal, profile }) {
     const out = await complete({
       userId, agentCode: 'CR', schema: roadmapSchema, maxTokens: 4096,
       system: SYSTEM,
-      messages: `Goal: ${goal}\nLearner level: ${prof.level}\nTime per week: ${prof.time_per_week || '?'} hours\nDesign the roadmap.`,
+      // Background and preferred style are collected during onboarding, so they
+      // must actually reach the prompt — asking someone about their experience
+      // and then ignoring it is worse than not asking at all.
+      messages: [
+        `Goal: ${goal}`,
+        `Learner level: ${prof.level}`,
+        `Time per week: ${prof.time_per_week || '?'} hours`,
+        prof.background ? `Learner background: ${prof.background}` : null,
+        Array.isArray(prof.learning_style) && prof.learning_style.length
+          ? `Preferred learning style: ${prof.learning_style.join(', ')}` : null,
+        prof.background
+          ? 'Pitch the roadmap at someone with that background, and do not re-teach what they already say they know.'
+          : null,
+        'Design the roadmap.',
+      ].filter(Boolean).join('\n'),
     });
     spec = validateSpec(out.json) ? out.json : null;
   } catch {

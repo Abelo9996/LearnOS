@@ -8,6 +8,8 @@ const STYLE_CHIPS = ['Visual examples', 'Hands-on projects', 'Theory first', 'Qu
 
 export default function Onboarding({ onComplete }) {
   const [step, setStep] = React.useState(1);
+  const [name, setName] = React.useState('');
+  const [background, setBackground] = React.useState('');
   const [goal, setGoal] = React.useState('');
   const [level, setLevel] = React.useState('beginner');
   const [hours, setHours] = React.useState(5);
@@ -22,6 +24,7 @@ export default function Onboarding({ onComplete }) {
   };
 
   const canSubmit = goal.trim().length >= 3;
+  const canPassIntro = name.trim().length >= 1;
 
   // F-02: Exponential backoff poll delays: 1s, 2s, 3s, 5s, 5s, ... up to ~5 min total
   const pollDelay = (i) => {
@@ -37,14 +40,22 @@ export default function Onboarding({ onComplete }) {
     setError(null);
     setPollProgress(0);
     try {
+      // Who they are comes first: the greeting, certificates and coach all read
+      // the user's name, and until now every install was stuck calling them "You".
+      await API.patchUserProfile({
+        name: name.trim().slice(0, 80),
+        ...(background.trim() ? { bio: background.trim().slice(0, 500) } : {}),
+      }).catch(() => {});
+
       // Persist the PR profile
-      await API.postIntake({
-        goal: goal.trim(),
-        answers: { level, time_per_week: hours, learning_style: styles },
-      });
+      const profile = {
+        level, time_per_week: hours, learning_style: styles,
+        ...(background.trim() ? { background: background.trim() } : {}),
+      };
+      await API.postIntake({ goal: goal.trim(), answers: profile });
 
       // Kick off roadmap generation
-      const { jobId } = await API.genRoadmap(goal.trim(), { level, time_per_week: hours, learning_style: styles });
+      const { jobId } = await API.genRoadmap(goal.trim(), profile);
       setJobStatus({ jobId });
 
       // F-02: Poll up to ~5 minutes with exponential backoff
@@ -104,23 +115,81 @@ export default function Onboarding({ onComplete }) {
               <path d="M3 8l9 5 9-5M12 13v9" stroke="oklch(0.16 0.02 270)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
             </svg>
           </div>
-          <h1 className="display" style={{ fontSize: 26, marginBottom: 6 }}>Welcome to LearnOS</h1>
+          <h1 className="display" style={{ fontSize: 26, marginBottom: 6 }}>
+            {name.trim() && step > 1 ? `Nice to meet you, ${name.trim().split(' ')[0]}` : 'Welcome to LearnOS'}
+          </h1>
           <div style={{ fontSize: 14, color: 'var(--muted)' }}>Let's personalize your learning experience</div>
         </div>
 
         {/* Step indicators */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 32 }}>
           <StepDot n={1} />
-          <div style={{ width: 40, height: 2, background: step >= 2 ? 'var(--brand)' : 'var(--border)', borderRadius: 999 }} />
+          <div style={{ width: 28, height: 2, background: step >= 2 ? 'var(--brand)' : 'var(--border)', borderRadius: 999 }} />
           <StepDot n={2} />
-          <div style={{ width: 40, height: 2, background: step >= 3 ? 'var(--brand)' : 'var(--border)', borderRadius: 999 }} />
+          <div style={{ width: 28, height: 2, background: step >= 3 ? 'var(--brand)' : 'var(--border)', borderRadius: 999 }} />
           <StepDot n={3} />
+          <div style={{ width: 28, height: 2, background: step >= 4 ? 'var(--brand)' : 'var(--border)', borderRadius: 999 }} />
+          <StepDot n={4} />
         </div>
 
-        {/* Step 1 — Goal */}
+        {/* Step 1 — Who you are.
+            The greeting, certificates and the coach all read the user's name, and
+            without this every install addressed the learner as "You". Background is
+            optional but genuinely used: it is passed to the Curriculum agent so the
+            roadmap is pitched at someone with that experience. */}
         {step === 1 && (
           <div style={{ animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
-            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 1 of 3</div>
+            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 1 of 4</div>
+            <h2 className="display" style={{ fontSize: 20, marginBottom: 6 }}>First — what should we call you?</h2>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
+              This stays on your machine. LearnOS has no accounts and no sign-up — it is
+              only used to make the app feel like yours.
+            </div>
+
+            <label className="cap" style={{ display: 'block', marginBottom: 6, fontSize: 10.5 }}>Your name</label>
+            <input
+              autoFocus
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. Abel"
+              maxLength={80}
+              onKeyDown={e => { if (e.key === 'Enter' && canPassIntro) setStep(2); }}
+              style={{
+                width: '100%', padding: '12px 16px', background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 10, color: 'var(--ink)', fontSize: 14, outline: 'none', marginBottom: 18,
+              }}
+            />
+
+            <label className="cap" style={{ display: 'block', marginBottom: 6, fontSize: 10.5 }}>
+              What do you do? <span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--faint)', fontWeight: 400 }}>— optional</span>
+            </label>
+            <textarea
+              value={background}
+              onChange={e => setBackground(e.target.value)}
+              placeholder="e.g. Backend engineer, comfortable with Python, no ML background yet"
+              maxLength={500}
+              rows={3}
+              style={{
+                width: '100%', padding: '12px 16px', background: 'var(--surface)', border: '1px solid var(--border)',
+                borderRadius: 10, color: 'var(--ink)', fontSize: 13.5, outline: 'none', resize: 'vertical',
+                fontFamily: 'inherit', lineHeight: 1.6, marginBottom: 8,
+              }}
+            />
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 24, lineHeight: 1.5 }}>
+              The Curriculum agent uses this to pitch your roadmap at the right level and skip
+              what you already know.
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Btn variant="primary" disabled={!canPassIntro} onClick={() => setStep(2)}>Continue →</Btn>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2 — Goal */}
+        {step === 2 && (
+          <div style={{ animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
+            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 2 of 4</div>
             <h2 className="display" style={{ fontSize: 20, marginBottom: 6 }}>What do you want to learn?</h2>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
               Describe your learning goal — be as specific or broad as you like.
@@ -130,7 +199,7 @@ export default function Onboarding({ onComplete }) {
               value={goal}
               onChange={e => setGoal(e.target.value)}
               placeholder="e.g. Build and deploy large language model applications"
-              onKeyDown={e => { if (e.key === 'Enter' && goal.trim().length >= 3) setStep(2); }}
+              onKeyDown={e => { if (e.key === 'Enter' && goal.trim().length >= 3) setStep(3); }}
               style={{
                 width: '100%', padding: '12px 16px', background: 'var(--surface)', border: '1px solid var(--border)',
                 borderRadius: 10, color: 'var(--ink)', fontSize: 14, outline: 'none', marginBottom: 16,
@@ -146,16 +215,18 @@ export default function Onboarding({ onComplete }) {
                 }}>{c}</button>
               ))}
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Btn variant="primary" disabled={goal.trim().length < 3} onClick={() => setStep(2)}>Continue →</Btn>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <Btn variant="outline" onClick={() => setStep(1)}>← Back</Btn>
+              <div style={{ flex: 1 }} />
+              <Btn variant="primary" disabled={goal.trim().length < 3} onClick={() => setStep(3)}>Continue →</Btn>
             </div>
           </div>
         )}
 
-        {/* Step 2 — Level + time */}
-        {step === 2 && (
+        {/* Step 3 — Level + time */}
+        {step === 3 && (
           <div style={{ animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
-            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 2 of 3</div>
+            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 3 of 4</div>
             <h2 className="display" style={{ fontSize: 20, marginBottom: 6 }}>Your level &amp; time</h2>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
               This helps the Curriculum agent calibrate the roadmap depth and pace.
@@ -188,16 +259,16 @@ export default function Onboarding({ onComplete }) {
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Btn variant="outline" onClick={() => setStep(1)}>← Back</Btn>
-              <Btn variant="primary" onClick={() => setStep(3)}>Continue →</Btn>
+              <Btn variant="outline" onClick={() => setStep(2)}>← Back</Btn>
+              <Btn variant="primary" onClick={() => setStep(4)}>Continue →</Btn>
             </div>
           </div>
         )}
 
-        {/* Step 3 — Style */}
-        {step === 3 && (
+        {/* Step 4 — Style */}
+        {step === 4 && (
           <div style={{ animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
-            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 3 of 3</div>
+            <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 4 of 4</div>
             <h2 className="display" style={{ fontSize: 20, marginBottom: 6 }}>How do you learn best?</h2>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
               Select one or more. This shapes how the Tutor agent presents material.
@@ -219,7 +290,7 @@ export default function Onboarding({ onComplete }) {
               })}
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <Btn variant="outline" onClick={() => setStep(2)}>← Back</Btn>
+              <Btn variant="outline" onClick={() => setStep(3)}>← Back</Btn>
               <Btn variant="primary" icon={I.spark} onClick={handleSubmit}>Generate my roadmap →</Btn>
             </div>
           </div>
@@ -267,7 +338,7 @@ export default function Onboarding({ onComplete }) {
               <button onClick={() => { setError(null); setSubmitting(false); setJobStatus(null); setPollProgress(0); }} style={{ float: 'right', background: 'none', border: 0, color: 'var(--bad)', cursor: 'pointer', fontSize: 16 }}>×</button>
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 12 }}>
-              <Btn variant="outline" onClick={() => { setError(null); setSubmitting(false); setJobStatus(null); setPollProgress(0); setStep(3); }}>
+              <Btn variant="outline" onClick={() => { setError(null); setSubmitting(false); setJobStatus(null); setPollProgress(0); setStep(4); }}>
                 ← Back to questions
               </Btn>
               <Btn variant="primary" icon={I.spark} onClick={handleSubmit}>
