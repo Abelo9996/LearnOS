@@ -52,7 +52,7 @@ server.js     → Express 5 entry point (API + serves the built SPA)
 routes/       → REST endpoints
 middleware/   → local-user resolver, logging, url-safety (SSRF guard)
 ai/           → LLM layer + agents (Claude)
-db/           → better-sqlite3 (schema.sql, seed.sql)
+db/           → better-sqlite3 (schema.sql). No seed data: every install starts empty.
 src/          → React 18 frontend (Vite)
 tests/        → Vitest
 ```
