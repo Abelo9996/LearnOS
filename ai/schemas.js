@@ -17,28 +17,34 @@ export const profileSchema = {
   required: ['background', 'level', 'time_per_week', 'learning_style', 'motivations'],
 };
 
+/**
+ * A roadmap is a COURSE PATHWAY: an ordered sequence of courses carrying the
+ * learner from where they are to their goal.
+ *
+ * It is deliberately NOT a concept graph. There are no parallel lanes, no DAG
+ * and no "explore in any order" — each stage depends on the one before it, so
+ * there is always exactly one next thing to do.
+ */
 export const roadmapSchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
     title: { type: 'string' },
     subtitle: { type: 'string' },
-    nodes: {
+    courses: {
       type: 'array',
       items: {
         type: 'object',
         additionalProperties: false,
         properties: {
-          id: { type: 'string' },                 // short local slug: "n1", "n2"...
-          title: { type: 'string' },
-          col: { type: 'integer' },                // 0-based prerequisite depth
-          row: { type: 'integer' },                // 0-based lane within a column
-          objectives: { type: 'array', items: { type: 'string' } },
-          prereqs: { type: 'array', items: { type: 'string' } }, // earlier node ids
+          title: { type: 'string' },                                // the course taken at this stage
+          topic: { type: 'string' },                                // self-contained topic for the course builder
+          why: { type: 'string' },                                  // why it sits at this point in the path
+          objectives: { type: 'array', items: { type: 'string' } }, // what it makes the learner able to do
         },
-        required: ['id', 'title', 'col', 'row', 'objectives', 'prereqs'],
+        required: ['title', 'topic', 'why', 'objectives'],
       },
     },
   },
-  required: ['title', 'subtitle', 'nodes'],
+  required: ['title', 'subtitle', 'courses'],
 };
