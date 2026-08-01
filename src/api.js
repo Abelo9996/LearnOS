@@ -137,6 +137,18 @@ const API = {
   getExportableCourses: () => API.get('/share/exportable'),
   exportCourse:        (slug) => API.get(`/share/course/${slug}`),
   importCourse:        (bundle) => API.post('/share/import', { bundle }),
+
+  // Community registry (C3) — a convenience layered on top of file sharing.
+  // Every one of these can fail without affecting anything else in the app.
+  getRegistryConfig:   () => API.get('/registry/config'),
+  setRegistryConfig:   (data) => API.patch('/registry/config', data),
+  browseRegistry:      (params = {}) => {
+    const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v)).toString();
+    return API.get(`/registry/browse${qs ? `?${qs}` : ''}`);
+  },
+  getRegistryCourse:   (id) => API.get(`/registry/browse/${id}`),
+  importFromRegistry:  (id) => API.post(`/registry/import/${id}`, {}),
+  publishToRegistry:   (slug, handle) => API.post(`/registry/publish/${slug}`, { handle }),
   getEnrollments:     () => API.get('/users/enrollments'),
   createCourse:       (data) => API.post('/courses', data),
   generateCourseAI:   (data) => API.post('/courses/generate', data),

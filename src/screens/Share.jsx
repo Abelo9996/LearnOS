@@ -3,6 +3,7 @@ import { I } from '../components/Icons';
 import { Card, Btn, Tag, PageScroll, PageHeader, SectionHead, SkeletonRows } from '../components/UI';
 import API from '../api.js';
 import { useToast } from '../App';
+import { CommunityBrowse, PublishPanel } from '../components/CommunityPanel.jsx';
 
 const GITHUB = 'https://github.com/Abelo9996/LearnOS';
 
@@ -79,8 +80,11 @@ export default function Share() {
       <PageHeader
         eyebrow="Open-source content commons"
         title="Share"
-        subtitle="A course is a file. Export yours to send to someone, or import one you were given — readings, resources, labs and question bank included."
+        subtitle="Browse what others have published, or publish your own. Everything also works as plain files — export a course to send it to someone directly, no server involved."
       />
+
+      <CommunityBrowse onImported={load} />
+      <PublishPanel courses={courses} onPublished={load} />
 
       {/* Import */}
       <Card style={{ marginBottom: 20 }}>

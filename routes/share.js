@@ -22,13 +22,19 @@ router.use(requireAuth);
 export const BUNDLE_VERSION = 1;
 const parse = (s, fb) => { try { return s ? JSON.parse(s) : fb; } catch { return fb; } };
 
-/** GET /api/share/course/:slug — the whole course as one portable JSON bundle. */
-router.get('/course/:slug', (req, res) => {
-  const course = db.prepare('SELECT * FROM courses WHERE slug = ?').get(req.params.slug);
-  if (!course) return res.status(404).json({ error: true, message: 'Course not found' });
+/**
+ * Build the portable bundle for a course.
+ *
+ * Exported as a function so publishing to the community registry produces
+ * byte-for-byte what a file download would: one definition, no chance of the
+ * two drifting into subtly different bundles.
+ */
+export function buildBundle(slug) {
+  const course = db.prepare('SELECT * FROM courses WHERE slug = ?').get(slug);
+  if (!course) return null;
 
   const modules = db.prepare('SELECT * FROM course_modules WHERE course_slug = ? ORDER BY order_idx').all(course.slug);
-  const bundle = {
+  return {
     bundleVersion: BUNDLE_VERSION,
     exportedAt: new Date().toISOString(),
     course: {
@@ -57,8 +63,13 @@ router.get('/course/:slug', (req, res) => {
         })),
     })),
   };
+}
 
-  res.setHeader('Content-Disposition', `attachment; filename="${course.slug}.learnos.json"`);
+/** GET /api/share/course/:slug — the whole course as one portable JSON bundle. */
+router.get('/course/:slug', (req, res) => {
+  const bundle = buildBundle(req.params.slug);
+  if (!bundle) return res.status(404).json({ error: true, message: 'Course not found' });
+  res.setHeader('Content-Disposition', `attachment; filename="${req.params.slug}.learnos.json"`);
   res.json(bundle);
 });
 
