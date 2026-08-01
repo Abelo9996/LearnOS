@@ -129,6 +129,40 @@ try { db.exec("ALTER TABLE assignments ADD COLUMN rubric_json TEXT"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN pass_threshold REAL"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN max_attempts INTEGER"); } catch {}
 
+// ── Notifications ───────────────────────────────────────────────────────────
+// Notifications used to BE the activity log: unread-count counted every row in
+// activity_log since you last looked, so finishing a practice quiz or ticking a
+// lesson produced a "notification". That is a diary, not an alert — and a bell
+// that lights up for everything teaches you to ignore it.
+//
+// These are separate concepts and now separate tables:
+//   activity_log   everything you did, complete history, shown on Activity.
+//   notifications  the few things worth interrupting you for, each of which
+//                  must be actionable — it says what happened AND where to go.
+//
+// group_key collapses repeats: "3 cards due" updates the existing row's count
+// rather than adding a third identical alert.
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    kind TEXT NOT NULL,              -- milestone | unlock | action_needed | job | review | content
+    title TEXT NOT NULL,
+    body TEXT,
+    priority TEXT NOT NULL DEFAULT 'normal',   -- high | normal
+    action_screen TEXT,              -- which screen clicking it opens
+    action_id TEXT,                  -- and which thing on it
+    group_key TEXT,                  -- collapses repeats of the same alert
+    count INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now')),
+    read_at TEXT,
+    dismissed_at TEXT
+  )`);
+  db.exec("CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, dismissed_at, read_at)");
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_notifications_group ON notifications(user_id, group_key) WHERE group_key IS NOT NULL");
+} catch (e) { console.log('notifications migration:', e.message); }
+
 // ── M9: reach — translation (spec §3.9) ─────────────────────────────────────
 // Coursera localises a subset of its catalogue because human translation costs
 // money per course per language. We generate content, so any course can be
@@ -643,6 +677,45 @@ export function logActivity(userId, { kind, text, sub = null, xp = 0, agent = nu
   db.prepare('INSERT INTO activity_log (id, user_id, kind, text, sub, xp, agent) VALUES (?, ?, ?, ?, ?, ?, ?)')
     .run(id, userId, kind, text, sub, xp, agent);
   return id;
+}
+
+/**
+ * Raise a notification — something worth interrupting the learner for.
+ *
+ * Deliberately NOT called for routine progress. Logging that you finished a
+ * lesson belongs in activity_log; a notification is for things you would want
+ * to be told about even if you were not looking: a milestone reached, something
+ * unlocked, work that needs your attention, or a long job finishing while you
+ * were away.
+ *
+ * Every notification must be actionable — actionScreen says where clicking it
+ * takes you, so an alert is never a dead end.
+ *
+ * @param {string} groupKey collapses repeats: passing the same key increments
+ *   the existing row's count instead of stacking identical alerts.
+ */
+export function notify(userId, { kind, title, body = null, priority = 'normal', actionScreen = null, actionId = null, groupKey = null }) {
+  if (!userId || !kind || !title) return null;
+  try {
+    if (groupKey) {
+      const existing = db.prepare('SELECT id, count FROM notifications WHERE user_id = ? AND group_key = ?').get(userId, groupKey);
+      if (existing) {
+        // Re-surface it: bump the count, refresh the wording, mark unread again.
+        db.prepare(`UPDATE notifications
+                    SET count = count + 1, title = ?, body = ?, priority = ?,
+                        action_screen = ?, action_id = ?, updated_at = datetime('now'),
+                        read_at = NULL, dismissed_at = NULL
+                    WHERE id = ?`)
+          .run(title, body, priority, actionScreen, actionId, existing.id);
+        return existing.id;
+      }
+    }
+    const id = `nt-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    db.prepare(`INSERT INTO notifications (id, user_id, kind, title, body, priority, action_screen, action_id, group_key)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run(id, userId, kind, title, body, priority, actionScreen, actionId, groupKey);
+    return id;
+  } catch { return null; }
 }
 
 // We export a helper function for awarding XP.

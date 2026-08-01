@@ -7,7 +7,7 @@
  * retake isn't the identical paper and grading is deterministic.
  */
 import { Router } from 'express';
-import db, { logActivity, awardXP, awardBadge } from '../db/database.js';
+import db, { logActivity, awardXP, awardBadge, notify } from '../db/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import { gradeQuiz, runCodeTests, DEFAULT_PASS_THRESHOLD, DEFAULT_MAX_ATTEMPTS } from '../ai/assessment/grader.js';
 import { runLabWithTests, availableLanguages } from '../ai/assessment/labRunner.js';
@@ -131,7 +131,28 @@ router.post('/module/:moduleId/submit', (req, res) => {
       const xp = g.passed ? g.correct * 5 + 20 : g.correct * 2;
       awardXP(req.userId, xp);
       logActivity(req.userId, { kind: 'quiz', text: `Graded: ${mod?.title || 'Module'} — ${g.score}%`, sub: `${g.passed ? 'PASSED' : 'not passed'} · attempt ${attemptNo}/${maxAttempts}`, xp, agent: 'AS' });
-      if (g.passed) unlocked = applyMasteryForModule(req.userId, moduleId, g.ratio);
+      if (g.passed) {
+        unlocked = applyMasteryForModule(req.userId, moduleId, g.ratio);
+        if (unlocked?.nextModules?.length) {
+          notify(req.userId, {
+            kind: 'unlock', priority: 'normal',
+            title: `Unlocked: ${unlocked.nextModules[0]}`,
+            body: unlocked.nextModules.length > 1
+              ? `Passing ${mod?.title || 'that module'} opened ${unlocked.nextModules.length} new modules.`
+              : `Passing ${mod?.title || 'that module'} opened the next module.`,
+            actionScreen: 'roadmaps',
+          });
+        }
+      } else if (attemptNo >= maxAttempts) {
+        // Out of attempts is the one failure that genuinely needs them back.
+        notify(req.userId, {
+          kind: 'action_needed', priority: 'high',
+          title: `No attempts left on ${mod?.title || 'a graded assessment'}`,
+          body: `You scored ${g.score}%. Review the weak areas, then ask for the assessment to be reset.`,
+          actionScreen: 'courses', actionId: mod?.course_slug || null,
+          groupKey: `attempts-exhausted:${moduleId}`,
+        });
+      }
       if (g.passed && g.score === 100 && awardBadge(req.userId, 'Perfect graded assessment', 'check')) {
         logActivity(req.userId, { kind: 'cert', text: 'Earned badge: Perfect graded assessment', sub: mod?.title || '', xp: 0, agent: 'CE' });
       }

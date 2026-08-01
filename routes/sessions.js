@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import db, { awardXP, logActivity, awardBadge, updateStreak } from '../db/database.js';
+import db, { awardXP, logActivity, awardBadge, updateStreak, notify } from '../db/database.js';
 import { enqueueJob } from '../ai/jobs.js';
 import '../ai/agents/analytics.js'; // registers 'analyze-session' handler
 
@@ -129,6 +129,13 @@ router.patch('/:id', (req, res) => {
               'LOS-' + sess.roadmap_id.slice(-3).toUpperCase() + '-' + new Date().getFullYear() + '-' + String(Math.floor(Math.random() * 9999)).padStart(4, '0'),
               JSON.stringify(evidence), 'self-attested');
           logActivity(req.userId, { kind: 'cert', text: `Earned certificate: ${rm.title}`, sub: 'Roadmap completed', xp: 200, agent: 'CE' });
+          // Finishing an entire pathway is the biggest thing that happens here.
+          notify(req.userId, {
+            kind: 'milestone', priority: 'high',
+            title: `Certificate earned — ${rm.title}`,
+            body: 'You completed every stage of this pathway. The certificate records exactly what you were assessed on.',
+            actionScreen: 'certificates',
+          });
           awardXP(req.userId, 200, { silent: true });
           try { awardBadge(req.userId, 'Roadmap complete', 'ribbon'); } catch {}
         }
