@@ -943,15 +943,12 @@ function CertCard({ cert }) {
   );
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   COMMUNITY — backed by real API
-   ═══════════════════════════════════════════════════════════════════════════ */
-// NOTE: the Community screen (threads, replies, votes, a contributor
-// leaderboard) has been removed. LearnOS is single-user and self-hosted, so the
+// NOTE: the old in-app Community screen (threads, replies, votes, a contributor
+// leaderboard) is gone. LearnOS is single-user and self-hosted, so the
 // "community" it displayed was four invented people and five seeded threads —
-// fabricated data presented as social proof. Sharing now works the way it
-// genuinely can for a local tool: courses are exported and imported as files.
-// See src/screens/Share.jsx.
+// fabricated data presented as social proof. The real thing is in
+// src/screens/Share.jsx: courses travel as files, and a registry server anyone
+// can run lets people publish and browse them for real.
 
 export function Feed() {
   const { data: rawActivity, loading } = useApi(() => API.getActivity());
@@ -1709,26 +1706,3 @@ function VerificationModal({ cert }) {
   );
 }
 
-/* ── Profile modal ────────────────────────────────────────────────────────── */
-function ProfileModal({ name, contributions }) {
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
-        <Avatar name={name} size={56} />
-        <div>
-          <div className="display" style={{ fontSize: 20 }}>{name}</div>
-          <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>{contributions} contributions</div>
-        </div>
-      </div>
-      <div style={{ padding: 14, background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', marginBottom: 12 }}>
-        <div className="cap" style={{ marginBottom: 8 }}>Top areas</div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {['Machine Learning', 'Deep Learning', 'Python'].map(t => <Tag key={t}>{t}</Tag>)}
-        </div>
-      </div>
-      <div style={{ fontSize: 13, color: 'var(--ink-2)', lineHeight: 1.55 }}>
-        Active contributor in the LearnOS community. Focuses on machine learning course content and hands-on exercises.
-      </div>
-    </div>
-  );
-}

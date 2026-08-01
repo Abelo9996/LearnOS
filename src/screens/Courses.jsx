@@ -491,11 +491,11 @@ export default function Courses() {
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: 16 }}>
         <div>
           <div style={{ marginBottom: 24 }}>
-            <Tag tone="accent" style={{ marginBottom: 12 }}>{I.spark} Community · Open-source · AI-Powered</Tag>
+            <Tag tone="accent" style={{ marginBottom: 12 }}>{I.spark} Yours · Open-source · AI-Powered</Tag>
             <h1 className="display" style={{ fontSize: 50, lineHeight: 1.0, color: 'var(--ink)', margin: '12px 0 8px', letterSpacing: '-0.025em', fontWeight: 700 }}>
               Explore <span className="gradient-text">Courses</span>
             </h1>
-            <div style={{ fontSize: 14, color: 'var(--muted)' }}>Community-authored, forkable AI-powered courses. Learn together, improve together.</div>
+            <div style={{ fontSize: 14, color: 'var(--muted)' }}>Courses you generated, plus any you imported. Build one on any subject, then share it as a file or publish it.</div>
           </div>
           {/* Enrolled vs Explore vs Starred — separate, not blended (#24) */}
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 16, marginBottom: 14, flexWrap: 'wrap' }}>
