@@ -88,17 +88,33 @@ check('V17a', 'dismissing a report restores the item to unverified', restored.ve
 check('V17b', 'dismissing never promotes an item to confirmed', restored.verification_status !== STATUS.CONFIRMED);
 
 // ── V16: verification is fail-safe ──────────────────────────────────────────
-// With no API credit the verifier cannot run; the contract is that it leaves
-// items UNVERIFIED (still usable) and never claims they were confirmed.
+// The contract: when the verifier cannot run, items stay UNVERIFIED (still
+// usable) and are never claimed as confirmed.
+//
+// This used to just call the verifier and hope it failed, so on a machine with
+// working API credit it ran, legitimately confirmed an item, and the check
+// reported a failure for doing its job. Induce the outage instead: take the key
+// away for the duration, so the property is genuinely under test here rather
+// than only on machines that happen to be broke.
 const before = verificationSummary();
+const envKeyed = !!(process.env.OPENROUTER_API_KEY || process.env.LEARNOS_OPENROUTER_KEY);
+const silenced = db.prepare("UPDATE api_keys SET is_active = 0 WHERE provider = 'openrouter' AND is_active = 1");
+const unsilence = db.prepare("UPDATE api_keys SET is_active = 1 WHERE provider = 'openrouter' AND is_active = 0");
+const silencedCount = silenced.run().changes;
 let threw = null;
 try {
   const { verifyCourseItems } = await import('../ai/quality/factCheck.js');
   await verifyCourseItems({ limit: 1 });
 } catch (e) { threw = e; }
+if (silencedCount) unsilence.run();
 const afterSummary = verificationSummary();
+// llm.js reads an env key into a module constant at import time, so that one
+// cannot be taken away from in here. Say so rather than claim a pass we did
+// not earn.
 check('V16a', 'a verifier that cannot run confirms nothing', afterSummary.confirmed <= before.confirmed,
-  threw ? `verifier unavailable (${String(threw.message).slice(0, 40)}…)` : 'verifier ran');
+  envKeyed ? 'INCONCLUSIVE — an env key kept the verifier alive; unset OPENROUTER_API_KEY to test this'
+    : threw ? `refused with no key (${String(threw.message).slice(0, 40)}…)`
+      : 'ran with no key and confirmed nothing');
 check('V16b', 'unverified items remain usable for grading', afterSummary.gradeable > 0, `${afterSummary.gradeable} gradeable`);
 
 // ── Verification visibility ─────────────────────────────────────────────────
