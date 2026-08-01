@@ -10,8 +10,13 @@
 import { spawn } from 'node:child_process';
 
 const SUITES = [
+  // Tolerated because it grades whatever courses happen to be in this database,
+  // so it says as much about your library as about the code. It is NOT a
+  // standing exemption: a failure here is a real gap in a real course — usually
+  // a module the builder left without assessment, or a reading under the floor —
+  // and `npm run enrich -- <slug>` is how you close it.
   { name: 'Depth floors (V1, V2)',        script: 'scripts/depth-check.mjs',          args: ['--summary'], tolerateFail: true,
-    note: 'hand-written seed courses predate the depth model — regenerate them through the builder to clear this' },
+    note: 'run `node scripts/depth-check.mjs` for the per-module breakdown, then enrich the courses it names' },
   { name: 'Assessment engine (V3-V7)',    script: 'scripts/verify-assessment.mjs',    args: [] },
   { name: 'Specialization (V8, V9)',      script: 'scripts/verify-specialization.mjs', args: [] },
   { name: 'Content integrity (V10-V12)',  script: 'scripts/verify-integrity.mjs',     args: [] },
