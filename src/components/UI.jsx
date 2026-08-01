@@ -242,6 +242,33 @@ export function Kbd({ children }) {
   );
 }
 
+/* ── Toggle ───────────────────────────────────────────────────────────────── */
+export function Toggle({ checked, onChange, disabled, label }) {
+  const W = 40, H = 22, KNOB = 16;
+  return (
+    <button
+      type="button" role="switch" aria-checked={!!checked} aria-label={label} disabled={disabled}
+      onClick={() => !disabled && onChange && onChange(!checked)}
+      style={{
+        position: 'relative', width: W, height: H, flexShrink: 0, padding: 0,
+        borderRadius: 999, cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
+        background: checked ? 'var(--brand)' : 'var(--surface-3)',
+        border: `1px solid ${checked ? 'var(--brand)' : 'var(--border)'}`,
+        transition: 'background var(--dur) var(--ease), border-color var(--dur) var(--ease)',
+      }}
+    >
+      <span style={{
+        position: 'absolute', top: (H - KNOB) / 2 - 1, left: 2,
+        width: KNOB, height: KNOB, borderRadius: 999, background: '#fff',
+        transform: `translateX(${checked ? W - KNOB - 6 : 0}px)`,
+        transition: 'transform var(--dur) var(--ease)',
+        boxShadow: '0 1px 3px rgb(0 0 0 / 0.3)',
+      }} />
+    </button>
+  );
+}
+
 /* ── Avatar ───────────────────────────────────────────────────────────────── */
 export function Avatar({ name = '?', size = 32, hue, ring }) {
   const initials = name.split(/[ .]/).filter(Boolean).slice(0,2).map(s => s[0]).join('').toUpperCase();
