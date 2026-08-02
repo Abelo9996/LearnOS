@@ -87,7 +87,19 @@ router.get('/:id', (req, res) => {
   for (const o of db.prepare('SELECT node_id, text FROM node_objectives WHERE roadmap_id = ? ORDER BY order_idx').all(r.id)) {
     (objsByNode[o.node_id] ||= []).push(o.text);
   }
-  nodes.forEach(n => { n.objectives = objsByNode[n.id] || []; });
+  // Attach the size of each stage's course where one has been built, so the map
+  // can say what a stage actually is — "11 modules · 150 lessons · 114h" — and
+  // not just show a title and a percentage.
+  const sizeOf = db.prepare(`SELECT c.hours,
+      (SELECT COUNT(*) FROM course_modules m WHERE m.course_slug = c.slug) modules,
+      (SELECT COUNT(*) FROM module_lessons l JOIN course_modules m ON m.id = l.module_id WHERE m.course_slug = c.slug) lessons
+    FROM courses c WHERE c.slug = ?`);
+  nodes.forEach(n => {
+    n.objectives = objsByNode[n.id] || [];
+    if (n.course_slug) {
+      try { n.course = sizeOf.get(n.course_slug) || null; } catch { n.course = null; }
+    }
+  });
   res.json({ ...r, nodes, edges: edges.map(e => [e.from_node, e.to_node]) });
 });
 
