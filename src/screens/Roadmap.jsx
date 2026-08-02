@@ -517,105 +517,215 @@ function ViewToggle({ view, setView }) {
   );
 }
 
-function RoadmapGraph({ nodes, edges, selected, setSelected, highlightedIds = [] }) {
-  // A pathway is a single ordered chain, so laying it out strictly by col would
-  // squeeze ten stages into one cramped row with overlapping labels. When every
-  // node sits on the same row (i.e. it IS a pathway) we wrap it into a
-  // serpentine — left to right, then back right to left — which still reads as
-  // one continuous route while giving each stage room to be labelled.
-  const srcMaxRow = Math.max(0, ...nodes.map(n => n.row_idx ?? n.row ?? 0));
-  const isChain = srcMaxRow === 0 && nodes.length > 4;
-  const PER_ROW = 4;
+/**
+ * The pathway map.
+ *
+ * A pathway is a sequence of whole courses, so the map's job is to make the
+ * route obvious: what comes first, what it unlocks, how far in you are, and how
+ * much course sits behind each stage. The previous version drew 26px circles on
+ * a serpentine grid — titles truncated to "Ethics and Political Philos…", an
+ * unlabelled number inside each dot, a quarter of the canvas empty, and a long
+ * sweeping arc wherever the snake wrapped. It looked like scattered dots rather
+ * than a workflow.
+ *
+ * This lays the graph out topologically instead: stage = longest path from a
+ * root, so anything with the same prerequisite depth sits on the same rank, and
+ * an edge always points down a rank. Stages are cards with room for a real
+ * title, and the connectors are drawn from measured card geometry rather than
+ * from a guessed grid, so they land on the cards wherever they end up.
+ */
+function rankNodes(nodes, edges) {
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  const parents = new Map(nodes.map(n => [n.id, []]));
+  for (const [a, b] of edges) {
+    if (byId.has(a) && byId.has(b)) parents.get(b).push(a);
+  }
 
-  const laid = nodes.map((n, i) => {
-    if (!isChain) return { n, c: n.col ?? 0, r: n.row_idx ?? n.row ?? 0 };
-    const r = Math.floor(i / PER_ROW);
-    const within = i % PER_ROW;
-    // Reverse every other row so the chain snakes instead of jumping back.
-    return { n, c: r % 2 === 0 ? within : PER_ROW - 1 - within, r };
-  });
-
-  const maxCol = Math.max(0, ...laid.map(l => l.c));
-  const maxRow = Math.max(0, ...laid.map(l => l.r));
-  const W = 1080, H = Math.max(320, 200 + maxRow * 170), padX = 130, padY = 80;
-  const colW = maxCol > 0 ? (W - padX * 2) / maxCol : 0;
-  const rowH = maxRow > 0 ? (H - padY * 2) / maxRow : 0;
-  const byId = new Map(laid.map(l => [l.n.id, l]));
-  const pos = (id) => {
-    const l = byId.get(id);
-    if (!l) return null;
-    return {
-      x: maxCol > 0 ? padX + l.c * colW : W / 2,
-      y: maxRow > 0 ? padY + l.r * rowH : H / 2,
-    };
+  // Longest path from a root. Memoised, with an in-progress marker so a cycle
+  // in bad data degrades to a rank instead of hanging the render.
+  const rank = new Map();
+  const visiting = new Set();
+  const depthOf = (id) => {
+    if (rank.has(id)) return rank.get(id);
+    if (visiting.has(id)) return 0;
+    visiting.add(id);
+    const ps = parents.get(id) || [];
+    const d = ps.length ? Math.max(...ps.map(p => depthOf(p) + 1)) : 0;
+    visiting.delete(id);
+    rank.set(id, d);
+    return d;
   };
-  const orderOf = new Map(laid.map((l, i) => [l.n.id, i + 1]));
+  nodes.forEach(n => depthOf(n.id));
+
+  const ranks = [];
+  nodes.forEach((n, i) => {
+    const d = rank.get(n.id) ?? 0;
+    (ranks[d] ||= []).push({ n, order: i });
+  });
+  return ranks.filter(Boolean);
+}
+
+const STATUS_TONE = {
+  done:   { line: 'var(--good)',  label: 'Completed' },
+  active: { line: 'var(--brand)', label: 'In progress' },
+  next:   { line: 'oklch(0.78 0.16 195)', label: 'Up next' },
+  locked: { line: 'var(--border)', label: 'Locked' },
+};
+
+function RoadmapGraph({ nodes, edges, selected, setSelected, highlightedIds = [] }) {
+  const wrapRef = React.useRef(null);
+  const cardRefs = React.useRef({});
+  const [geom, setGeom] = React.useState(null);
+
+  const ranks = React.useMemo(() => rankNodes(nodes, edges), [nodes, edges]);
+  const orderOf = React.useMemo(() => new Map(nodes.map((n, i) => [n.id, i + 1])), [nodes]);
+
+  // Measure once laid out, and again whenever the container resizes, so the
+  // connectors track the cards instead of assuming a fixed grid.
+  React.useLayoutEffect(() => {
+    const measure = () => {
+      const wrap = wrapRef.current;
+      if (!wrap) return;
+      const base = wrap.getBoundingClientRect();
+      const box = {};
+      for (const [id, el] of Object.entries(cardRefs.current)) {
+        if (!el) continue;
+        const r = el.getBoundingClientRect();
+        box[id] = { x: r.left - base.left, y: r.top - base.top, w: r.width, h: r.height };
+      }
+      setGeom({ w: base.width, h: base.height, box });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (wrapRef.current) ro.observe(wrapRef.current);
+    window.addEventListener('resize', measure);
+    return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
+  }, [nodes, edges, ranks]);
+
+  if (!nodes.length) {
+    return <div style={{ padding: 40, textAlign: 'center', fontSize: 13, color: 'var(--muted)' }}>This pathway has no stages yet.</div>;
+  }
+
+  const done = nodes.filter(n => n.status === 'done').length;
 
   return (
-    <div style={{ padding: '18px 22px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
+    <div style={{ padding: '18px 22px 22px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4, flexWrap: 'wrap', gap: 8 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>Pathway map</div>
-        <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', display: 'flex', gap: 14 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--good)' }} />done</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--brand)', boxShadow: '0 0 6px var(--brand)' }} />active</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: 999, background: 'var(--surface-3)' }} />locked</span>
+        <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)' }}>
+          {done}/{nodes.length} courses complete · follow the line top to bottom
         </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
-        <defs>
-          <linearGradient id="rmEdgeActive" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="oklch(0.78 0.16 195)"/>
-            <stop offset="100%" stopColor="oklch(0.74 0.21 295)"/>
-          </linearGradient>
-        </defs>
-        {edges.map(([a, b], i) => {
-          const na = nodes.find(n => n.id === a);
-          const nb = nodes.find(n => n.id === b);
-          const pa = pos(a), pb = pos(b);
-          if (!na || !nb || !pa || !pb) return null;
-          const isDone   = na.status === 'done' && (nb.status === 'done' || nb.status === 'active');
-          const isActive = na.status === 'active' || nb.status === 'active';
-          const stroke   = isDone || isActive ? 'url(#rmEdgeActive)' : 'var(--border)';
-          const dash     = nb.status === 'locked' ? '4 4' : undefined;
-          const sameRow  = Math.abs(pa.y - pb.y) < 1;
-          // Within a row curve horizontally; when the chain wraps to the next
-          // row, bow the link vertically so it reads as a turn, not a leap.
-          const dx = (pb.x - pa.x) * 0.4;
-          const bow = pa.x > W / 2 ? 80 : -80;
-          const d = sameRow
-            ? `M ${pa.x + (pb.x > pa.x ? 30 : -30)} ${pa.y} C ${pa.x + dx} ${pa.y}, ${pb.x - dx} ${pb.y}, ${pb.x + (pb.x > pa.x ? -30 : 30)} ${pb.y}`
-            : `M ${pa.x} ${pa.y + 30} C ${pa.x + bow} ${pa.y + 70}, ${pb.x + bow} ${pb.y - 70}, ${pb.x} ${pb.y - 30}`;
-          return <path key={i} d={d} stroke={stroke} strokeWidth={isActive ? 2 : 1.2} fill="none" strokeDasharray={dash} opacity={nb.status === 'locked' ? 0.5 : 1} />;
-        })}
-        {laid.map(({ n }) => {
-          const p = pos(n.id);
-          if (!p) return null;
-          const on       = n.id === selected;
-          const isDone   = n.status === 'done';
-          const isActive = n.status === 'active';
-          const isLocked = n.status === 'locked';
-          const isHighlighted = highlightedIds.includes(n.id);
-          const fill   = isDone ? 'var(--good)' : isActive ? 'oklch(0.74 0.21 295)' : n.status === 'next' ? 'var(--surface-2)' : 'var(--surface)';
-          const stroke = isDone ? 'var(--good)' : isActive ? 'oklch(0.78 0.16 195)' : n.status === 'next' ? 'var(--brand)' : 'var(--border)';
-          const label  = n.title.length > 28 ? `${n.title.slice(0, 27)}…` : n.title;
-          return (
-            <g key={n.id} onClick={() => setSelected(n.id)} style={{ cursor: 'pointer' }}>
-              {on       && <circle cx={p.x} cy={p.y} r={42} fill="var(--accent-soft)" />}
-              {isActive && <circle cx={p.x} cy={p.y} r={36} fill="none" stroke="oklch(0.78 0.16 195 / 0.4)" strokeWidth="1" />}
-              {isHighlighted && <circle cx={p.x} cy={p.y} r={48} fill="none" stroke="oklch(0.78 0.16 85)" strokeWidth="2" strokeDasharray="4 3">
-                <animateTransform attributeName="transform" type="rotate" from={`0 ${p.x} ${p.y}`} to={`360 ${p.x} ${p.y}`} dur="8s" repeatCount="3" />
-              </circle>}
-              <circle cx={p.x} cy={p.y} r={26} fill={fill} stroke={stroke} strokeWidth={isActive ? 2 : 1.2} />
-              {isDone   && <path d={`M ${p.x - 7} ${p.y} L ${p.x - 2} ${p.y + 5} L ${p.x + 8} ${p.y - 6}`} stroke="oklch(0.16 0.02 270)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />}
-              {isActive && <text x={p.x} y={p.y + 4} textAnchor="middle" fontFamily="var(--font-display)" fontSize="13" fontWeight="700" fill="oklch(0.16 0.02 270)">{Math.round((n.mastery || 0) * 100)}</text>}
-              {!isDone && !isActive && <text x={p.x} y={p.y + 4} textAnchor="middle" fontFamily="var(--font-mono)" fontSize="11" fontWeight="600" fill={isLocked ? 'var(--faint)' : 'var(--brand)'}>{Math.round((n.mastery || 0) * 100)}</text>}
-              {/* A pathway has an order, so the map shows the stage number. */}
-              <text x={p.x} y={p.y - 36} textAnchor="middle" fontFamily="var(--font-mono)" fontSize="9.5" fill="var(--faint)">{String(orderOf.get(n.id)).padStart(2, '0')}</text>
-              <text x={p.x} y={p.y + 48} textAnchor="middle" fontFamily="var(--font-body)" fontSize="11.5" fontWeight={on ? 600 : 500} fill={isLocked ? 'var(--faint)' : 'var(--ink-2)'}>{label}</text>
-            </g>
-          );
-        })}
-      </svg>
+
+      <div ref={wrapRef} style={{ position: 'relative', marginTop: 16 }}>
+        {/* Connectors sit behind the cards and are computed from where the cards
+            actually are, so they stay correct at any width. */}
+        {geom && (
+          <svg width={geom.w} height={geom.h} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}>
+            <defs>
+              <linearGradient id="rmFlow" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="oklch(0.78 0.16 195)" />
+                <stop offset="100%" stopColor="oklch(0.74 0.21 295)" />
+              </linearGradient>
+              <marker id="rmArrow" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 1 L 7 4 L 0 7 z" fill="var(--border-strong, var(--border))" />
+              </marker>
+              <marker id="rmArrowLive" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 1 L 7 4 L 0 7 z" fill="oklch(0.74 0.21 295)" />
+              </marker>
+            </defs>
+            {edges.map(([a, b], i) => {
+              const A = geom.box[a], B = geom.box[b];
+              if (!A || !B) return null;
+              const na = nodes.find(n => n.id === a);
+              const nb = nodes.find(n => n.id === b);
+              if (!na || !nb) return null;
+              const live = na.status === 'done' || na.status === 'active' || nb.status === 'active';
+              const x1 = A.x + A.w / 2, y1 = A.y + A.h;
+              const x2 = B.x + B.w / 2, y2 = B.y;
+              const mid = (y1 + y2) / 2;
+              // Vertical-first bezier: leaves the bottom edge, arrives at the
+              // top edge, so direction reads even when the columns differ.
+              const d = `M ${x1} ${y1} C ${x1} ${mid}, ${x2} ${mid}, ${x2} ${y2 - 7}`;
+              return (
+                <path key={i} d={d} fill="none"
+                  stroke={live ? 'url(#rmFlow)' : 'var(--border)'}
+                  strokeWidth={live ? 2 : 1.4}
+                  strokeDasharray={nb.status === 'locked' ? '5 5' : undefined}
+                  opacity={nb.status === 'locked' ? 0.55 : 1}
+                  markerEnd={live ? 'url(#rmArrowLive)' : 'url(#rmArrow)'} />
+              );
+            })}
+          </svg>
+        )}
+
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 26 }}>
+          {ranks.map((rank, ri) => (
+            <div key={ri} style={{
+              display: 'grid',
+              // A linear pathway is one card per rank, and letting that run the
+              // full page width puts a 40-character title in a 1100px box. Cap
+              // the spine and centre it; only spread out when a rank genuinely
+              // holds parallel stages.
+              gridTemplateColumns: `repeat(${Math.min(rank.length, 3)}, minmax(0, ${rank.length === 1 ? '580px' : '1fr'}))`,
+              gap: 16, justifyContent: 'center',
+            }}>
+              {rank.map(({ n }) => {
+                const tone = STATUS_TONE[n.status] || STATUS_TONE.locked;
+                const on = n.id === selected;
+                const isLocked = n.status === 'locked';
+                const hl = highlightedIds.includes(n.id);
+                const pct = Math.round((n.mastery || 0) * 100);
+                const built = n.course;
+                return (
+                  <div
+                    key={n.id}
+                    ref={el => { cardRefs.current[n.id] = el; }}
+                    onClick={() => setSelected(n.id)}
+                    className="hover-lift"
+                    style={{
+                      position: 'relative', cursor: 'pointer', textAlign: 'left',
+                      background: on ? 'var(--surface-2)' : 'var(--surface)',
+                      border: `1px solid ${on ? 'var(--brand)' : hl ? 'oklch(0.78 0.16 85)' : 'var(--border)'}`,
+                      borderRadius: 12, padding: '13px 15px 14px',
+                      opacity: isLocked ? 0.62 : 1,
+                      boxShadow: on ? '0 0 0 3px var(--accent-soft)' : 'none',
+                      transition: 'background var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease)',
+                    }}
+                  >
+                    {/* status stripe — the one thing you should read at a glance */}
+                    <span style={{ position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: 3, background: tone.line }} />
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                      <span className="mono" style={{ fontSize: 10, color: 'var(--faint)' }}>
+                        {String(orderOf.get(n.id)).padStart(2, '0')}
+                      </span>
+                      <span className="cap" style={{ fontSize: 9.5, color: tone.line, letterSpacing: '0.08em' }}>{tone.label}</span>
+                      {n.status === 'active' && <span style={{ marginLeft: 'auto' }} className="mono" ><span style={{ fontSize: 10.5, color: 'var(--brand)' }}>{pct}%</span></span>}
+                    </div>
+
+                    <div style={{ fontSize: 13.5, fontWeight: 600, lineHeight: 1.35, color: isLocked ? 'var(--muted)' : 'var(--ink)' }}>
+                      {n.title}
+                    </div>
+
+                    <div className="mono" style={{ fontSize: 10.5, color: 'var(--faint)', marginTop: 6 }}>
+                      {built
+                        ? `${built.modules} modules · ${built.lessons} lessons${built.hours ? ` · ${built.hours}h` : ''}`
+                        : n.build_status === 'building' ? 'building…' : 'course not generated yet'}
+                    </div>
+
+                    {pct > 0 && (
+                      <div style={{ height: 3, borderRadius: 3, background: 'var(--surface-3)', marginTop: 9, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${pct}%`, background: tone.line, transition: 'width var(--dur) var(--ease)' }} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
