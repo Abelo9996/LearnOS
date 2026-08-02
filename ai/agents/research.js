@@ -106,6 +106,131 @@ export async function checkUrlReachable(url, kind = 'article') {
   } catch { clearTimeout(timeout); return false; }
 }
 
+/**
+ * Reachable is not the same as correct.
+ *
+ * checkUrlReachable answers "does this URL load?" — and every citation passed,
+ * because the model does not invent hostnames, it invents *identifiers*. A
+ * lesson on policy and value functions cited arXiv 1712.00567, which loads
+ * perfectly and is a paper called "Biorthogonal rational functions of R_II
+ * type". Eight of eleven arXiv citations in this database pointed at an
+ * unrelated paper. The link worked, so nothing ever complained.
+ *
+ * So: ask the source what the document actually is, and compare it with what
+ * the course claims it is.
+ */
+const STOPWORDS = new Set(['the','a','an','and','or','of','for','with','to','in','on','from','into','using','via','their','this','that','how','what','why','are','is','be','at','by','as','it','its','we','you']);
+const contentWords = (s) => new Set(
+  String(s || '').toLowerCase().match(/[a-z][a-z0-9+#-]{2,}/g)?.filter(w => !STOPWORDS.has(w)) || []
+);
+
+/** Ask arXiv what a paper is actually called. Authoritative and cheap. */
+async function arxivTitle(id) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 9000);
+  try {
+    const r = await fetch(`http://export.arxiv.org/api/query?id_list=${encodeURIComponent(id)}&max_results=1`,
+      { signal: controller.signal, headers: { 'User-Agent': 'LearnOS-Verifier/1.0' } });
+    clearTimeout(timeout);
+    if (!r.ok) return null;
+    const xml = await r.text();
+    const m = xml.match(/<entry>[\s\S]*?<title>([\s\S]*?)<\/title>/);
+    return m ? m[1].replace(/\s+/g, ' ').trim() : null;
+  } catch { clearTimeout(timeout); return null; }
+}
+
+/** The document's own title, for anything that serves HTML. */
+async function htmlTitle(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 9000);
+  try {
+    const r = await fetch(url, {
+      redirect: 'follow', signal: controller.signal,
+      headers: { 'User-Agent': 'LearnOS-Verifier/1.0', Range: 'bytes=0-40000' },
+    });
+    clearTimeout(timeout);
+    if (!r.ok) return null;
+    if (!(r.headers.get('content-type') || '').toLowerCase().includes('html')) return null;
+    const html = await r.text();
+    // Sites append their own name — "Markov chain - Wikipedia" — and that name
+    // would otherwise count as a content word in every comparison.
+    //
+    // Strip it ONLY when the trailing segment actually names the site. A blanket
+    // "drop everything after the last dash" rule turned "RL Course by David
+    // Silver - Lecture 5: Policy Evaluation" into "RL Course by David Silver"
+    // and then reported the citation as pointing somewhere else.
+    const hostWords = new Set((new URL(url).hostname.toLowerCase().match(/[a-z]{3,}/g) || []));
+    const clean = (s) => {
+      let t = s.replace(/\s+/g, ' ').trim();
+      const tail = t.match(/^(.*\S)\s*[|\-–—]\s*([^|\-–—]{1,30})$/);
+      if (tail) {
+        const words = tail[2].toLowerCase().match(/[a-z]{3,}/g) || [];
+        if (words.length && words.every(w => hostWords.has(w))) t = tail[1];
+      }
+      return t || null;
+    };
+    const og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i);
+    if (og) return clean(og[1]);
+    const t = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    return t ? clean(t[1]) : null;
+  } catch { clearTimeout(timeout); return null; }
+}
+
+/**
+ * Does this URL hold the document the course says it does?
+ *
+ * Returns `{ ok, realTitle, reason }`. `ok` is true when we could confirm a
+ * match AND when we could not determine a title at all — an unverifiable source
+ * is not evidence of a wrong one, and failing closed here would strip every
+ * legitimate link behind a login wall or a JS-rendered page.
+ */
+export async function checkUrlMatchesClaim(url, claimedTitle, { context = '' } = {}) {
+  if (!url || !claimedTitle) return { ok: true, realTitle: null, reason: 'nothing to compare' };
+  let u;
+  try { u = new URL(url); } catch { return { ok: false, realTitle: null, reason: 'unparseable url' }; }
+
+  const host = u.hostname.replace(/^www\./, '');
+
+  // Only sources addressed by an OPAQUE IDENTIFIER are worth checking this way.
+  // "arxiv.org/abs/1712.00567" and "youtube.com/watch?v=go5Au01Jrvs" can point
+  // at literally anything, and that is exactly how a fabricated citation ends
+  // up resolving to a real but unrelated paper.
+  //
+  // A descriptive path cannot fail that way — you do not accidentally land on
+  // "pandas.pydata.org/docs/user_guide/groupby.html" while meaning something
+  // else. Checking those by title comparison only produced false alarms, since
+  // a page legitimately titled "Group by: split-apply-combine" was cited as
+  // "pandas groupby operations" and got flagged as wrong. Detaching a correct
+  // link is worse than keeping a questionable one, so those are left alone once
+  // they are known to resolve.
+  const arxivId = (host === 'arxiv.org' || host === 'export.arxiv.org') && u.pathname.match(/^\/(?:abs|pdf)\/(.+?)(?:v\d+)?$/);
+  const isVideo = /^(youtube\.com|youtu\.be|m\.youtube\.com)$/.test(host);
+  if (!arxivId && !isVideo) return { ok: true, realTitle: null, reason: 'descriptive url — reachability is enough' };
+
+  const realTitle = arxivId ? await arxivTitle(arxivId[1]) : await htmlTitle(url);
+  if (!realTitle) return { ok: true, realTitle: null, reason: 'no title available' };
+
+  // Wikipedia titles are one or two words ("Markov chain") against a lesson
+  // title that is a sentence, so require the article name to appear rather than
+  // scoring overlap both ways.
+  const real = contentWords(realTitle);
+  const claim = contentWords(`${claimedTitle} ${context}`);
+  if (!real.size || !claim.size) return { ok: true, realTitle, reason: 'nothing comparable' };
+
+  const shared = [...real].filter(w => claim.has(w)).length;
+  const ratio = shared / Math.min(real.size, claim.size);
+
+  // Academic titles describe their contents, so a real overlap is expected and
+  // its absence is meaningful. Video titles do not play by that rule — "Python
+  // OOP Tutorial 1: Classes and Instances" is exactly the right video for a
+  // lesson called "Object-Oriented Programming in Python" while sharing one
+  // word. So for video, only a total absence of overlap counts as wrong; that
+  // still catches the real failures, where a machine-learning lesson cites a
+  // video called "Whole game".
+  const ok = isVideo ? shared > 0 : (shared >= 2 || ratio >= 0.5);
+  return { ok, realTitle, reason: ok ? 'match' : `claims "${claimedTitle}" but is "${realTitle}"` };
+}
+
 const resourceListSchema = {
   type: 'object',
   additionalProperties: false,

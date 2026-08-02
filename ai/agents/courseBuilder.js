@@ -19,7 +19,7 @@
  */
 import db, { logActivity, notify } from '../../db/database.js';
 import { complete } from '../llm.js';
-import { checkUrlReachable } from './research.js';
+import { checkUrlReachable, checkUrlMatchesClaim } from './research.js';
 import { validateCourseDepth, FLOORS } from '../quality/depthFloors.js';
 import { registerJobHandler, setJobProgress } from '../jobs.js';
 
@@ -473,7 +473,7 @@ export async function enrichCourse({ userId, slug, onProgress = () => {} }) {
         for (const r of (t?.readings || []).slice(0, Math.max(0, 3 - readings))) {
           if (r?.body_md) add(r.title || m.title, r.body_md, 'reading', { minutes: r.minutes || 12 });
         }
-        const reach = await verifyReachable(t?.resources);
+        const reach = await verifyReachable(t?.resources, m.title);
         const existing = new Set(lessons.map(l => l.url).filter(Boolean));
         for (const r of (t?.resources || [])) {
           if (!reach.has(r.url) || existing.has(r.url)) continue;
@@ -549,7 +549,7 @@ export async function enrichCourse({ userId, slug, onProgress = () => {} }) {
           system: TOPUP_SYSTEM,
           messages: `Course: ${course.title} (${lvl})\nModule: ${m.title}\nObjectives: ${objectives.join('; ')}\n\nSuggest resources with URLs you are confident exist.`,
         })).json;
-        const reach = await verifyReachable(extra?.resources);
+        const reach = await verifyReachable(extra?.resources, m.title);
         const known = new Set(db.prepare('SELECT url FROM module_lessons WHERE module_id = ? AND url IS NOT NULL').all(m.id).map(r => r.url));
         for (const r of (extra?.resources || [])) {
           if (!reach.has(r.url) || known.has(r.url)) continue;
@@ -621,11 +621,24 @@ Suggest 8 resources whose URLs you are certain exist and are stable. Strongly pr
 
 Accuracy of the URL matters more than novelty. Do not invent article titles, paper IDs or video IDs. If unsure of an exact URL, prefer a well-known Wikipedia article on the concept.`;
 
-async function verifyReachable(resources) {
+/**
+ * A resource has to load AND be the thing it claims to be.
+ *
+ * The model does not invent hostnames, it invents identifiers, so a fabricated
+ * citation resolves perfectly to somebody else's paper. Reachability alone let
+ * a lesson on value functions cite "Biorthogonal rational functions of R_II
+ * type" and call it verified.
+ */
+async function verifyReachable(resources, context = '') {
   const ok = new Set();
   await Promise.all((resources || []).map(async (r) => {
     if (!r || !r.url) return;
-    try { if (await checkUrlReachable(r.url, r.kind)) ok.add(r.url); } catch { /* drop */ }
+    try {
+      if (!await checkUrlReachable(r.url, r.kind)) return;
+      const claim = await checkUrlMatchesClaim(r.url, r.title || '', { context });
+      if (!claim.ok) return;
+      ok.add(r.url);
+    } catch { /* drop */ }
   }));
   return ok;
 }
@@ -637,7 +650,7 @@ const VIDEOS_PER_MODULE = 2;
 
 async function topUpResources({ userId, bp, modules, level, onProgress }) {
   await mapWithConcurrency(modules, MODULE_CONCURRENCY, async (m) => {
-    const have = await verifyReachable(m.resources);
+    const have = await verifyReachable(m.resources, m.title);
     m.resources = (m.resources || []).filter(r => have.has(r.url));
 
     if (m.resources.length < FLOORS.resourcesPerModule) {
@@ -650,7 +663,7 @@ async function topUpResources({ userId, bp, modules, level, onProgress }) {
           system: TOPUP_SYSTEM,
           messages: `Course: ${bp.title} (${level})\nModule: ${m.title}\nSummary: ${m.summary || ''}\nObjectives: ${(m.objectives || []).join('; ')}\n\nSuggest resources with URLs you are confident exist.`,
         })).json;
-        const okExtra = await verifyReachable(extra?.resources);
+        const okExtra = await verifyReachable(extra?.resources, m.title);
         const seen = new Set(m.resources.map(r => r.url));
         for (const r of (extra?.resources || [])) {
           if (okExtra.has(r.url) && !seen.has(r.url)) { m.resources.push(r); seen.add(r.url); }
@@ -674,7 +687,7 @@ async function topUpResources({ userId, bp, modules, level, onProgress }) {
           system: TOPUP_SYSTEM,
           messages: `Course: ${bp.title} (${level})\nModule: ${m.title}\nObjectives: ${(m.objectives || []).join('; ')}\n\nSuggest 6-8 LECTURE VIDEOS ONLY (kind "video", YouTube) covering this module. Only include videos famous enough that you are certain of the exact URL — well-known channels: MIT OpenCourseWare, Stanford, 3Blue1Brown, StatQuest, freeCodeCamp, Computerphile, Fireship, CppCon, conference keynotes. A verifier checks each video actually exists.`,
         })).json;
-        const okExtra = await verifyReachable((extra?.resources || []).filter(r => r?.kind === 'video'));
+        const okExtra = await verifyReachable((extra?.resources || []).filter(r => r?.kind === 'video'), m.title);
         const seen = new Set(m.resources.map(r => r.url));
         for (const r of (extra?.resources || [])) {
           if (r?.kind === 'video' && okExtra.has(r.url) && !seen.has(r.url)) {
