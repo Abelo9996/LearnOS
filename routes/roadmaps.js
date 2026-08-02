@@ -57,8 +57,24 @@ router.post('/generate', (req, res) => {
   res.json({ ok: true, jobId });
 });
 
+/**
+ * GET / — the learner's roadmaps.
+ *
+ * Building a course also writes a private companion roadmap (`rm-<slug>`) whose
+ * nodes are that course's modules. It exists because module mastery is tracked
+ * on roadmap_nodes — see applyMasteryForModule in routes/assessments.js — not
+ * because a course is a roadmap. A course is a course, and listing it beside
+ * real pathways made "your roadmaps" a mix of two different things and counted
+ * every course twice.
+ *
+ * So the companions stay as the progress structure they are, and never appear
+ * here. `course_slug IS NULL` is the structural test: a roadmap that points at
+ * one course IS that course.
+ */
 router.get('/', (req, res) => {
-  const roadmaps = db.prepare('SELECT * FROM roadmaps WHERE user_id = ? ORDER BY created_at').all(req.userId);
+  const roadmaps = db.prepare(
+    'SELECT * FROM roadmaps WHERE user_id = ? AND course_slug IS NULL ORDER BY created_at'
+  ).all(req.userId);
   res.json(roadmaps);
 });
 
