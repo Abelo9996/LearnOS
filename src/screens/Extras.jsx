@@ -608,7 +608,7 @@ function AssignmentExam({ a, onClose }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Card style={{ padding: 20 }}>
             <SectionHead title="Overview" />
-            <div style={{ fontSize: 14.5, lineHeight: 1.7 }}><MarkdownText text={a.description || 'This assignment applies the module’s objectives. Complete every requirement below in your submission.'} /></div>
+            <MarkdownText prose text={a.description || 'This assignment applies the module’s objectives. Complete every requirement below in your submission.'} />
           </Card>
 
           {total > 0 && (

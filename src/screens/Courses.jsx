@@ -14,6 +14,37 @@ function youtubeId(url) {
   const m = String(url).match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
   return m ? m[1] : null;
 }
+
+/**
+ * What can we actually show in place, rather than sending the learner away?
+ *
+ * Only sources that publish an embed endpoint are framed — guessing gets you a
+ * box showing "refused to connect", which is worse than an honest link. Every
+ * frame is sandboxed and referrer-trimmed; anything unrecognised falls through
+ * to the link card and the in-app reader below it.
+ *
+ * The frame hosts here must also be present in the CSP frame-src list in
+ * server.js, or the browser blocks them regardless of what this returns.
+ */
+function embedFor(url) {
+  if (!url) return null;
+  const yt = youtubeId(url);
+  if (yt) return { kind: 'video', src: `https://www.youtube-nocookie.com/embed/${yt}`, label: 'Lecture video' };
+  let u;
+  try { u = new URL(url); } catch { return null; }
+  const host = u.hostname.replace(/^www\./, '');
+
+  const vimeo = host === 'vimeo.com' && u.pathname.match(/^\/(\d+)/);
+  if (vimeo) return { kind: 'video', src: `https://player.vimeo.com/video/${vimeo[1]}`, label: 'Lecture video' };
+
+  // arXiv abstract pages have a matching PDF that frames cleanly.
+  const arxiv = (host === 'arxiv.org' || host === 'export.arxiv.org') && u.pathname.match(/^\/abs\/(.+)$/);
+  if (arxiv) return { kind: 'doc', src: `https://arxiv.org/pdf/${arxiv[1]}`, label: 'Paper' };
+
+  if (/\.pdf($|\?)/i.test(u.pathname + u.search)) return { kind: 'doc', src: url, label: 'PDF' };
+
+  return null;
+}
 const LESSON_KIND = {
   video:    { label: 'Lecture video', color: 'oklch(0.7 0.19 25)',  icon: 'cap' },
   paper:    { label: 'Paper',         color: 'oklch(0.72 0.18 295)', icon: 'search' },
@@ -60,8 +91,8 @@ function ResourceReader({ lessonId }) {
         <span className="mono" style={{ fontSize: 10.5, color: 'var(--muted)' }}>{state.source}</span>
         <span className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', marginLeft: 'auto' }}>extracted — open the original for full fidelity</span>
       </div>
-      <div style={{ padding: '16px 20px', fontSize: 14, lineHeight: 1.7, maxHeight: '60vh', overflowY: 'auto' }} className="scroll">
-        <MarkdownText text={state.markdown} />
+      <div style={{ padding: '16px 20px', maxHeight: '60vh', overflowY: 'auto' }} className="scroll">
+        <MarkdownText text={state.markdown} prose />
       </div>
     </div>
   );
@@ -248,7 +279,8 @@ export default function Courses() {
       const prev = idx > 0 ? flat[idx - 1] : null;
       const next = idx >= 0 && idx < flat.length - 1 ? flat[idx + 1] : null;
       const meta = LESSON_KIND[lesson.kind] || LESSON_KIND.reading;
-      const vid = youtubeId(lesson.url);
+      const embed = embedFor(lesson.url);
+      const vid = embed?.kind === 'video';
       const isDone = completedIds.includes(lesson.id);
       const complete = async (advance) => {
         try {
@@ -267,10 +299,22 @@ export default function Courses() {
             {React.cloneElement(I.chevronL, { size: 14 })} {c.title}
           </button>
           <Card style={{ padding: 0, overflow: 'hidden' }}>
-            {/* Embedded lecture video */}
-            {vid && (
-              <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', background: '#000' }}>
-                <iframe title={lesson.title} src={`https://www.youtube-nocookie.com/embed/${vid}`} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />
+            {/* Embedded source — video plays in place, a paper or PDF reads in
+                place. Sandboxed, and with the referrer trimmed to the origin. */}
+            {embed && (
+              <div style={{ position: 'relative', width: '100%', background: '#000', ...(embed.kind === 'video' ? { aspectRatio: '16 / 9' } : { height: '78vh', minHeight: 420 }) }}>
+                {/* Deliberately not sandboxed: Chrome refuses to run its PDF
+                    viewer inside a sandboxed frame, so `sandbox` turned every
+                    embedded paper into a blocked-content icon. The real control
+                    is the CSP frame-src allowlist in server.js — only four
+                    trusted hosts can be framed at all — and same-origin policy
+                    keeps the frame away from this page either way. */}
+                <iframe
+                  title={lesson.title} src={embed.src}
+                  referrerPolicy="strict-origin-when-cross-origin"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }} />
               </div>
             )}
             <div style={{ padding: 28 }}>
@@ -284,7 +328,7 @@ export default function Courses() {
               <h1 className="display" style={{ fontSize: 27, color: 'var(--ink)', margin: '4px 0 18px' }}>{lesson.title}</h1>
 
               {/* Non-video external resource → rich open card */}
-              {lesson.url && !vid && (
+              {lesson.url && !embed && (
                 <a href={lesson.url} target="_blank" rel="noopener noreferrer" className="hover-card" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, marginBottom: 18, borderRadius: 12, background: 'var(--surface)', border: `1px solid color-mix(in oklch, ${meta.color} 30%, var(--border))`, textDecoration: 'none', color: 'var(--ink)' }}>
                   <span style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 10, background: `color-mix(in oklch, ${meta.color} 16%, transparent)`, color: meta.color, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: `1px solid color-mix(in oklch, ${meta.color} 35%, transparent)` }}>{React.cloneElement(I[meta.icon] || I.book, { size: 20 })}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -296,10 +340,10 @@ export default function Courses() {
               )}
 
               {/* Readable in-app rendering of the external reference */}
-              {lesson.url && !vid && <ResourceReader lessonId={lesson.id} />}
+              {lesson.url && !embed && <ResourceReader lessonId={lesson.id} />}
 
               {lesson.body_md ? (
-                <div style={{ fontSize: 14.5, lineHeight: 1.75 }}><MarkdownText text={lesson.body_md} /></div>
+                <MarkdownText text={lesson.body_md} prose stripTitle={lesson.title} />
               ) : (!lesson.url && <div style={{ color: 'var(--muted)', fontSize: 14 }}>No lesson content yet.</div>)}
 
               {/* Labs are runnable where the topic allows it (M8). */}

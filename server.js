@@ -55,8 +55,15 @@ app.use(helmet({
       connectSrc: ["'self'"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       objectSrc: ["'none'"],
-      // Allow embedded lecture videos (privacy-nocookie YouTube) in lessons.
-      frameSrc: ["'self'", "https://www.youtube-nocookie.com", "https://www.youtube.com"],
+      // Sources a lesson can embed in place rather than linking away to. Kept
+      // to providers that publish an embed endpoint and match embedFor() in
+      // src/screens/Courses.jsx — anything else falls back to a link.
+      frameSrc: [
+        "'self'",
+        "https://www.youtube-nocookie.com", "https://www.youtube.com",
+        "https://player.vimeo.com",
+        "https://arxiv.org",
+      ],
       imgSrc: ["'self'", "data:", "blob:", "https://i.ytimg.com"],
     },
   },
