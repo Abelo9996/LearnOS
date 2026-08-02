@@ -1,7 +1,7 @@
 {
   "name": "learnos",
   "version": "1.0.0",
-  "description": "LearnOS — AI-Powered Learning Platform",
+  "description": "LearnOS \u2014 AI-Powered Learning Platform",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,6 +15,7 @@
     "verify:integrity": "node scripts/verify-integrity.mjs",
     "verify": "node scripts/verify-all.mjs",
     "enrich": "node scripts/enrich.mjs",
+    "check:resources": "node scripts/check-resources.mjs",
     "deepen": "node scripts/deepen-courses.mjs",
     "factcheck": "node scripts/factcheck.mjs",
     "verify:accuracy": "node scripts/verify-accuracy.mjs",
