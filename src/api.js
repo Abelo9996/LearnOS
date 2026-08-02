@@ -96,6 +96,9 @@ const API = {
 
   // ── Schedule ──────────────────────────────────────────────────────────────
   getSchedule:         () => API.get('/schedule'),
+  // The real commitments — assignment deadlines, reviews coming due, the next
+  // unfinished lesson in each course — merged and sorted by when they are due.
+  getAgenda:           (days) => API.get('/schedule/agenda' + (days ? `?days=${days}` : '')),
   createScheduleEvent: (data) => API.post('/schedule', data),
   deleteScheduleEvent: (id) => API.del(`/schedule/${id}`),
   patchScheduleEvent:  (id, data) => API.patch(`/schedule/${id}`, data),
