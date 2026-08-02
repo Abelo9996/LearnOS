@@ -187,7 +187,9 @@ app.get('/api/stats', (req, res) => {
   const completedSessions = db.prepare("SELECT COUNT(*) as c FROM sessions WHERE user_id = ? AND status = 'completed'").get(uid).c;
   const pendingAssignments= db.prepare("SELECT COUNT(*) as c FROM assignments WHERE user_id = ? AND status != 'graded'").get(uid).c;
   const dueFlashcards     = db.prepare("SELECT COUNT(*) as c FROM flashcards WHERE user_id = ? AND (next_review IS NULL OR next_review <= date('now'))").get(uid).c;
-  const avgMastery        = db.prepare("SELECT AVG(mastery) as m FROM roadmaps WHERE user_id = ? AND status = 'active'").get(uid);
+  // course_slug IS NULL excludes the private per-course companion roadmaps
+  // (see GET /api/roadmaps) — counting those averaged every course in twice.
+  const avgMastery        = db.prepare("SELECT AVG(mastery) as m FROM roadmaps WHERE user_id = ? AND status = 'active' AND course_slug IS NULL").get(uid);
   res.json({
     level:              user.level,
     xp:                 user.xp,
