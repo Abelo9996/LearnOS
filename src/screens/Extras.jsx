@@ -1,6 +1,6 @@
 import React from 'react';
 import { I } from '../components/Icons';
-import { Card, Btn, ProgressBar, Ring, MiniBars, Tag, Avatar, AgentChip, PageScroll, PageHeader, SectionHead, Toggle, ConfirmModal } from '../components/UI';
+import { Card, Btn, ProgressBar, Ring, MiniBars, Tag, Avatar, AgentChip, PageScroll, PageHeader, SectionHead, Toggle, ConfirmModal, SkeletonRows } from '../components/UI';
 import { AGENTS } from '../data/data';
 import API, { timeAgo, fmtDate, dueLabel } from '../api.js';
 import { useToast, useModal } from '../App';
@@ -40,6 +40,139 @@ function ErrorBanner({ error, onRetry }) {
 /* ═══════════════════════════════════════════════════════════════════════════
    SCHEDULE
    ═══════════════════════════════════════════════════════════════════════════ */
+/**
+ * What is actually due.
+ *
+ * The Schedule was a weekly grid of blocks you typed in by hand, sitting next
+ * to 31 assignments with real due dates that it knew nothing about. This is the
+ * other half: the commitments the app already tracks, dated, sorted, and
+ * clickable through to the thing itself.
+ */
+const AGENDA_KIND = {
+  assignment: { label: 'Assignment', color: 'oklch(0.74 0.18 25)',  icon: 'check' },
+  review:     { label: 'Review',     color: 'var(--brand-3)',       icon: 'layers' },
+  lesson:     { label: 'Continue',   color: 'oklch(0.74 0.17 220)', icon: 'book' },
+};
+
+function ScheduleAgenda({ setScreen }) {
+  const [data, setData] = React.useState(null);
+  const [showAll, setShowAll] = React.useState(false);
+
+  React.useEffect(() => { API.getAgenda().then(setData).catch(() => setData({ items: [], counts: {} })); }, []);
+
+  const open = (it) => {
+    if (it.courseSlug) { try { localStorage.setItem('learnos_open_course', it.courseSlug); } catch {} }
+    setScreen && setScreen(it.screen);
+  };
+
+  if (!data) return <Card style={{ padding: 16, marginBottom: SECT_MARGIN }}><SkeletonRows rows={3} height={44} /></Card>;
+
+  // A lesson is not "due" — it is where you left off. Mixing the two meant the
+  // undated ones sorted below every deadline and fell off the end of the list,
+  // which is the opposite of useful for the thing you do most days.
+  const dated = (data.items || []).filter(i => i.due);
+  const carryOn = (data.items || []).filter(i => !i.due);
+  const items = showAll ? dated : dated.slice(0, 6);
+  const { overdue = 0, today = 0, total = 0 } = data.counts || {};
+
+  const whenLabel = (it) => {
+    if (!it.due) return 'anytime';
+    const d = new Date(it.due + 'T00:00:00');
+    const days = Math.round((d - new Date(new Date().toDateString())) / 86400000);
+    if (days < 0)  return `${Math.abs(days)}d overdue`;
+    if (days === 0) return 'today';
+    if (days === 1) return 'tomorrow';
+    if (days < 7)  return `in ${days}d`;
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <Card pad={false} style={{ marginBottom: SECT_MARGIN }}>
+      <div style={{ padding: '15px 18px 12px', display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 650, color: 'var(--ink)' }}>What's due</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
+            Pulled from your assignments, reviews and courses — not typed in here.
+          </div>
+        </div>
+        <div className="mono" style={{ fontSize: 11, display: 'flex', gap: 12 }}>
+          {overdue > 0 && <span style={{ color: 'var(--bad)' }}>{overdue} overdue</span>}
+          {today > 0 && <span style={{ color: 'var(--brand)' }}>{today} today</span>}
+          <span style={{ color: 'var(--muted)' }}>{total} in the next two weeks</span>
+        </div>
+      </div>
+
+      {items.length === 0 ? (
+        <div style={{ padding: '0 18px 16px', fontSize: 13, color: 'var(--muted)', lineHeight: 1.6 }}>
+          {carryOn.length
+            ? 'No deadlines in the next two weeks.'
+            : 'Nothing due and nothing in progress. Start a course and it will show up here.'}
+        </div>
+      ) : (
+        <div className="stagger">
+          {items.map(it => {
+            const k = AGENDA_KIND[it.kind] || AGENDA_KIND.lesson;
+            return (
+              <div key={`${it.kind}-${it.id}`} className="list-row" onClick={() => open(it)}
+                style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderTop: '1px solid var(--border)', cursor: 'pointer' }}>
+                <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  background: `color-mix(in oklch, ${k.color} 16%, transparent)`, color: k.color, border: `1px solid color-mix(in oklch, ${k.color} 32%, transparent)` }}>
+                  {React.cloneElement(I[k.icon] || I.book, { size: 14 })}
+                </span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, color: 'var(--ink)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</div>
+                  <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {k.label} · {it.sub}{it.minutes ? ` · ${it.minutes}m` : ''}
+                  </div>
+                </div>
+                <span className="mono" style={{ fontSize: 11, flexShrink: 0, color: it.overdue ? 'var(--bad)' : it.due ? 'var(--ink-2)' : 'var(--faint)' }}>
+                  {whenLabel(it)}
+                </span>
+              </div>
+            );
+          })}
+          {dated.length > 6 && (
+            <button onClick={() => setShowAll(s => !s)}
+              style={{ display: 'block', width: '100%', padding: '9px 18px', background: 'none', border: 0, borderTop: '1px solid var(--border)', cursor: 'pointer', fontSize: 12, color: 'var(--brand)', textAlign: 'left' }}>
+              {showAll ? 'Show less' : `Show all ${dated.length} deadlines`}
+            </button>
+          )}
+        </div>
+      )}
+
+      {carryOn.length > 0 && (
+        <>
+          <div style={{ padding: '13px 18px 9px', borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>Pick up where you left off</div>
+            <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: 2 }}>The next unfinished lesson in each course you're taking.</div>
+          </div>
+          <div className="stagger">
+            {carryOn.map(it => {
+              const k = AGENDA_KIND[it.kind] || AGENDA_KIND.lesson;
+              return (
+                <div key={`${it.kind}-${it.id}`} className="list-row" onClick={() => open(it)}
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 18px', borderTop: '1px solid var(--border)', cursor: 'pointer' }}>
+                  <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    background: `color-mix(in oklch, ${k.color} 16%, transparent)`, color: k.color, border: `1px solid color-mix(in oklch, ${k.color} 32%, transparent)` }}>
+                    {React.cloneElement(I[k.icon] || I.book, { size: 14 })}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, color: 'var(--ink)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.title}</div>
+                    <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {it.sub}{it.minutes ? ` · ${it.minutes}m` : ''}
+                    </div>
+                  </div>
+                  <span className="mono" style={{ fontSize: 11, flexShrink: 0, color: 'var(--brand)' }}>continue →</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
 export function Schedule({ setScreen }) {
   const { add: toast } = useToast();
   const { open: openModal, close: closeModal } = useModal();
@@ -182,8 +315,9 @@ export function Schedule({ setScreen }) {
 
   return (
     <PageScroll>
-      <PageHeader eyebrow={`Week · ${days[0]} – ${days[6]}`} title="Schedule" subtitle="Click any cell to add an event. Click an existing event to edit or delete it."
+      <PageHeader eyebrow={`Week · ${days[0]} – ${days[6]}`} title="Schedule" subtitle="What's due, and the week you've planned around it."
         actions={<><Btn variant="primary" size="md" icon={I.plus} onClick={() => handleCellClick(new Date().getDay() === 0 ? 6 : new Date().getDay() - 1, 9)}>New block</Btn></>} />
+      <ScheduleAgenda setScreen={setScreen} />
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: SECT_MARGIN }}>
         <Card pad={false}>
           <div style={{ display: 'grid', gridTemplateColumns: '52px repeat(7, 1fr)', borderBottom: '1px solid var(--border)' }}>

@@ -66,4 +66,93 @@ router.post('/:id/reminder-sent', (req, res) => {
   res.json({ ok: true });
 });
 
+/**
+ * GET /agenda — the work that is actually waiting, in the order it is due.
+ *
+ * The schedule used to be a weekly grid of blocks you typed in yourself, with
+ * no idea that 31 assignments had due dates, that reviews were coming due, or
+ * that three courses were part-finished. It was a calendar that knew nothing
+ * about the thing it was a calendar for.
+ *
+ * This gathers the real commitments from the tables that own them and hands
+ * back one dated, sorted list. Every item carries where to go, so the schedule
+ * becomes a way into the work rather than a picture of it.
+ */
+router.get('/agenda', (req, res) => {
+  const uid = req.userId;
+  const days = Math.min(Math.max(parseInt(req.query.days, 10) || 14, 1), 60);
+  const items = [];
+
+  // Assignments — the only thing here with a real deadline attached.
+  for (const a of db.prepare(
+    `SELECT id, title, course, due_date, status, priority, estimated_minutes
+       FROM assignments
+      WHERE user_id = ? AND status != 'graded' AND due_date IS NOT NULL
+        AND date(due_date) <= date('now', ?)
+      ORDER BY date(due_date)`
+  ).all(uid, `+${days} days`)) {
+    items.push({
+      kind: 'assignment', id: a.id, title: a.title,
+      sub: a.course || 'Assignment', due: a.due_date,
+      minutes: a.estimated_minutes || null,
+      overdue: new Date(a.due_date) < new Date(new Date().toDateString()),
+      screen: 'assignments',
+    });
+  }
+
+  // Spaced review — one entry for the whole batch; a hundred separate cards
+  // would drown everything else.
+  const dueCards = db.prepare(
+    "SELECT COUNT(*) c FROM flashcards WHERE user_id = ? AND (next_review IS NULL OR next_review <= date('now'))"
+  ).get(uid).c;
+  if (dueCards > 0) {
+    items.push({
+      kind: 'review', id: 'review-batch', title: `${dueCards} card${dueCards === 1 ? '' : 's'} due for review`,
+      sub: 'Spaced repetition', due: new Date().toISOString().slice(0, 10),
+      minutes: Math.max(5, Math.round(dueCards * 0.5)), overdue: false, screen: 'cards',
+    });
+  }
+
+  // Courses in progress — the next unfinished lesson, so "carry on" is one
+  // click rather than a hunt through the syllabus.
+  for (const e of db.prepare(
+    `SELECT e.course_slug, c.title FROM enrollments e JOIN courses c ON c.slug = e.course_slug
+      WHERE e.user_id = ? AND e.status != 'completed'`
+  ).all(uid)) {
+    const next = db.prepare(
+      `SELECT l.id, l.title, l.estimated_minutes
+         FROM module_lessons l JOIN course_modules m ON m.id = l.module_id
+        WHERE m.course_slug = ?
+          AND l.id NOT IN (SELECT lesson_id FROM enrollment_progress WHERE user_id = ? AND course_slug = m.course_slug)
+        ORDER BY m.order_idx, l.order_idx LIMIT 1`
+    ).get(e.course_slug, uid);
+    if (next) {
+      items.push({
+        kind: 'lesson', id: next.id, title: next.title, sub: e.title,
+        due: null, minutes: next.estimated_minutes || null, overdue: false,
+        screen: 'courses', courseSlug: e.course_slug,
+      });
+    }
+  }
+
+  // Undated work sorts after everything with a deadline.
+  items.sort((a, b) => {
+    if (a.due && b.due) return a.due < b.due ? -1 : a.due > b.due ? 1 : 0;
+    if (a.due) return -1;
+    if (b.due) return 1;
+    return 0;
+  });
+
+  const today = new Date().toISOString().slice(0, 10);
+  res.json({
+    ok: true,
+    items,
+    counts: {
+      overdue: items.filter(i => i.overdue).length,
+      today:   items.filter(i => i.due === today && !i.overdue).length,
+      total:   items.length,
+    },
+  });
+});
+
 export default router;
