@@ -194,14 +194,8 @@ function AppLoader() {
       minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
       background: 'var(--bg)', flexDirection: 'column', gap: 18,
     }}>
-      <span style={{
-        width: 44, height: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        borderRadius: 10, background: 'oklch(0.98 0.008 295)',
-        boxShadow: '0 0 0 1px oklch(0.68 0.21 295 / 0.25), 0 0 20px oklch(0.68 0.21 295 / 0.3)',
-      }}>
-        <img src="/logo.png" alt="" aria-hidden="true" draggable={false}
-          style={{ width: 36, height: 36, display: 'block', objectFit: 'contain' }} />
-      </span>
+      <img src="/logo.png" alt="" aria-hidden="true" width={48} height={48} draggable={false}
+        style={{ width: 48, height: 48, display: 'block', objectFit: 'contain' }} />
       <div style={{ display: 'flex', gap: 6 }}>
         {[0, 1, 2].map(i => (
           <span key={i} style={{
@@ -610,18 +604,12 @@ function Sidebar({ screen, setScreen, collapsed, onToggle, counts = {}, onHome }
           background: 'none', border: 0, cursor: 'pointer', textAlign: 'left',
           transition: 'padding var(--dur-normal) var(--ease-smooth), background var(--dur-fast) var(--ease-smooth)',
         }}>
-        {/* Pale tile behind the mark — see BrandGlyph in components/UI.jsx for
-            why the artwork cannot sit directly on the dark chrome. */}
-        <span className="sidebar-logo" style={{
-          width: 32, height: 32, display: 'inline-flex', flexShrink: 0,
-          alignItems: 'center', justifyContent: 'center',
-          borderRadius: 7, background: 'oklch(0.98 0.008 295)',
-          boxShadow: '0 0 0 1px oklch(0.68 0.21 295 / 0.25), 0 0 18px oklch(0.68 0.21 295 / 0.28)',
-          transition: 'transform var(--dur-normal) var(--ease-spring), box-shadow var(--dur-normal) var(--ease-smooth)',
-        }}>
-          <img src="/logo.png" alt="" aria-hidden="true" draggable={false}
-            style={{ width: 26, height: 26, display: 'block', objectFit: 'contain' }} />
-        </span>
+        <img className="sidebar-logo" src="/logo.png" alt="" aria-hidden="true"
+          width={32} height={32} draggable={false}
+          style={{
+            width: 32, height: 32, display: 'block', flexShrink: 0, objectFit: 'contain',
+            transition: 'transform var(--dur-normal) var(--ease-spring)',
+          }} />
         {!collapsed && (
           <span className="display" style={{
             fontSize: 18, color: 'var(--ink)', letterSpacing: '-0.02em',
