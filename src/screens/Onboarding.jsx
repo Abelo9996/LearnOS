@@ -143,15 +143,8 @@ export default function Onboarding({ onComplete }) {
       }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: 13, marginBottom: 16,
-            background: 'oklch(0.98 0.008 295)',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 0 0 1px oklch(0.68 0.21 295 / 0.25), 0 0 22px oklch(0.68 0.21 295 / 0.3)',
-          }}>
-            <img src="/logo.png" alt="" aria-hidden="true" draggable={false}
-              style={{ width: 46, height: 46, display: 'block', objectFit: 'contain' }} />
-          </div>
+          <img src="/logo.png" alt="" aria-hidden="true" width={60} height={60} draggable={false}
+            style={{ width: 60, height: 60, display: 'block', margin: '0 auto 16px', objectFit: 'contain' }} />
           <h1 className="display" style={{ fontSize: 26, marginBottom: 6 }}>
             {name.trim() && step > 1 ? `Nice to meet you, ${name.trim().split(' ')[0]}` : 'Welcome to LearnOS'}
           </h1>

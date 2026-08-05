@@ -333,27 +333,18 @@ export function PageScroll({ children }) {
 }
 
 /**
- * The LearnOS mark.
+ * The LearnOS mark — the artwork on its own, over whatever is behind it.
  *
- * The artwork is drawn for a light surface: the tassel is near-black, and on
- * the app's dark chrome it disappeared completely, leaving a cap and an amber
- * tab floating unconnected. So the mark sits on its own pale tile — the way an
- * app icon does — which keeps all four of its colours legible down to 16px and
- * in either theme, instead of quietly losing a quarter of the logo.
+ * The PNG is transparent (three quarters of it is empty pixels), so nothing
+ * here should introduce a plate or a fill behind it.
  */
 export function BrandGlyph({ size = 32 }) {
   return (
-    <span style={{
-      width: size, height: size, display: 'inline-flex', flexShrink: 0,
-      alignItems: 'center', justifyContent: 'center',
-      borderRadius: size / 4.5,
-      background: 'oklch(0.98 0.008 295)',
-      boxShadow: '0 0 0 1px oklch(0.68 0.21 295 / 0.25), 0 0 18px oklch(0.68 0.21 295 / 0.28)',
-      transition: 'transform var(--dur-normal) var(--ease-spring), box-shadow var(--dur-normal) var(--ease-smooth)',
-    }}>
-      <img src="/logo.png" alt="" aria-hidden="true" draggable={false}
-        style={{ width: size * 0.82, height: size * 0.82, display: 'block', objectFit: 'contain' }} />
-    </span>
+    <img src="/logo.png" alt="" aria-hidden="true" width={size} height={size} draggable={false}
+      style={{
+        width: size, height: size, display: 'block', flexShrink: 0, objectFit: 'contain',
+        transition: 'transform var(--dur-normal) var(--ease-spring)',
+      }} />
   );
 }
 
