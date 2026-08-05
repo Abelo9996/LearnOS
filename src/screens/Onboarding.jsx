@@ -144,14 +144,13 @@ export default function Onboarding({ onComplete }) {
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{
-            width: 48, height: 48, borderRadius: 12, background: 'var(--brand-grad)',
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
-            boxShadow: '0 0 0 1px oklch(0.68 0.21 295 / 0.4), 0 0 20px oklch(0.68 0.21 295 / 0.4)',
+            width: 56, height: 56, borderRadius: 13, marginBottom: 16,
+            background: 'oklch(0.98 0.008 295)',
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 0 0 1px oklch(0.68 0.21 295 / 0.25), 0 0 22px oklch(0.68 0.21 295 / 0.3)',
           }}>
-            <svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-              <path d="M12 3 21 8v8l-9 5-9-5V8z" stroke="oklch(0.16 0.02 270)" strokeWidth="2" strokeLinejoin="round"/>
-              <path d="M3 8l9 5 9-5M12 13v9" stroke="oklch(0.16 0.02 270)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
-            </svg>
+            <img src="/logo.png" alt="" aria-hidden="true" draggable={false}
+              style={{ width: 46, height: 46, display: 'block', objectFit: 'contain' }} />
           </div>
           <h1 className="display" style={{ fontSize: 26, marginBottom: 6 }}>
             {name.trim() && step > 1 ? `Nice to meet you, ${name.trim().split(' ')[0]}` : 'Welcome to LearnOS'}

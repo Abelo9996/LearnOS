@@ -196,13 +196,11 @@ function AppLoader() {
     }}>
       <span style={{
         width: 44, height: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        borderRadius: 11, background: 'var(--brand-grad)',
-        boxShadow: '0 0 0 1px oklch(0.68 0.21 295 / 0.4), 0 0 18px oklch(0.68 0.21 295 / 0.4)',
+        borderRadius: 10, background: 'oklch(0.98 0.008 295)',
+        boxShadow: '0 0 0 1px oklch(0.68 0.21 295 / 0.25), 0 0 20px oklch(0.68 0.21 295 / 0.3)',
       }}>
-        <svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-          <path d="M12 3 21 8v8l-9 5-9-5V8z" stroke="oklch(0.16 0.02 270)" strokeWidth="2" strokeLinejoin="round"/>
-          <path d="M3 8l9 5 9-5M12 13v9" stroke="oklch(0.16 0.02 270)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
-        </svg>
+        <img src="/logo.png" alt="" aria-hidden="true" draggable={false}
+          style={{ width: 36, height: 36, display: 'block', objectFit: 'contain' }} />
       </span>
       <div style={{ display: 'flex', gap: 6 }}>
         {[0, 1, 2].map(i => (
@@ -612,18 +610,17 @@ function Sidebar({ screen, setScreen, collapsed, onToggle, counts = {}, onHome }
           background: 'none', border: 0, cursor: 'pointer', textAlign: 'left',
           transition: 'padding var(--dur-normal) var(--ease-smooth), background var(--dur-fast) var(--ease-smooth)',
         }}>
+        {/* Pale tile behind the mark — see BrandGlyph in components/UI.jsx for
+            why the artwork cannot sit directly on the dark chrome. */}
         <span className="sidebar-logo" style={{
-          width: 32, height: 32, display: 'inline-flex',
+          width: 32, height: 32, display: 'inline-flex', flexShrink: 0,
           alignItems: 'center', justifyContent: 'center',
-          borderRadius: 8, background: 'var(--brand-grad)',
-          boxShadow: '0 0 0 1px oklch(0.68 0.21 295 / 0.4), 0 0 18px oklch(0.68 0.21 295 / 0.4)',
-          flexShrink: 0,
+          borderRadius: 7, background: 'oklch(0.98 0.008 295)',
+          boxShadow: '0 0 0 1px oklch(0.68 0.21 295 / 0.25), 0 0 18px oklch(0.68 0.21 295 / 0.28)',
           transition: 'transform var(--dur-normal) var(--ease-spring), box-shadow var(--dur-normal) var(--ease-smooth)',
         }}>
-          <svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-            <path d="M12 3 21 8v8l-9 5-9-5V8z" stroke="oklch(0.16 0.02 270)" strokeWidth="2" strokeLinejoin="round"/>
-            <path d="M3 8l9 5 9-5M12 13v9" stroke="oklch(0.16 0.02 270)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
-          </svg>
+          <img src="/logo.png" alt="" aria-hidden="true" draggable={false}
+            style={{ width: 26, height: 26, display: 'block', objectFit: 'contain' }} />
         </span>
         {!collapsed && (
           <span className="display" style={{

@@ -332,20 +332,27 @@ export function PageScroll({ children }) {
   );
 }
 
+/**
+ * The LearnOS mark.
+ *
+ * The artwork is drawn for a light surface: the tassel is near-black, and on
+ * the app's dark chrome it disappeared completely, leaving a cap and an amber
+ * tab floating unconnected. So the mark sits on its own pale tile — the way an
+ * app icon does — which keeps all four of its colours legible down to 16px and
+ * in either theme, instead of quietly losing a quarter of the logo.
+ */
 export function BrandGlyph({ size = 32 }) {
   return (
     <span style={{
-      width: size, height: size, display: 'inline-flex',
+      width: size, height: size, display: 'inline-flex', flexShrink: 0,
       alignItems: 'center', justifyContent: 'center',
-      borderRadius: size / 4,
-      background: 'var(--brand-grad)',
-      boxShadow: '0 0 0 1px oklch(0.68 0.21 295 / 0.4), 0 0 18px oklch(0.68 0.21 295 / 0.4)',
+      borderRadius: size / 4.5,
+      background: 'oklch(0.98 0.008 295)',
+      boxShadow: '0 0 0 1px oklch(0.68 0.21 295 / 0.25), 0 0 18px oklch(0.68 0.21 295 / 0.28)',
       transition: 'transform var(--dur-normal) var(--ease-spring), box-shadow var(--dur-normal) var(--ease-smooth)',
     }}>
-      <svg width={size * 0.6} height={size * 0.6} viewBox="0 0 24 24" fill="none">
-        <path d="M12 3 21 8v8l-9 5-9-5V8z" stroke="oklch(0.16 0.02 270)" strokeWidth="2" strokeLinejoin="round"/>
-        <path d="M3 8l9 5 9-5M12 13v9" stroke="oklch(0.16 0.02 270)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"/>
-      </svg>
+      <img src="/logo.png" alt="" aria-hidden="true" draggable={false}
+        style={{ width: size * 0.82, height: size * 0.82, display: 'block', objectFit: 'contain' }} />
     </span>
   );
 }
