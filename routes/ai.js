@@ -17,17 +17,38 @@ router.get('/status', (req, res) => {
   res.json({ managed: hasManagedKey(), byok: byok > 0, ready: hasManagedKey() || byok > 0 });
 });
 
-// Full OpenRouter model catalog (cached ~1h) so the user can route any agent to
-// any available model. The list endpoint is public — no key required.
+/**
+ * The OpenRouter model catalog (cached ~1h). The list endpoint is public, so no
+ * key is needed to browse it.
+ *
+ * There are ~400 entries and LearnOS should offer all of them — including the
+ * free ones, which are the whole reason somebody self-hosts this and brings
+ * their own key. A learner asking for `inclusionai/ling-3.0-tiny:free` should
+ * find it.
+ *
+ * Two kinds of noise are worth removing:
+ *
+ *   `:batch`  — the same model behind OpenRouter's asynchronous batch endpoint.
+ *               60 of the 401 entries. Every one is a second copy of a model
+ *               already in the list, and batch semantics do not work for
+ *               interactive tutoring, so offering them is offering a broken
+ *               duplicate. A custom slug still reaches them if anyone insists.
+ *
+ *   duplicate ids — defensive; the upstream list has none today.
+ *
+ * `:free` and `:thinking` are NOT duplicates. They are genuinely different
+ * offerings of the model and both stay.
+ */
 let _modelCache = { at: 0, data: null };
 const FALLBACK_MODELS = [
-  { id: 'anthropic/claude-haiku-4.5', name: 'Claude Haiku 4.5' },
-  { id: 'anthropic/claude-sonnet-4.6', name: 'Claude Sonnet 4.6' },
-  { id: 'openai/gpt-4o-mini', name: 'GPT-4o mini' },
-  { id: 'openai/gpt-4o', name: 'GPT-4o' },
-  { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-  { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B' },
+  { id: 'inclusionai/ling-3.0-tiny:free', name: 'Ling 3.0 Tiny (free)', free: true, promptPrice: 0, completionPrice: 0, context: null },
+  { id: 'anthropic/claude-haiku-4.5', name: 'Claude Haiku 4.5', free: false, promptPrice: null, completionPrice: null, context: null },
+  { id: 'anthropic/claude-sonnet-4.6', name: 'Claude Sonnet 4.6', free: false, promptPrice: null, completionPrice: null, context: null },
+  { id: 'openai/gpt-4o-mini', name: 'GPT-4o mini', free: false, promptPrice: null, completionPrice: null, context: null },
+  { id: 'google/gemini-2.5-flash', name: 'Gemini 2.5 Flash', free: false, promptPrice: null, completionPrice: null, context: null },
+  { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B', free: false, promptPrice: null, completionPrice: null, context: null },
 ];
+
 router.get('/models', async (_req, res) => {
   const now = Date.now();
   if (_modelCache.data && (now - _modelCache.at) < 3_600_000) return res.json(_modelCache.data);
@@ -35,16 +56,29 @@ router.get('/models', async (_req, res) => {
     const r = await fetch('https://openrouter.ai/api/v1/models', { headers: { Accept: 'application/json' } });
     if (!r.ok) throw new Error('openrouter ' + r.status);
     const j = await r.json();
+
+    const seen = new Set();
     const models = (j.data || [])
-      .map(m => ({
-        id: m.id,
-        name: m.name || m.id,
-        context: m.context_length || m.top_provider?.context_length || null,
-        promptPrice: m.pricing?.prompt != null ? Number(m.pricing.prompt) : null,
-        completionPrice: m.pricing?.completion != null ? Number(m.pricing.completion) : null,
-      }))
-      .filter(m => m.id)
-      .sort((a, b) => a.id.localeCompare(b.id));
+      .filter(m => m?.id && !/:batch$/.test(m.id))
+      .filter(m => (seen.has(m.id) ? false : seen.add(m.id)))
+      .map(m => {
+        const prompt = m.pricing?.prompt != null ? Number(m.pricing.prompt) : null;
+        const completion = m.pricing?.completion != null ? Number(m.pricing.completion) : null;
+        return {
+          id: m.id,
+          name: m.name || m.id,
+          provider: m.id.split('/')[0],
+          context: m.context_length || m.top_provider?.context_length || null,
+          promptPrice: prompt,
+          completionPrice: completion,
+          // "Free" means it costs nothing to send AND nothing to receive.
+          free: prompt === 0 && completion === 0,
+        };
+      })
+      // Free models first — they are the hardest to find and the most asked
+      // for — then everything else alphabetically.
+      .sort((a, b) => (a.free === b.free ? a.id.localeCompare(b.id) : a.free ? -1 : 1));
+
     _modelCache = { at: now, data: models };
     res.json(models);
   } catch {

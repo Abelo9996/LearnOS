@@ -5,6 +5,7 @@ import { AGENTS } from '../data/data';
 import API, { timeAgo, fmtDate, dueLabel } from '../api.js';
 import { useToast, useModal } from '../App';
 import MarkdownText from '../components/Markdown';
+import ModelPicker from '../components/ModelPicker';
 
 const SECT_MARGIN = 16;
 
@@ -1251,55 +1252,9 @@ function CoverVizSmall({ kind }) {
    ═══════════════════════════════════════════════════════════════════════════ */
 // Searchable picker over the full OpenRouter model catalog. Lets the user filter
 // by id/name and pick any model, or type a custom slug that isn't listed.
-function ModelSelect({ value, onChange, models, placeholder = 'model slug…' }) {
-  const [open, setOpen] = React.useState(false);
-  const [q, setQ] = React.useState('');
-  const ref = React.useRef(null);
-  React.useEffect(() => {
-    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, []);
-  const list = React.useMemo(() => {
-    const arr = models || [];
-    const ql = q.trim().toLowerCase();
-    if (!ql) return arr.slice(0, 80);
-    return arr.filter(m => m.id.toLowerCase().includes(ql) || (m.name || '').toLowerCase().includes(ql)).slice(0, 80);
-  }, [q, models]);
-  const price = (m) => m.promptPrice != null ? ` · $${(m.promptPrice * 1e6).toFixed(2)}/M in` : '';
-  return (
-    <div ref={ref} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
-      <input
-        value={open ? q : value}
-        placeholder={placeholder}
-        onFocus={() => { setOpen(true); setQ(''); }}
-        onChange={e => { setQ(e.target.value); setOpen(true); }}
-        style={{ width: '100%', padding: '8px 12px', background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 12.5, fontFamily: 'var(--font-mono)' }}
-      />
-      {open && (
-        <div className="scroll" style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, zIndex: 50, maxHeight: 280, overflowY: 'auto', background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: 'var(--shadow-md)' }}>
-          {(!models) && <div style={{ padding: 10, fontSize: 12, color: 'var(--muted)' }}>Loading models…</div>}
-          {models && list.length === 0 && !q.trim() && <div style={{ padding: 10, fontSize: 12, color: 'var(--muted)' }}>No models</div>}
-          {list.map(m => (
-            <button key={m.id} onClick={() => { onChange(m.id); setOpen(false); }}
-              style={{ display: 'flex', flexDirection: 'column', gap: 1, width: '100%', textAlign: 'left', padding: '7px 10px', background: m.id === value ? 'var(--accent-soft)' : 'transparent', border: 0, borderTop: '1px solid var(--border)', cursor: 'pointer' }}
-              onMouseEnter={e => e.currentTarget.style.background = 'var(--surface)'}
-              onMouseLeave={e => e.currentTarget.style.background = m.id === value ? 'var(--accent-soft)' : 'transparent'}>
-              <span className="mono" style={{ fontSize: 11.5, color: 'var(--ink)' }}>{m.id}</span>
-              <span style={{ fontSize: 10, color: 'var(--muted)' }}>{m.name}{price(m)}</span>
-            </button>
-          ))}
-          {q.trim() && !list.some(m => m.id === q.trim()) && (
-            <button onClick={() => { onChange(q.trim()); setOpen(false); }}
-              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', background: 'transparent', border: 0, borderTop: '1px solid var(--border)', cursor: 'pointer', fontSize: 11.5, color: 'var(--brand)' }}>
-              Use custom slug "{q.trim()}"
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
+// The model picker lives in components/ModelPicker.jsx so onboarding and
+// Settings offer the same catalog. The copy that used to live here capped
+// the list at 80 entries, which hid most of the ~340 models.
 
 /**
  * Community registry settings.
@@ -1612,7 +1567,7 @@ export function Settings() {
                     <div className="cap" style={{ marginBottom: 8 }}>Add OpenRouter key</div>
                     <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
                       <span style={{ fontSize: 11.5, color: 'var(--muted)', whiteSpace: 'nowrap' }}>Default model</span>
-                      <ModelSelect value={newModel} onChange={setNewModel} models={models} placeholder="search OpenRouter models…" />
+                      <ModelPicker value={newModel} onChange={setNewModel} models={models} placeholder="search OpenRouter models…" />
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input value={newKey} onChange={e => setNewKey(e.target.value)} placeholder="sk-or-v1-…" style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13 }} />
@@ -1645,7 +1600,7 @@ export function Settings() {
                   <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 500 }}>{a.name}</span>
                 </div>
                 <div className="mono" style={{ fontSize: 11.5, color: 'var(--muted)' }}>{a.short}</div>
-                <ModelSelect
+                <ModelPicker
                   value={routeModels[code] || 'anthropic/claude-haiku-4.5'}
                   models={models}
                   onChange={async (model) => {

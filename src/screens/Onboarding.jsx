@@ -1,6 +1,7 @@
 import React from 'react';
 import { I } from '../components/Icons';
 import { Btn } from '../components/UI';
+import ModelPicker from '../components/ModelPicker';
 import API from '../api';
 import { generatePathway } from '../lib/generatePathway.js';
 
@@ -39,6 +40,10 @@ export default function Onboarding({ onComplete }) {
   const [styles, setStyles] = React.useState([]);
   const [apiKey, setApiKey] = React.useState('');
   const [model, setModel] = React.useState('anthropic/claude-sonnet-4.6');
+  // The whole OpenRouter catalog, so the model step is a real choice rather
+  // than four options somebody hardcoded.
+  const [models, setModels] = React.useState(null);
+  React.useEffect(() => { API.getModels().then(setModels).catch(() => setModels([])); }, []);
   const [keyState, setKeyState] = React.useState('idle');   // idle | testing | ok | bad
   const [keyMsg, setKeyMsg] = React.useState('');
   const [skipKey, setSkipKey] = React.useState(false);
@@ -369,19 +374,18 @@ export default function Onboarding({ onComplete }) {
             </div>
 
             <label className="cap" style={{ display: 'block', marginBottom: 6, fontSize: 10.5 }}>Model</label>
-            <select
-              value={model}
-              onChange={e => { setModel(e.target.value); if (keyState === 'ok') setKeyState('idle'); }}
-              style={{
-                width: '100%', padding: '11px 14px', background: 'var(--surface)', border: '1px solid var(--border)',
-                borderRadius: 10, color: 'var(--ink)', fontSize: 13.5, outline: 'none', marginBottom: 12,
-              }}
-            >
-              <option value="anthropic/claude-sonnet-4.6">Claude Sonnet 4.6 — best quality (recommended)</option>
-              <option value="anthropic/claude-haiku-4.5">Claude Haiku 4.5 — faster and cheaper</option>
-              <option value="openai/gpt-4o">GPT-4o</option>
-              <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash</option>
-            </select>
+            <div style={{ marginBottom: 12 }}>
+              <ModelPicker
+                value={model} models={models} size="lg"
+                placeholder="Search every OpenRouter model…"
+                onChange={(id) => { setModel(id); if (keyState === 'ok') setKeyState('idle'); }}
+              />
+            </div>
+            <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: -4, marginBottom: 12, lineHeight: 1.5 }}>
+              Any model on OpenRouter, priced per million tokens. There are free ones —
+              filter by <strong style={{ color: 'var(--good)', fontWeight: 500 }}>Free only</strong> if you would rather not
+              spend anything. You can change this per agent later in Settings.
+            </div>
 
             {keyMsg && (
               <div style={{
