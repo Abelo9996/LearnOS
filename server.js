@@ -126,8 +126,19 @@ const uploadLimiter = rateLimit({
 app.use('/api/uploads', uploadLimiter);
 
 // ── Static assets ─────────────────────────────────────────────────────────────
+// Hashed assets (dist/assets/*) are immutable → cache hard. index.html must
+// NEVER be cached: it is the pointer to the current bundle, and caching it for
+// an hour meant users kept running last hour's frontend after every deploy.
 if (fs.existsSync(distPath)) {
-  app.use(express.static(distPath, { maxAge: '1h' }));
+  app.use(express.static(distPath, {
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html')) {
+        res.setHeader('Cache-Control', 'no-cache');
+      } else {
+        res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      }
+    },
+  }));
 }
 
 // ── Uploads static serving (§3.3) ─────────────────────────────────────────────
@@ -246,6 +257,7 @@ app.use((req, res, next) => {
   if (req.method !== 'GET') return next();
   const { pathname } = new URL(req.url, 'http://localhost');
   if (!pathname.startsWith('/api/') && !pathname.includes('.')) {
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(join(distPath, 'index.html'));
   } else {
     next();
