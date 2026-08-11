@@ -1567,7 +1567,7 @@ export function Settings() {
                     <div className="cap" style={{ marginBottom: 8 }}>Add OpenRouter key</div>
                     <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
                       <span style={{ fontSize: 11.5, color: 'var(--muted)', whiteSpace: 'nowrap' }}>Default model</span>
-                      <ModelPicker value={newModel} onChange={setNewModel} models={models} placeholder="search OpenRouter models…" />
+                      <ModelPicker value={newModel} onChange={setNewModel} models={models} />
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <input value={newKey} onChange={e => setNewKey(e.target.value)} placeholder="sk-or-v1-…" style={{ flex: 1, padding: '8px 12px', background: 'var(--bg-window)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13 }} />

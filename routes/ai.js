@@ -64,10 +64,19 @@ router.get('/models', async (_req, res) => {
       .map(m => {
         const prompt = m.pricing?.prompt != null ? Number(m.pricing.prompt) : null;
         const completion = m.pricing?.completion != null ? Number(m.pricing.completion) : null;
+        const rawProvider = m.id.split('/')[0];
+        // A leading `~` marks a floating alias — `~anthropic/claude-sonnet-latest`
+        // always resolves to the newest Sonnet. Grouped under the real vendor,
+        // or the picker would show a phantom "~anthropic" next to "anthropic".
+        const alias = rawProvider.startsWith('~');
         return {
           id: m.id,
           name: m.name || m.id,
-          provider: m.id.split('/')[0],
+          provider: alias ? rawProvider.slice(1) : rawProvider,
+          // The part after the slash — what the model is actually called within
+          // its vendor, and all the second dropdown needs to show.
+          slug: m.id.slice(m.id.indexOf('/') + 1),
+          alias,
           context: m.context_length || m.top_provider?.context_length || null,
           promptPrice: prompt,
           completionPrice: completion,
