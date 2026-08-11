@@ -27,11 +27,65 @@ import { runCodeTests } from './grader.js';
 
 const MAX_OUTPUT = 20000;      // characters of stdout/stderr kept
 const DEFAULT_TIMEOUT = 5000;
+const COMPILE_TIMEOUT = 25000; // compilers (and first-run toolchains) are slow
 
+/**
+ * Language definitions. Interpreted languages have only `run`; compiled ones
+ * add a `compile` step that produces an artifact inside the temp dir. `file`
+ * is the source filename (Java requires it to match the public class name).
+ * `install` is the human hint shown when the toolchain is missing.
+ */
 export const LANGUAGES = {
-  javascript: { label: 'JavaScript', ext: 'js', cmd: process.execPath, args: (f) => [f] },
-  python:     { label: 'Python',     ext: 'py', cmd: pythonCmd(), args: (f) => ['-I', f] },
+  javascript: {
+    label: 'JavaScript', file: 'main.js',
+    run: (dir) => ({ cmd: process.execPath, args: [join(dir, 'main.js')] }),
+    hello: 'console.log("ok")',
+    install: 'Node.js is required (it runs LearnOS itself, so this should never happen).',
+  },
+  python: {
+    label: 'Python', file: 'main.py',
+    run: (dir) => ({ cmd: pythonCmd(), args: ['-I', join(dir, 'main.py')] }),
+    hello: 'print("ok")',
+    install: 'Install Python 3 from python.org or your package manager.',
+  },
+  cpp: {
+    label: 'C++', file: 'main.cpp',
+    compile: (dir) => ({ cmd: 'c++', args: ['-std=c++17', '-O1', '-o', join(dir, 'main'), join(dir, 'main.cpp')] }),
+    run: (dir) => ({ cmd: join(dir, 'main'), args: [] }),
+    hello: '#include <iostream>\nint main() { std::cout << "ok"; return 0; }',
+    install: 'Install a C++ compiler: Xcode Command Line Tools on macOS (xcode-select --install), g++ on Linux.',
+  },
+  c: {
+    label: 'C', file: 'main.c',
+    compile: (dir) => ({ cmd: 'cc', args: ['-std=c11', '-O1', '-o', join(dir, 'main'), join(dir, 'main.c')] }),
+    run: (dir) => ({ cmd: join(dir, 'main'), args: [] }),
+    hello: '#include <stdio.h>\nint main(void) { printf("ok"); return 0; }',
+    install: 'Install a C compiler: Xcode Command Line Tools on macOS (xcode-select --install), gcc on Linux.',
+  },
+  java: {
+    label: 'Java', file: 'Main.java',
+    // macOS ships a stub javac that errors with "Unable to locate a Java
+    // Runtime" when no JDK is installed — that is a missing toolchain, not a
+    // failure of the learner's code.
+    notInstalledPattern: /Unable to locate a Java Runtime/i,
+    compile: (dir) => ({ cmd: 'javac', args: [join(dir, 'Main.java')] }),
+    run: (dir) => ({ cmd: 'java', args: ['-cp', dir, 'Main'] }),
+    hello: 'public class Main { public static void main(String[] args) { System.out.print("ok"); } }',
+    install: 'Install a JDK (e.g. Temurin from adoptium.net, or `brew install openjdk`).',
+  },
+  go: {
+    label: 'Go', file: 'main.go',
+    // `go run` compiles and runs in one step — no separate artifact to manage.
+    run: (dir) => ({ cmd: 'go', args: ['run', join(dir, 'main.go')] }),
+    runTimeoutMs: 20000, // includes compilation on every invocation
+    hello: 'package main\n\nimport "fmt"\n\nfunc main() { fmt.Print("ok") }',
+    install: 'Install Go from go.dev/dl or `brew install go`.',
+  },
 };
+
+// Languages whose lab tests are I/O cases (program reads stdin, prints stdout)
+// rather than function calls. See runIoTests.
+export const IO_TEST_LANGUAGES = new Set(['cpp', 'c', 'java', 'go']);
 
 function pythonCmd() {
   // `python3` on POSIX, `python` on most Windows installs. Resolved lazily at
@@ -49,6 +103,77 @@ const truncate = (s) => {
 };
 
 /**
+ * Spawn one process step (argv only, never a shell string) with a hard timeout
+ * and output caps. Used for both the compile and the run phase.
+ */
+function spawnStep({ cmd, args, cwd, timeoutMs, stdin = '', label }) {
+  return new Promise((resolve) => {
+    let stdout = '', stderr = '', timedOut = false, settled = false;
+    const started = Date.now();
+    const done = (v) => { if (!settled) { settled = true; resolve(v); } };
+
+    const child = spawn(cmd, args, { cwd, windowsHide: true });
+    const timer = setTimeout(() => { timedOut = true; child.kill('SIGKILL'); }, timeoutMs);
+
+    child.stdout.on('data', d => { if (stdout.length < MAX_OUTPUT * 2) stdout += d; });
+    child.stderr.on('data', d => { if (stderr.length < MAX_OUTPUT * 2) stderr += d; });
+
+    child.on('error', (e) => {
+      clearTimeout(timer);
+      done({
+        ok: false, stdout: '', stderr: '', exitCode: null, timedOut: false, durationMs: Date.now() - started,
+        error: e.code === 'ENOENT'
+          ? `${label} is not installed or not on PATH on this machine.`
+          : `Could not start ${label}: ${e.message}`,
+        notInstalled: e.code === 'ENOENT',
+      });
+    });
+
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      done({
+        ok: !timedOut && code === 0,
+        stdout: truncate(stdout),
+        stderr: truncate(stderr),
+        exitCode: code,
+        timedOut,
+        durationMs: Date.now() - started,
+        error: timedOut ? `Ran longer than ${Math.round(timeoutMs / 1000)}s and was stopped — check for an infinite loop.` : null,
+      });
+    });
+
+    if (stdin) { try { child.stdin.write(String(stdin)); } catch {} }
+    try { child.stdin.end(); } catch {}
+  });
+}
+
+/**
+ * Write the source into `dir` and compile it when the language needs it.
+ * Returns { ok, error?, stderr? } — on success the dir is ready to run.
+ */
+async function prepareDir(dir, source, language) {
+  const lang = LANGUAGES[language];
+  await writeFile(join(dir, lang.file), String(source), 'utf8');
+  if (!lang.compile) return { ok: true };
+  const step = lang.compile(dir);
+  const out = await spawnStep({ ...step, cwd: dir, timeoutMs: COMPILE_TIMEOUT, label: `${lang.label} compiler (${step.cmd})` });
+  if (!out.ok) {
+    const stubMissing = lang.notInstalledPattern && lang.notInstalledPattern.test(`${out.stderr}\n${out.stdout}`);
+    const notInstalled = out.notInstalled || stubMissing;
+    return {
+      ok: false,
+      notInstalled,
+      stderr: out.stderr,
+      error: notInstalled
+        ? `${lang.label} is not installed on this machine. ${lang.install}`
+        : (out.error || `Compilation failed:\n${out.stderr || out.stdout}`),
+      compileFailed: !notInstalled && !out.error,
+    };
+  }
+  return { ok: true };
+}
+
+/**
  * Run a lab submission and return what the learner would see in a terminal.
  * @returns {Promise<{ok, language, stdout, stderr, exitCode, timedOut, durationMs, error}>}
  */
@@ -61,52 +186,19 @@ export async function runLab({ source, language = 'javascript', timeoutMs = DEFA
   const started = Date.now();
   try {
     dir = await mkdtemp(join(tmpdir(), 'learnos-lab-'));
-    const file = join(dir, `main.${lang.ext}`);
-    await writeFile(file, String(source), 'utf8');
 
-    return await new Promise((resolve) => {
-      let stdout = '', stderr = '', timedOut = false, settled = false;
-      const done = (v) => { if (!settled) { settled = true; resolve(v); } };
+    const prep = await prepareDir(dir, source, language);
+    if (!prep.ok) {
+      return {
+        ok: false, language, stdout: '', stderr: truncate(prep.stderr || ''), exitCode: null, timedOut: false,
+        durationMs: Date.now() - started,
+        error: prep.compileFailed ? 'Compilation failed — see the compiler output below.' : prep.error,
+      };
+    }
 
-      // argv only — never a shell string, so nothing in the source or filename
-      // can be interpreted as a command.
-      const child = spawn(lang.cmd, lang.args(file), { cwd: dir, windowsHide: true });
-
-      const timer = setTimeout(() => {
-        timedOut = true;
-        child.kill('SIGKILL');
-      }, timeoutMs);
-
-      child.stdout.on('data', d => { if (stdout.length < MAX_OUTPUT * 2) stdout += d; });
-      child.stderr.on('data', d => { if (stderr.length < MAX_OUTPUT * 2) stderr += d; });
-
-      child.on('error', (e) => {
-        clearTimeout(timer);
-        done({
-          ok: false, language, stdout: '', stderr: '', exitCode: null, timedOut: false, durationMs: Date.now() - started,
-          error: e.code === 'ENOENT'
-            ? `${lang.label} is not installed or not on PATH on this machine.`
-            : `Could not start ${lang.label}: ${e.message}`,
-        });
-      });
-
-      child.on('close', (code) => {
-        clearTimeout(timer);
-        done({
-          ok: !timedOut && code === 0,
-          language,
-          stdout: truncate(stdout),
-          stderr: truncate(stderr),
-          exitCode: code,
-          timedOut,
-          durationMs: Date.now() - started,
-          error: timedOut ? `Your code ran longer than ${Math.round(timeoutMs / 1000)}s and was stopped — check for an infinite loop.` : null,
-        });
-      });
-
-      if (stdin) { try { child.stdin.write(String(stdin)); } catch {} }
-      try { child.stdin.end(); } catch {}
-    });
+    const step = lang.run(dir);
+    const out = await spawnStep({ ...step, cwd: dir, timeoutMs: lang.runTimeoutMs || timeoutMs, stdin, label: lang.label });
+    return { ...out, language, durationMs: Date.now() - started, error: out.error };
   } catch (e) {
     return { ok: false, error: e?.message || String(e), language, stdout: '', stderr: '', exitCode: null, timedOut: false, durationMs: Date.now() - started };
   } finally {
@@ -120,6 +212,12 @@ export async function runLab({ source, language = 'javascript', timeoutMs = DEFA
  * Python is graded by appending a data-driven harness that prints a verdict.
  */
 export async function runLabWithTests({ source, language = 'javascript', tests, timeoutMs = DEFAULT_TIMEOUT }) {
+  // I/O-tested languages grade by feeding each case's stdin to the compiled
+  // program — the plain run happens as case zero, so skip the separate warm-up.
+  if (IO_TEST_LANGUAGES.has(language)) {
+    return runIoTests({ source, language, tests, timeoutMs });
+  }
+
   const run = await runLab({ source, language, timeoutMs });
   const list = Array.isArray(tests) ? tests.filter(t => t && t.fn) : [];
   if (!list.length) return { ...run, tests: null };
@@ -140,6 +238,73 @@ export async function runLabWithTests({ source, language = 'javascript', tests, 
   }
 
   return { ...run, tests: null };
+}
+
+/**
+ * Judge-style grading for compiled/system languages: compile once, then run the
+ * program once per case with the case's stdin, comparing trimmed stdout to the
+ * expected text. Case format reuses the standard test shape — args[0] is the
+ * exact stdin, expected is the exact expected stdout.
+ */
+async function runIoTests({ source, language, tests, timeoutMs = DEFAULT_TIMEOUT }) {
+  const lang = LANGUAGES[language];
+  const list = Array.isArray(tests) ? tests.filter(t => t && t.expected !== undefined) : [];
+  const base = { language, stdout: '', stderr: '', exitCode: null, timedOut: false };
+
+  let dir;
+  const started = Date.now();
+  try {
+    dir = await mkdtemp(join(tmpdir(), 'learnos-lab-'));
+    const prep = await prepareDir(dir, source, language);
+    if (!prep.ok) {
+      return {
+        ...base, ok: false, stderr: truncate(prep.stderr || ''), durationMs: Date.now() - started,
+        error: prep.compileFailed ? 'Compilation failed — see the compiler output below.' : prep.error,
+        tests: list.length ? { ok: false, error: 'Did not compile', total: list.length, passedCount: 0, score: 0, ratio: 0, passed: false, cases: [] } : null,
+      };
+    }
+
+    const step = lang.run(dir);
+    const runTimeout = lang.runTimeoutMs || timeoutMs;
+
+    // The bare run (no stdin, or the first case's stdin) is what the learner
+    // sees in the output panel.
+    const firstStdin = list.length ? String(list[0].args?.[0] ?? '') : '';
+    const firstRun = await spawnStep({ ...step, cwd: dir, timeoutMs: runTimeout, stdin: firstStdin, label: lang.label });
+    const runResult = { ...base, ...firstRun, language, durationMs: Date.now() - started };
+
+    if (!list.length) return { ...runResult, tests: null };
+
+    const cases = [];
+    let passedCount = 0;
+    for (let i = 0; i < list.length; i++) {
+      const t = list[i];
+      const stdin = String(t.args?.[0] ?? '');
+      const out = i === 0 ? firstRun : await spawnStep({ ...step, cwd: dir, timeoutMs: runTimeout, stdin, label: lang.label });
+      const expected = String(t.expected ?? '').replace(/\r\n/g, '\n').trim();
+      const actual = String(out.stdout ?? '').replace(/\r\n/g, '\n').trim();
+      const passed = out.ok && actual === expected;
+      if (passed) passedCount++;
+      const entry = { name: t.name || `case ${i + 1}`, hidden: !!t.hidden, passed };
+      if (!passed) {
+        if (out.error) entry.error = out.error;
+        else if (!out.ok) entry.error = `exited with code ${out.exitCode}${out.stderr ? ` — ${out.stderr.slice(0, 200)}` : ''}`;
+      }
+      if (!t.hidden) { entry.expected = expected; entry.actual = actual; }
+      cases.push(entry);
+    }
+
+    const ratio = passedCount / list.length;
+    return {
+      ...runResult,
+      durationMs: Date.now() - started,
+      tests: { ok: true, error: null, total: list.length, passedCount, score: Math.round(ratio * 100), ratio, passed: ratio >= 0.8, cases },
+    };
+  } catch (e) {
+    return { ...base, ok: false, error: e?.message || String(e), durationMs: Date.now() - started, tests: null };
+  } finally {
+    if (dir) rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 // Python grading: the learner's module is imported and each case called with
@@ -194,16 +359,27 @@ _sys.stderr.write("__LEARNOS_TESTS__" + _json.dumps({"passedCount": _passed, "ca
   }
 }
 
-/** Which runtimes actually work on this machine. */
-export async function availableLanguages() {
+/**
+ * Which runtimes actually work on this machine. Each language is probed with a
+ * real hello-world through the full compile+run path, so "available" means it
+ * genuinely works — not just that a binary exists on PATH. Probes run once and
+ * are cached for the process lifetime (toolchains don't appear mid-session,
+ * and compiling five hello-worlds per Settings visit would be silly).
+ */
+let runtimesCache = null;
+export async function availableLanguages({ refresh = false } = {}) {
+  if (runtimesCache && !refresh) return runtimesCache;
   const out = {};
-  for (const [key, lang] of Object.entries(LANGUAGES)) {
-    const probe = await runLab({
-      source: key === 'python' ? 'print("ok")' : 'console.log("ok")',
-      language: key, timeoutMs: 8000,
-    });
-    out[key] = { label: lang.label, available: probe.ok && /ok/.test(probe.stdout), reason: probe.error || null };
-  }
+  await Promise.all(Object.entries(LANGUAGES).map(async ([key, lang]) => {
+    const probe = await runLab({ source: lang.hello, language: key, timeoutMs: 20000 });
+    out[key] = {
+      label: lang.label,
+      available: probe.ok && /ok/.test(probe.stdout),
+      reason: probe.error || null,
+      install: (probe.ok && /ok/.test(probe.stdout)) ? null : lang.install,
+    };
+  }));
+  runtimesCache = out;
   return out;
 }
 

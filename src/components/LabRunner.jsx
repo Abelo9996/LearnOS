@@ -14,17 +14,29 @@ import API from '../api.js';
  * Work is autosaved locally: losing an hour of lab work to a refresh would be
  * unforgivable.
  */
+// Languages the in-product runner can execute. Compiled languages (cpp, c,
+// java, go) are judged on stdin → stdout; js/python on function calls.
+const LANG_META = {
+  javascript: { label: 'JavaScript', io: false },
+  python:     { label: 'Python',     io: false },
+  cpp:        { label: 'C++',        io: true },
+  c:          { label: 'C',          io: true },
+  java:       { label: 'Java',       io: true },
+  go:         { label: 'Go',         io: true },
+};
+
 export default function LabRunner({ lessonId }) {
   const [lab, setLab] = React.useState(null);
   const [source, setSource] = React.useState('');
   const [running, setRunning] = React.useState(false);
   const [result, setResult] = React.useState(null);
   const [error, setError] = React.useState('');
+  const [runtime, setRuntime] = React.useState(null); // availability of this lab's language on this machine
   const storageKey = `learnos_lab_${lessonId}`;
 
   React.useEffect(() => {
     let alive = true;
-    setResult(null); setError(''); setLab(null);
+    setResult(null); setError(''); setLab(null); setRuntime(null);
     API.getLab(lessonId)
       .then(r => {
         if (!alive) return;
@@ -32,6 +44,9 @@ export default function LabRunner({ lessonId }) {
         let saved = null;
         try { saved = localStorage.getItem(storageKey); } catch {}
         setSource(saved ?? r.lab.starter_code ?? '');
+        if (LANG_META[r.lab.language]) {
+          API.getRuntimes().then(rt => { if (alive) setRuntime(rt?.runtimes?.[r.lab.language] || null); }).catch(() => {});
+        }
       })
       .catch(e => { if (alive) setError(e.message || 'Could not load this lab.'); });
     return () => { alive = false; };
@@ -60,14 +75,16 @@ export default function LabRunner({ lessonId }) {
   if (!lab) return <Panel><div style={{ color: 'var(--muted)', fontSize: 13 }}>Loading lab…</div></Panel>;
 
   // A lab without a runtime is still a legitimate exercise — it just isn't code.
-  if (lab.language !== 'javascript' && lab.language !== 'python') return null;
+  const meta = LANG_META[lab.language];
+  if (!meta) return null;
 
   const tests = result?.tests;
+  const missing = runtime && !runtime.available;
   return (
     <Panel>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
         <span className="mono" style={{ fontSize: 10.5, padding: '3px 9px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, background: 'color-mix(in oklch, var(--brand-3) 16%, transparent)', color: 'var(--brand-3)', border: '1px solid color-mix(in oklch, var(--brand-3) 35%, transparent)' }}>
-          {lab.language === 'python' ? 'Python' : 'JavaScript'}
+          {meta.label}
         </span>
         <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>
           Write it, run it, see what happens{lab.tests?.length ? ` — ${lab.tests.length + (lab.hiddenTestCount || 0)} checks` : ''}
@@ -75,9 +92,16 @@ export default function LabRunner({ lessonId }) {
         <span style={{ flex: 1 }} />
         <Btn variant="ghost" size="sm" onClick={reset}>Reset</Btn>
         <Btn variant="primary" size="sm" disabled={running} onClick={run} icon={React.cloneElement(I.play, { size: 13 })}>
-          {running ? 'Running…' : 'Run'}
+          {running ? (meta.io ? 'Compiling & running…' : 'Running…') : 'Run'}
         </Btn>
       </div>
+
+      {missing && (
+        <div style={{ padding: '10px 14px', borderRadius: 10, marginBottom: 10, fontSize: 12.5, lineHeight: 1.6, background: 'color-mix(in oklch, oklch(0.78 0.16 85) 12%, transparent)', border: '1px solid color-mix(in oklch, oklch(0.78 0.16 85) 35%, transparent)', color: 'var(--ink-2)' }}>
+          <strong style={{ color: 'var(--ink)' }}>{meta.label} isn't set up on this machine.</strong>{' '}
+          {runtime.install || runtime.reason} You can still edit the code; Run will work once it's installed.
+        </div>
+      )}
 
       <textarea
         value={source}
@@ -105,7 +129,9 @@ export default function LabRunner({ lessonId }) {
         <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, lineHeight: 1.6 }}>
           Your code is checked against {lab.tests.length} visible case{lab.tests.length === 1 ? '' : 's'}
           {lab.hiddenTestCount ? ` and ${lab.hiddenTestCount} hidden one${lab.hiddenTestCount === 1 ? '' : 's'}` : ''}.
-          {lab.tests[0] && <> For example: <code style={{ color: 'var(--ink-2)' }}>{lab.tests[0].fn}({JSON.stringify(lab.tests[0].args).slice(1, -1)}) → {JSON.stringify(lab.tests[0].expected)}</code></>}
+          {lab.tests[0] && (meta.io
+            ? <> For example, input <code style={{ color: 'var(--ink-2)' }}>{String(lab.tests[0].args?.[0] ?? '')}</code> should print <code style={{ color: 'var(--ink-2)' }}>{String(lab.tests[0].expected)}</code>.</>
+            : <> For example: <code style={{ color: 'var(--ink-2)' }}>{lab.tests[0].fn}({JSON.stringify(lab.tests[0].args).slice(1, -1)}) → {JSON.stringify(lab.tests[0].expected)}</code></>)}
         </div>
       )}
 
