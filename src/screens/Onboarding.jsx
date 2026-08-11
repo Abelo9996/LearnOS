@@ -377,7 +377,6 @@ export default function Onboarding({ onComplete }) {
             <div style={{ marginBottom: 12 }}>
               <ModelPicker
                 value={model} models={models} size="lg"
-                placeholder="Search every OpenRouter model…"
                 onChange={(id) => { setModel(id); if (keyState === 'ok') setKeyState('idle'); }}
               />
             </div>
