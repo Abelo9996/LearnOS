@@ -170,7 +170,7 @@ const assessmentSchema = {
         steps: { type: 'array', items: { type: 'string' } },
         minutes: { type: 'integer' },
         // A lab the learner can actually RUN, when the topic admits code.
-        language: { type: 'string', enum: ['javascript', 'python', 'none'] },
+        language: { type: 'string', enum: ['javascript', 'python', 'cpp', 'c', 'java', 'go', 'none'] },
         starter_code: { type: 'string' },
         tests: {
           type: 'array',
@@ -248,7 +248,10 @@ const ASSESSMENT_SYSTEM = `You are the Assessment agent for LearnOS writing the 
 Produce ALL THREE:
 - "quiz_items": exactly 10 practice questions with 4 choices each, the correct "answer_idx" (0-based), and an "explanation" that teaches why the answer is right and why the tempting distractor is wrong. Vary difficulty across easy/medium/hard. Tag each with the "skill" it tests.
 - "lab": a hands-on exercise the learner actually performs, with 4-8 concrete steps. This is the "doing" half of the module.
-  Whenever the topic admits code, make the lab RUNNABLE: set "language" to "javascript" or "python", give "starter_code" that defines the required function(s) with a clear TODO body the learner completes, and 3-6 "tests" that check the finished function. Mark 1-2 tests hidden. Each test is {name, fn, args_json, expected_json, hidden} where "args_json" is a JSON ARRAY of the call arguments (e.g. "[2, 3]") and "expected_json" is the JSON value the function must return (e.g. "5" or "[1,2]") — both as JSON-encoded STRINGS, and describing a value, never prose. If the topic genuinely has no code (a design or writing exercise), set "language" to "none", "starter_code" to "" and "tests" to [].
+  Whenever the topic admits code, make the lab RUNNABLE. Choose "language" to MATCH the course: a C++ course gets "cpp", a Java course "java", a C course "c", a Go course "go"; use "javascript" or "python" for everything else. Mark 1-2 tests hidden. Each test is {name, fn, args_json, expected_json, hidden}, and its meaning depends on the language:
+  · javascript/python — function labs: "starter_code" defines the required function(s) with a clear TODO body; "fn" names the function under test, "args_json" is a JSON ARRAY of call arguments (e.g. "[2, 3]"), "expected_json" is the JSON value it must return (e.g. "5" or "[1,2]") — both JSON-encoded STRINGS describing values, never prose.
+  · cpp/c/java/go — I/O labs, judged like a programming contest: "starter_code" is a COMPLETE compilable program skeleton with a TODO section (for Java the public class MUST be named Main) that reads its input from stdin and prints the answer to stdout. Set "fn" to "main". "args_json" is a JSON array with EXACTLY ONE string: the exact stdin for the case (e.g. "[\"3 4\"]"); "expected_json" is a JSON string of the exact expected stdout (e.g. "\"7\""). Trailing whitespace is ignored.
+  If the topic genuinely has no code (a design or writing exercise), set "language" to "none", "starter_code" to "" and "tests" to [].
 - "graded": the assessment that counts, with a 4-7 step task list and a 3-5 criterion rubric whose weights sum to 1.
 
 "minutes" fields are honest time estimates. Returning fewer than 10 quiz items, or omitting the lab or the graded assessment, is a failure.`;
@@ -891,7 +894,8 @@ function safeHost(url) { try { return new URL(url).hostname; } catch { return nu
 function attachLabCode(lessonId, lab) {
   if (!lessonId || !lab) return;
   const lang = lab.language;
-  if (lang !== 'javascript' && lang !== 'python') return;
+  const RUNNABLE = ['javascript', 'python', 'cpp', 'c', 'java', 'go'];
+  if (!RUNNABLE.includes(lang)) return;
   // Test args/expected travel as JSON strings (see the schema comment) and are
   // decoded here; anything that doesn't decode cleanly is dropped rather than
   // shipped as a broken case.
