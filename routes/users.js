@@ -146,6 +146,42 @@ router.patch('/agent-routing/:code', (req, res) => {
   res.json({ ok: true });
 });
 
+/**
+ * PATCH /agent-routing — point several agents at one model in a single write.
+ *
+ * Most people run every agent on the same model and only split them up later,
+ * if at all. Doing that one row at a time meant seven separate requests and
+ * seven chances to end up half-applied; this is one transaction, so the routing
+ * table is never left in a state nobody asked for.
+ *
+ * `codes` omitted means every agent the user has.
+ */
+router.patch('/agent-routing', (req, res) => {
+  const { model, codes } = req.body || {};
+  if (!model || typeof model !== 'string') {
+    return res.status(400).json({ error: true, message: 'model required' });
+  }
+
+  const known = db.prepare('SELECT agent_code FROM agent_routing WHERE user_id = ?')
+    .all(req.userId).map(r => r.agent_code);
+
+  let targets = known;
+  if (codes !== undefined) {
+    if (!Array.isArray(codes) || codes.length === 0) {
+      return res.status(400).json({ error: true, message: 'codes must be a non-empty array, or omitted to mean every agent' });
+    }
+    // Only touch agents that actually exist — an unknown code is a caller bug,
+    // not a licence to invent a routing row.
+    targets = codes.filter(c => known.includes(c));
+    if (!targets.length) return res.status(400).json({ error: true, message: 'no such agents' });
+  }
+
+  const stmt = db.prepare('INSERT OR REPLACE INTO agent_routing (user_id, agent_code, model) VALUES (?, ?, ?)');
+  db.transaction(() => { for (const c of targets) stmt.run(req.userId, c, model); })();
+
+  res.json({ ok: true, updated: targets.length, agents: targets, model });
+});
+
 // ── Agent Status ─────────────────────────────────────────────────────────
 
 router.get('/agents', (req, res) => {

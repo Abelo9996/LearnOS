@@ -1265,6 +1265,136 @@ function CoverVizSmall({ kind }) {
  * without a registry, and the settings screen should say so rather than imply
  * the network is load-bearing.
  */
+/**
+ * Which model runs which agent.
+ *
+ * Seven agents, and almost everyone wants the same model behind all of them —
+ * at least until they have a reason not to. Setting that one row at a time
+ * meant seven searches through a 341-model catalog to express a single
+ * decision. Select some agents (or none, meaning all), pick a model once,
+ * apply.
+ */
+function AgentRouting({ models, routeModels, setRouteModels, toast }) {
+  const codes = React.useMemo(() => Object.keys(AGENTS), []);
+  const [picked, setPicked] = React.useState(() => new Set());
+  const [bulkModel, setBulkModel] = React.useState('');
+  const [applying, setApplying] = React.useState(false);
+
+  const modelOf = (code) => routeModels[code] || 'anthropic/claude-haiku-4.5';
+  const distinct = React.useMemo(() => new Set(codes.map(modelOf)), [codes, routeModels]);
+  const targets = picked.size ? [...picked] : codes;
+
+  const toggle = (code) => setPicked(prev => {
+    const next = new Set(prev);
+    next.has(code) ? next.delete(code) : next.add(code);
+    return next;
+  });
+
+  const apply = async () => {
+    if (!bulkModel) { toast('Pick a model to apply first', 'error'); return; }
+    setApplying(true);
+    try {
+      // One transaction rather than seven requests — half-applied routing is
+      // worse than none.
+      const r = await API.setAgentRoutingBulk(bulkModel, picked.size ? [...picked] : undefined);
+      setRouteModels(prev => {
+        const next = { ...prev };
+        for (const c of (r.agents || targets)) next[c] = bulkModel;
+        return next;
+      });
+      toast(`${r.updated ?? targets.length} agent${(r.updated ?? targets.length) === 1 ? '' : 's'} → ${bulkModel}`, 'success');
+      setPicked(new Set());
+    } catch (e) {
+      toast(e.message || 'Could not apply', 'error');
+    } finally { setApplying(false); }
+  };
+
+  const box = (checked, onClick, label) => (
+    <button type="button" onClick={onClick} aria-label={label} aria-pressed={checked}
+      style={{
+        width: 16, height: 16, flexShrink: 0, borderRadius: 4, cursor: 'pointer', padding: 0,
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        background: checked ? 'var(--brand)' : 'transparent',
+        border: `1px solid ${checked ? 'var(--brand)' : 'var(--border-strong, var(--border))'}`,
+        color: '#fff', fontSize: 10, lineHeight: 1,
+        transition: 'background var(--dur-fast), border-color var(--dur-fast)',
+      }}>
+      {checked ? '✓' : ''}
+    </button>
+  );
+
+  const allPicked = picked.size === codes.length;
+
+  return (
+    <Card style={{ padding: 18 }}>
+      <SectionHead
+        title="Agent routing"
+        subtitle={distinct.size === 1
+          ? `All ${codes.length} agents are on ${[...distinct][0]}.`
+          : `${distinct.size} different models across ${codes.length} agents.`}
+      />
+
+      {/* Batch bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+        padding: '12px 13px', marginTop: 12, borderRadius: 10,
+        background: 'var(--surface)', border: `1px solid ${picked.size ? 'var(--accent-line)' : 'var(--border)'}`,
+        transition: 'border-color var(--dur) var(--ease)',
+      }}>
+        <span style={{ fontSize: 12.5, color: 'var(--ink-2)', flexShrink: 0 }}>
+          {picked.size ? `Set ${picked.size} selected agent${picked.size === 1 ? '' : 's'} to` : `Set all ${codes.length} agents to`}
+        </span>
+        <div style={{ flex: '1 1 260px', minWidth: 200 }}>
+          <ModelPicker value={bulkModel} models={models} onChange={setBulkModel} />
+        </div>
+        <Btn variant="primary" size="sm" disabled={!bulkModel || applying} onClick={apply}>
+          {applying ? 'Applying…' : `Apply to ${targets.length}`}
+        </Btn>
+        {picked.size > 0 && (
+          <Btn variant="ghost" size="sm" onClick={() => setPicked(new Set())}>Clear</Btn>
+        )}
+      </div>
+
+      {/* Select-all header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0 8px', marginTop: 6 }}>
+        {box(allPicked, () => setPicked(allPicked ? new Set() : new Set(codes)), 'Select all agents')}
+        <span className="cap" style={{ fontSize: 10 }}>
+          {picked.size ? `${picked.size} of ${codes.length} selected` : 'Select agents'}
+        </span>
+      </div>
+
+      {codes.map(code => {
+        const a = AGENTS[code];
+        const on = picked.has(code);
+        return (
+          <div key={code} style={{
+            display: 'grid', gridTemplateColumns: '26px 168px 1fr 250px', gap: 12, alignItems: 'center',
+            padding: '10px 0', borderTop: '1px solid var(--border)',
+            background: on ? 'var(--accent-soft)' : 'transparent',
+            transition: 'background var(--dur-fast)',
+          }}>
+            {box(on, () => toggle(code), `Select ${a.name}`)}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <AgentChip code={code} size={26} glow={false} />
+              <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>
+            </div>
+            <div className="mono" style={{ fontSize: 11.5, color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.short}</div>
+            <ModelPicker
+              value={modelOf(code)}
+              models={models}
+              onChange={async (model) => {
+                setRouteModels(prev => ({ ...prev, [code]: model }));
+                await API.patchAgentRouting(code, { model }).catch(() => {});
+                toast(`${a.name} → ${model}`, 'success');
+              }}
+            />
+          </div>
+        );
+      })}
+    </Card>
+  );
+}
+
 function RegistrySettings() {
   const { add: toast } = useToast();
   const { open: openModal, close: closeModal } = useModal();
@@ -1590,29 +1720,7 @@ export function Settings() {
           </Card>
         );
       case 'agents':
-        return (
-          <Card style={{ padding: 18 }}>
-            <SectionHead title="Per-agent routing" subtitle={`Route each agent to any of ${models ? models.length.toLocaleString() : '…'} OpenRouter models. Type to search, or paste a custom slug.`} />
-            {Object.entries(AGENTS).map(([code, a]) => (
-              <div key={code} style={{ display: 'grid', gridTemplateColumns: '180px 1fr 260px', gap: 14, alignItems: 'center', padding: '10px 0', borderTop: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <AgentChip code={code} size={26} glow={false} />
-                  <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 500 }}>{a.name}</span>
-                </div>
-                <div className="mono" style={{ fontSize: 11.5, color: 'var(--muted)' }}>{a.short}</div>
-                <ModelPicker
-                  value={routeModels[code] || 'anthropic/claude-haiku-4.5'}
-                  models={models}
-                  onChange={async (model) => {
-                    setRouteModels(prev => ({ ...prev, [code]: model }));
-                    await API.patchAgentRouting(code, { model }).catch(() => {});
-                    toast(`${a.name} → ${model}`, 'success');
-                  }}
-                />
-              </div>
-            ))}
-          </Card>
-        );
+        return <AgentRouting models={models} routeModels={routeModels} setRouteModels={setRouteModels} toast={toast} />;
       case 'theme':
         return (
           <Card style={{ padding: 18 }}>
