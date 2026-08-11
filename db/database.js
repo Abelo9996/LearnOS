@@ -11,7 +11,10 @@ import fs from 'fs';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const DB_PATH = join(__dirname, '..', 'db', 'learnos.db');
+// LEARNOS_DB points the whole app at a different database file. Useful for
+// trying something against a throwaway instance — a fresh first-run, say —
+// without going anywhere near the library you actually use.
+const DB_PATH = process.env.LEARNOS_DB || join(__dirname, '..', 'db', 'learnos.db');
 const SCHEMA_PATH = join(__dirname, 'schema.sql');
 
 // Ensure db directory exists
