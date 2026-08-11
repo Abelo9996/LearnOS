@@ -122,6 +122,9 @@ const API = {
   patchApiKey:      (id, data) => API.patch(`/users/apikeys/${id}`, data),
   getAgentRouting:  () => API.get('/users/agent-routing'),
   patchAgentRouting: (code, data) => API.patch(`/users/agent-routing/${code}`, data),
+  // Point several agents at one model in a single transaction. Omit `codes` to
+  // mean every agent.
+  setAgentRoutingBulk: (model, codes) => API.patch('/users/agent-routing', codes ? { model, codes } : { model }),
   getAgents:        () => API.get('/users/agents'),
 
   // Course sharing (M12) — a course is a portable file, which is how a
