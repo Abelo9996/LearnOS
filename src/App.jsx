@@ -515,10 +515,8 @@ function ProgressPopup({ onClose }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <div className="display" style={{ fontSize: 22 }}>Your Progress</div>
-        <button onClick={onClose} style={{ background: 'none', border: 0, color: 'var(--muted)', cursor: 'pointer', fontSize: 18, padding: 4 }}>✕</button>
-      </div>
+      {/* No close button here — the modal shell already renders one. */}
+      <div className="display" style={{ fontSize: 22, marginBottom: 20 }}>Your Progress</div>
 
       {/* XP / Level */}
       <div style={{ padding: 16, background: 'linear-gradient(135deg, oklch(0.22 0.05 295), oklch(0.18 0.05 250))', borderRadius: 12, border: '1px solid var(--accent-line)', marginBottom: 16 }}>
