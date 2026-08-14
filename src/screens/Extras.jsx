@@ -1257,15 +1257,6 @@ function CoverVizSmall({ kind }) {
 // the list at 80 entries, which hid most of the ~340 models.
 
 /**
- * Community registry settings.
- *
- * Three things a self-hoster needs to be able to do: point at a different
- * registry (or their own), see which handle they claimed, and switch the whole
- * thing off. Off has to be a real, visible choice — LearnOS works completely
- * without a registry, and the settings screen should say so rather than imply
- * the network is load-bearing.
- */
-/**
  * Which model runs which agent.
  *
  * Seven agents, and almost everyone wants the same model behind all of them —
@@ -1395,149 +1386,19 @@ function AgentRouting({ models, routeModels, setRouteModels, toast }) {
   );
 }
 
-function RegistrySettings() {
-  const { add: toast } = useToast();
-  const { open: openModal, close: closeModal } = useModal();
-  const [cfg, setCfg]         = React.useState(null);
-  const [url, setUrl]         = React.useState('');
-  const [saving, setSaving]   = React.useState(false);
-  const [status, setStatus]   = React.useState(null); // {ok, text}
-
-  const load = React.useCallback(() => {
-    API.getRegistryConfig()
-      .then(c => { setCfg(c); setUrl(c.url || ''); })
-      .catch(e => toast(e.message || 'Could not read registry settings', 'error'));
-  }, [toast]);
-  React.useEffect(load, [load]);
-
-  const patch = async (data, note) => {
-    setSaving(true);
-    try {
-      const c = await API.setRegistryConfig(data);
-      setCfg(c); if (c.url) setUrl(c.url);
-      if (note) toast(note, 'success');
-    } catch (e) {
-      toast(e.message || 'Could not save', 'error');
-      load();
-    } finally { setSaving(false); }
-  };
-
-  // The token is the only proof the handle is yours and the registry cannot
-  // reissue it, so this is a one-way door and has to say so.
-  const forgetHandle = () => {
-    openModal(
-      <ConfirmModal
-        danger
-        title={`Forget @${cfg?.handle}?`}
-        message={`This install will lose the token proving @${cfg.handle} is yours, and the registry cannot issue another one. Courses you already published stay up, but you will never be able to update them, and the handle stays claimed so nobody else can take it either.`}
-        confirmLabel="Forget it"
-        onCancel={closeModal}
-        onConfirm={async () => {
-          closeModal();
-          await patch({ handle: null }, 'Handle forgotten on this install');
-        }}
-      />
-    );
-  };
-
-  // Say plainly whether the configured registry is actually answering, rather
-  // than letting the first failure surface as a broken-looking Share screen.
-  const testConnection = async () => {
-    setStatus({ ok: null, text: 'Checking…' });
-    try {
-      const r = await API.browseRegistry({ limit: 1 });
-      setStatus({ ok: true, text: `Reachable · ${r.total ?? (r.courses || []).length} course(s) published here` });
-    } catch (e) {
-      setStatus({ ok: false, text: e.message || 'Could not reach it' });
-    }
-  };
-
-  const enabled = !!cfg?.enabled;
-  const inp = {
-    flex: 1, minWidth: 0, padding: '9px 13px', borderRadius: 8, fontSize: 13,
-    background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--ink)',
-    outline: 'none', fontFamily: 'var(--font-mono)',
-  };
-
-  return (
-    <Card style={{ padding: 18 }}>
-      <SectionHead
-        title="Community registry"
-        subtitle="Where LearnOS looks for published courses, and where yours go if you publish them"
-      />
-
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '14px 0', borderTop: '1px solid var(--border)', marginTop: 4 }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13.5, color: 'var(--ink)' }}>Use a community registry</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3, lineHeight: 1.55 }}>
-            Optional. With this off, LearnOS never contacts a registry — everything else works
-            exactly the same, and courses still travel as files.
-          </div>
-        </div>
-        <Toggle checked={enabled} disabled={saving}
-          onChange={v => patch({ enabled: v }, v ? 'Registry enabled' : 'Registry off — LearnOS will not contact it')} />
-      </div>
-
-      {enabled && (
-        <>
-          <div style={{ padding: '14px 0', borderTop: '1px solid var(--border)' }}>
-            <label className="cap" style={{ display: 'block', marginBottom: 7 }}>Registry address</label>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <input value={url} onChange={e => setUrl(e.target.value)} placeholder="http://localhost:4100" style={inp} />
-              <Btn variant="outline" size="sm" disabled={saving || !url.trim() || url.trim() === cfg?.url}
-                onClick={() => { setStatus(null); patch({ url: url.trim() }, 'Registry address saved'); }}>
-                Save
-              </Btn>
-              <Btn variant="ghost" size="sm" onClick={testConnection}>Test</Btn>
-            </div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 7, lineHeight: 1.55 }}>
-              {cfg?.isDefault
-                ? 'Currently the default. Run your own registry and point this at it if you would rather not use a shared one.'
-                : 'Custom registry.'}
-            </div>
-            {status && (
-              <div style={{ marginTop: 9, fontSize: 12.5, color: status.ok === true ? 'var(--good)' : status.ok === false ? 'var(--bad)' : 'var(--muted)' }}>
-                {status.text}
-              </div>
-            )}
-          </div>
-
-          <div style={{ padding: '14px 0', borderTop: '1px solid var(--border)' }}>
-            <label className="cap" style={{ display: 'block', marginBottom: 7 }}>Publisher handle</label>
-            {cfg?.handle ? (
-              <>
-                <div className="mono" style={{ fontSize: 14, color: 'var(--ink)' }}>@{cfg.handle}</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 5, lineHeight: 1.55 }}>
-                  Claimed on this registry. The token proving it is yours is stored on your own machine
-                  and is never sent to the browser — keep this install and you keep the ability to update
-                  what you published.
-                </div>
-                <div style={{ marginTop: 10 }}>
-                  <Btn variant="ghost" size="sm" disabled={saving} onClick={forgetHandle}>
-                    Forget this handle
-                  </Btn>
-                </div>
-              </>
-            ) : (
-              <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.55 }}>
-                None yet. Publishing a course from the Share screen claims one — no account, no email.
-              </div>
-            )}
-          </div>
-        </>
-      )}
-    </Card>
-  );
-}
-
 export function Settings() {
   const { add: toast } = useToast();
-  const [activeTab, setActiveTab] = React.useState(() => localStorage.getItem('settings_tab') || 'api');
+  // Deep-linked tabs may name a tab that no longer exists (or 'keys' from an
+  // older link) — fall back to API keys rather than rendering nothing.
+  const VALID_TABS = ['account', 'api', 'agents', 'data'];
+  const [activeTab, setActiveTab] = React.useState(() => {
+    const t = localStorage.getItem('settings_tab');
+    return VALID_TABS.includes(t) ? t : 'api';
+  });
   React.useEffect(() => { localStorage.removeItem('settings_tab'); }, []);
 
   const { data: apiKeysData, loading: loadingKeys, reload: reloadKeys } = useApi(() => API.getApiKeys());
   const { data: profileData  } = useApi(() => API.getUserProfile());
-  const { data: settingsData } = useApi(() => API.getUserSettings());
   const { data: routingData  } = useApi(() => API.getAgentRouting());
   const { data: models       } = useApi(() => API.getModels());
 
@@ -1552,24 +1413,10 @@ export function Settings() {
       setRouteModels(m);
     }
   }, [routingData]);
-  const [theme, setTheme]           = React.useState('dark');
-  const [density, setDensity]       = React.useState('regular');
-  const [fontSize, setFontSize]     = React.useState(14);
-
-  React.useEffect(() => {
-    if (settingsData) {
-      setTheme(settingsData.theme || 'dark');
-      setDensity(settingsData.density || 'regular');
-      setFontSize(settingsData.font_size || 14);
-    }
-  }, [settingsData]);
-
   const tabs = [
     { id: 'account',  label: 'Account',    icon: I.user },
     { id: 'api',      label: 'API keys',   icon: I.api },
     { id: 'agents',   label: 'Agents',     icon: I.spark },
-    { id: 'theme',    label: 'Appearance', icon: I.bolt },
-    { id: 'registry', label: 'Community',  icon: I.upload },
     { id: 'data',     label: 'Data',       icon: I.layers },
   ];
 
@@ -1721,36 +1568,6 @@ export function Settings() {
         );
       case 'agents':
         return <AgentRouting models={models} routeModels={routeModels} setRouteModels={setRouteModels} toast={toast} />;
-      case 'theme':
-        return (
-          <Card style={{ padding: 18 }}>
-            <SectionHead title="Appearance" />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div>
-                <div className="cap" style={{ marginBottom: 8 }}>Theme</div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {['dark', 'light'].map(t => (
-                    <button key={t} onClick={() => { setTheme(t); document.documentElement.dataset.light = t === 'light' ? '1' : '0'; API.patchUserSettings({ theme: t }).catch(() => {}); toast(`Theme: ${t}`, 'success'); }} style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${theme === t ? 'var(--accent-line)' : 'var(--border)'}`, background: theme === t ? 'var(--accent-soft)' : 'var(--surface)', color: theme === t ? 'oklch(0.82 0.18 295)' : 'var(--ink-2)', fontSize: 13, cursor: 'pointer' }}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="cap" style={{ marginBottom: 8 }}>Density</div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  {['compact', 'regular', 'comfy'].map(d => (
-                    <button key={d} onClick={() => { setDensity(d); document.documentElement.dataset.density = d; API.patchUserSettings({ density: d }).catch(() => {}); toast(`Density: ${d}`, 'success'); }} style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${density === d ? 'var(--accent-line)' : 'var(--border)'}`, background: density === d ? 'var(--accent-soft)' : 'var(--surface)', color: density === d ? 'oklch(0.82 0.18 295)' : 'var(--ink-2)', fontSize: 13, cursor: 'pointer' }}>{d.charAt(0).toUpperCase() + d.slice(1)}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div className="cap" style={{ marginBottom: 8 }}>Font Size: {fontSize}px</div>
-                <input type="range" min="12" max="18" step="1" value={fontSize} onChange={(e) => { const v = parseInt(e.target.value); setFontSize(v); API.patchUserSettings({ font_size: v }).catch(() => {}); }} style={{ width: 200, accentColor: 'oklch(0.74 0.21 295)' }} />
-              </div>
-            </div>
-          </Card>
-        );
-      case 'registry':
-        return <RegistrySettings />;
       case 'data':
         return (
           <Card style={{ padding: 18 }}>
