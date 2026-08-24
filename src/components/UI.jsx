@@ -324,10 +324,13 @@ export function SectionHead({ title, action, subtitle }) {
 }
 
 /* ── Brand helpers ────────────────────────────────────────────────────────── */
-export function PageScroll({ children }) {
+export function PageScroll({ children, wide = false }) {
+  // Most screens read best at a fixed measure; browse-heavy ones (the course
+  // catalog) should spread across the whole page instead of leaving big empty
+  // gutters on a wide monitor. `wide` opts into that without touching the rest.
   return (
     <div className="scroll" style={{ height: '100%', padding: '28px 32px 60px' }}>
-      <div style={{ maxWidth: 1280, margin: '0 auto' }}>{children}</div>
+      <div style={{ maxWidth: wide ? 1760 : 1280, margin: '0 auto' }}>{children}</div>
     </div>
   );
 }

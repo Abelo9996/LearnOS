@@ -144,4 +144,23 @@ router.get('/reader/:lessonId', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/content/framable/:lessonId — may the UI embed this lesson's external
+ * source in an iframe? The URL is read from the lesson row server-side, checked
+ * behind the SSRF guard, and probed for framing headers. The client embeds when
+ * true and falls back to a link card when false, so a blocked frame is never
+ * shown.
+ */
+router.get('/framable/:lessonId', async (req, res) => {
+  const lesson = db.prepare('SELECT id, url FROM module_lessons WHERE id = ?').get(req.params.lessonId);
+  if (!lesson || !lesson.url) return res.status(404).json({ error: true, message: 'No external resource on this lesson' });
+  try {
+    const { canBeFramed } = await import('../ai/reader.js');
+    const framable = await canBeFramed(lesson.url);
+    res.json({ ok: true, url: lesson.url, framable });
+  } catch (e) {
+    res.json({ ok: true, url: lesson.url, framable: false, reason: e.message });
+  }
+});
+
 export default router;

@@ -843,6 +843,12 @@ export function Flashcards() {
   const { add: toast } = useToast();
   const { open: openModal, close: closeModal } = useModal();
   const { data: rawCards, loading, error, reload } = useApi(() => API.getFlashcardsDue());
+  // Decks (all cards, not just due) — so we can tell "empty deck, go generate"
+  // apart from "caught up for today", and show what's in the deck at all.
+  const { data: decks, reload: reloadDecks } = useApi(() => API.getFlashcardDecks());
+  const totalCards = (decks || []).reduce((s, d) => s + (d.total || 0), 0);
+  const reloadAll = () => { reload(); reloadDecks(); };
+  const openGenerate = () => openModal(<GenerateDeckModal onDone={() => { closeModal(); reloadAll(); }} />);
 
   const cards = React.useMemo(() => {
     if (!rawCards) return [];
@@ -894,12 +900,14 @@ export function Flashcards() {
 
   return (
     <PageScroll>
-      <PageHeader eyebrow={sessionComplete ? `Review complete! · ${total} cards reviewed` : `Review · ${done} / ${total} due today`} title="Spaced review" subtitle="Cards scheduled by the Assessment Agent based on your recall curve."
+      <PageHeader eyebrow={sessionComplete ? `Review complete! · ${total} cards reviewed` : `Review · ${done} / ${total} due today`} title="Spaced review" subtitle="Built from your courses' questions and the ones you get wrong — resurfaced on a spacing schedule so it sticks before the next assignment."
         actions={<>
-          <Btn variant="outline" icon={I.plus} onClick={() => openModal(<CreateCardsModal onCreated={() => { closeModal(); reload(); toast('Cards created!', 'success'); }} />)}>Create cards</Btn>
+          <Btn variant="outline" icon={I.spark} onClick={openGenerate}>Generate from a course</Btn>
+          <Btn variant="ghost" icon={I.plus} onClick={() => openModal(<CreateCardsModal onCreated={() => { closeModal(); reloadAll(); toast('Cards created!', 'success'); }} />)}>Create cards</Btn>
           <Btn variant="primary" size="md" icon={I.play} onClick={() => {
             if (sessionComplete) return resetSession();
-            if (total === 0) return toast('Create some cards first', 'info');
+            if (totalCards === 0) return openGenerate();  // nothing to review yet — fill the deck
+            if (total === 0) return toast("You're caught up — nothing due today", 'info');
             // Previously this branch did nothing at all — the primary CTA was
             // dead whenever cards were actually due. Advance to the next
             // unreviewed card (or flip the current one).
@@ -907,16 +915,31 @@ export function Flashcards() {
             const target = nextIdx === -1 ? cards.findIndex(c => !reviewed[c.id]) : nextIdx;
             if (target === -1) { setSessionComplete(true); return; }
             if (target === idx) setFlipped(f => !f); else setIdx(target);
-          }}>{sessionComplete ? 'New session' : total === 0 ? 'No cards due' : 'Continue'}</Btn>
+          }}>{sessionComplete ? 'New session' : totalCards === 0 ? 'Generate cards' : total === 0 ? 'All caught up' : 'Continue'}</Btn>
         </>} />
       <ErrorBanner error={error} onRetry={reload} />
       <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: SECT_MARGIN }}>
         <Card pad={false} style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {total === 0 ? (
-            <div style={{ minHeight: 280, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+          {totalCards === 0 ? (
+            <div style={{ minHeight: 280, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, textAlign: 'center', padding: '0 24px' }}>
+              <div style={{ fontSize: 44 }}>🗂️</div>
+              <div className="display" style={{ fontSize: 24, color: 'var(--ink)' }}>Your review deck is empty</div>
+              <div style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.6, maxWidth: 420 }}>
+                Spaced review works best fed from what you're studying. Turn a course's questions into
+                a deck, then review a little each day so it's locked in before the assignment. Anything
+                you miss on a graded quiz is added here automatically.
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                <Btn variant="primary" size="md" icon={I.spark} onClick={openGenerate}>Generate from a course</Btn>
+                <Btn variant="outline" size="md" icon={I.plus} onClick={() => openModal(<CreateCardsModal onCreated={() => { closeModal(); reloadAll(); toast('Cards created!', 'success'); }} />)}>Add manually</Btn>
+              </div>
+            </div>
+          ) : total === 0 ? (
+            <div style={{ minHeight: 280, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, textAlign: 'center' }}>
               <div style={{ fontSize: 48 }}>✨</div>
               <div className="display" style={{ fontSize: 24, color: 'var(--ink)' }}>All caught up!</div>
-              <div style={{ fontSize: 14, color: 'var(--muted)' }}>No cards due today. Come back tomorrow.</div>
+              <div style={{ fontSize: 14, color: 'var(--muted)' }}>Nothing due today across your {totalCards} card{totalCards === 1 ? '' : 's'}. Come back tomorrow, or add more.</div>
+              <Btn variant="outline" size="sm" icon={I.spark} onClick={openGenerate} style={{ marginTop: 4 }}>Generate more from a course</Btn>
             </div>
           ) : sessionComplete ? (
             <div style={{ minHeight: 280, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
@@ -964,18 +987,30 @@ export function Flashcards() {
         </Card>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <Card style={{ padding: 16 }}>
-            <SectionHead title="Today" subtitle={`${total} cards due`} />
-            {total === 0 ? (
-              <div style={{ padding: '12px 0', color: 'var(--muted)', fontSize: 13 }}>All clear — no cards due today!</div>
+            <SectionHead title="Your decks" subtitle={totalCards ? `${totalCards} card${totalCards === 1 ? '' : 's'} · ${total} due today` : 'No decks yet'} />
+            {!decks || decks.length === 0 ? (
+              <div style={{ padding: '12px 0', color: 'var(--muted)', fontSize: 13, lineHeight: 1.6 }}>
+                Generate a deck from a course to get started.
+              </div>
             ) : (
-              // group by deck
-              Object.entries(cards.reduce((acc, c) => { acc[c.deck] = (acc[c.deck] || 0) + 1; return acc; }, {})).map(([deck, n], i) => (
-                <div key={deck} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: i === 0 ? 0 : '1px solid var(--border)' }}>
-                  <div style={{ flex: 1, fontSize: 12.5, color: 'var(--ink)' }}>{deck}</div>
-                  <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{n} due</span>
+              decks.map((d, i) => (
+                <div key={d.deck} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: i === 0 ? 0 : '1px solid var(--border)' }}>
+                  <div style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.deck}</div>
+                  {d.due > 0
+                    ? <span className="mono" style={{ fontSize: 11, color: 'var(--brand)', flexShrink: 0 }}>{d.due} due</span>
+                    : <span className="mono" style={{ fontSize: 11, color: 'var(--faint)', flexShrink: 0 }}>{d.total}</span>}
                 </div>
               ))
             )}
+          </Card>
+          <Card style={{ padding: 16 }}>
+            <div style={{ fontSize: 12.5, color: 'var(--ink)', fontWeight: 600, marginBottom: 6 }}>How this works</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.65 }}>
+              Cards come from your courses' question banks and anything you miss on a graded quiz.
+              Grade each recall <span style={{ color: 'var(--ink-2)' }}>Again → Easy</span> and the
+              scheduler spaces the next review — frequent for shaky ones, rare for solid ones — so a
+              few minutes a day keeps a course fresh through its assignments.
+            </div>
           </Card>
         </div>
       </div>
@@ -1773,6 +1808,84 @@ function CreateAssignmentModal({ onCreated }) {
         <Btn variant="outline" onClick={closeModal}>Cancel</Btn>
         <Btn variant="primary" onClick={create} disabled={creating}>{creating ? 'Creating…' : 'Create assignment'}</Btn>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Turn a course (or one of its modules) into a spaced-review deck in one click.
+ * This is the intended way to fill review — the manual card editor is the
+ * fallback for anything the course didn't cover.
+ */
+function GenerateDeckModal({ onDone }) {
+  const { add: toast } = useToast();
+  const { data: courses } = useApi(() => API.getCourses());
+  const [slug, setSlug] = React.useState('');
+  const [moduleId, setModuleId] = React.useState('');
+  const [mods, setMods] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
+  const list = courses || [];
+
+  // Load the chosen course's modules so review can be scoped to one (e.g. right
+  // before that module's assignment) rather than the whole course.
+  React.useEffect(() => {
+    setModuleId(''); setMods(null);
+    if (!slug) return;
+    let alive = true;
+    API.getCourseModules(slug).then(m => { if (alive) setMods(m || []); }).catch(() => { if (alive) setMods([]); });
+    return () => { alive = false; };
+  }, [slug]);
+
+  const inp = { width: '100%', padding: '9px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13 };
+
+  const go = async () => {
+    if (!slug) { toast('Pick a course first', 'error'); return; }
+    setBusy(true);
+    try {
+      const r = await API.generateFlashcards(slug, moduleId || undefined);
+      if (r.created > 0) toast(`Added ${r.created} review card${r.created === 1 ? '' : 's'} to "${r.deck}"`, 'success');
+      else if (r.totalQuestions === 0) toast('That course has no questions to turn into cards yet — build or enrich it first.', 'info');
+      else toast('Those cards are already in your deck.', 'info');
+      onDone && onDone();
+    } catch (e) { toast(e.message || 'Could not generate cards', 'error'); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{ minWidth: 460, maxWidth: 520 }}>
+      <h3 className="display" style={{ fontSize: 22, marginBottom: 6 }}>Generate review cards</h3>
+      <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.6 }}>
+        Every graded question in the course becomes a recall card — the question on the front, the
+        answer and why it's right on the back. Review a whole course, or just the module whose
+        assignment is coming up.
+      </div>
+      {list.length === 0 ? (
+        <div style={{ fontSize: 13, color: 'var(--muted)', padding: '8px 0 4px' }}>
+          You don't have any courses yet. Generate or import a course first, then come back to build a deck from it.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <label className="cap" style={{ display: 'block', marginBottom: 4 }}>Course</label>
+            <select value={slug} onChange={e => setSlug(e.target.value)} style={inp}>
+              <option value="">Choose a course…</option>
+              {list.map(c => <option key={c.slug} value={c.slug}>{c.title}</option>)}
+            </select>
+          </div>
+          {slug && (
+            <div>
+              <label className="cap" style={{ display: 'block', marginBottom: 4 }}>Scope</label>
+              <select value={moduleId} onChange={e => setModuleId(e.target.value)} style={inp} disabled={!mods}>
+                <option value="">Whole course</option>
+                {(mods || []).map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
+              </select>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+            <Btn variant="primary" disabled={!slug || busy} onClick={go}>{busy ? 'Generating…' : 'Generate deck'}</Btn>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

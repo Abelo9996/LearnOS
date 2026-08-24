@@ -80,6 +80,8 @@ const API = {
   getFlashcardsDue: () => API.get('/flashcards/due'),
   getFlashcardDecks: () => API.get('/flashcards/stats/decks'),
   createFlashcard:  (data) => API.post('/flashcards', data),
+  // Build a review deck from a course's question bank (optionally one module).
+  generateFlashcards: (course_slug, module_id) => API.post('/flashcards/generate', module_id ? { course_slug, module_id } : { course_slug }),
   reviewFlashcard:  (id, data) => API.post(`/flashcards/${id}/review`, data),
   deleteFlashcard:  (id) => API.del(`/flashcards/${id}`),
 
@@ -170,6 +172,7 @@ const API = {
   getContentReports:  (status) => API.get(`/content/reports${status ? `?status=${status}` : ''}`),
   getVerification:    (slug) => API.get(`/content/verification${slug ? `?slug=${slug}` : ''}`),
   getReader:          (lessonId) => API.get(`/content/reader/${lessonId}`),
+  getFramable:        (lessonId) => API.get(`/content/framable/${lessonId}`),
 
   // Specializations (M4) — a pathway of whole courses from A to B.
   planSpecialization: (data) => API.post('/roadmaps/specialization', data),
