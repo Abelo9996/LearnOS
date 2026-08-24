@@ -127,6 +127,57 @@ export function formatInline(text, citationMap) {
   return <>{parts}</>;
 }
 
+/**
+ * Mermaid diagrams from a ```mermaid fence.
+ *
+ * LLMs emit Mermaid more reliably than any other diagram syntax, so letting the
+ * generator draw flowcharts, sequences and trees turns walls of prose into
+ * something you can see. Loaded on demand (a philosophy lesson shouldn't pay
+ * for a diagram engine), rendered with securityLevel 'strict' since the source
+ * is model-generated, and it falls back to the raw fence if the diagram doesn't
+ * parse — a broken diagram should never blank the lesson.
+ */
+let mermaidMod = null, mermaidPromise = null;
+function loadMermaid() {
+  if (mermaidMod) return Promise.resolve(mermaidMod);
+  mermaidPromise ||= import('mermaid').then((m) => {
+    const mm = m.default || m;
+    mm.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'dark', fontFamily: 'inherit' });
+    mermaidMod = mm;
+    return mm;
+  });
+  return mermaidPromise;
+}
+let mermaidSeq = 0;
+function Mermaid({ code }) {
+  const [svg, setSvg] = React.useState(null);
+  const [failed, setFailed] = React.useState(false);
+  React.useEffect(() => {
+    let alive = true; setFailed(false); setSvg(null);
+    loadMermaid()
+      .then(async (mm) => {
+        try {
+          // parse() throws on invalid syntax without touching the DOM — check
+          // first so a bad diagram falls back cleanly instead of leaving mermaid
+          // error markup on the page.
+          await mm.parse(code);
+          const { svg } = await mm.render(`mmd-${mermaidSeq++}`, code);
+          if (alive) setSvg(svg);
+        } catch { if (alive) setFailed(true); }
+      })
+      .catch(() => { if (alive) setFailed(true); });
+    return () => { alive = false; };
+  }, [code]);
+
+  if (failed) return <CodeBlock code={code} lang="mermaid" />;
+  if (!svg) return <div style={{ padding: 18, textAlign: 'center', color: 'var(--muted)', fontSize: 12.5 }}>Rendering diagram…</div>;
+  return (
+    <div className="mermaid-diagram"
+      style={{ margin: '16px 0', padding: 14, textAlign: 'center', overflowX: 'auto', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10 }}
+      dangerouslySetInnerHTML={{ __html: svg }} />
+  );
+}
+
 /* ── Code block: says what language it is, and lets you take it away ───────── */
 function CodeBlock({ code, lang }) {
   const [copied, setCopied] = React.useState(false);
@@ -228,7 +279,10 @@ export default function MarkdownText({ text, citationMap, prose = false, stripTi
       const code = [];
       i++;
       while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) { code.push(lines[i]); i++; }
-      elements.push(<CodeBlock key={`c-${i}`} code={code.join('\n')} lang={fence[1]} />);
+      const body = code.join('\n');
+      elements.push(fence[1] === 'mermaid'
+        ? <Mermaid key={`m-${i}`} code={body} />
+        : <CodeBlock key={`c-${i}`} code={body} lang={fence[1]} />);
       continue;
     }
 

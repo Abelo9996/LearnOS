@@ -235,7 +235,8 @@ Produce:
 
 Readings must be VISUALLY STRUCTURED, never a wall of text:
 - A ### heading every 150-250 words; no paragraph longer than 4 sentences.
-- At least one fenced code block per reading: a worked, runnable example for code topics, or a text diagram (flow, tree, timeline, before/after) for non-code topics.
+- At least one fenced code block per reading: a worked, runnable example for code topics.
+- At least one DIAGRAM per reading as a \`\`\`mermaid fenced block — the reader renders it visually. Use whichever Mermaid diagram type fits: flowchart for processes/decisions, sequenceDiagram for interactions, graph for relationships/architecture, timeline for history, mindmap for concept breakdowns. Keep labels short and the syntax valid. A picture of how the pieces connect is worth more than another paragraph.
 - At least one Markdown table per reading (comparison, decision guide, or summary — | Col | Col | rows).
 - Bold the key terms on first use. End every reading with a "**Key takeaways**" bullet list of 3-5 points.
 

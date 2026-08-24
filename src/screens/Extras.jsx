@@ -857,7 +857,8 @@ export function Flashcards() {
       deck:     c.deck,
       q:        c.front,
       a:        c.back,
-      interval: c.interval_days ? `${c.interval_days}d` : '1d',
+      interval: c.interval_days ? `${c.interval_days}d` : 'new',
+      preview:  c.preview || null,  // FSRS per-grade "next due" from the server
     }));
   }, [rawCards]);
 
@@ -975,10 +976,11 @@ export function Flashcards() {
                 <div className="mono" style={{ position: 'absolute', bottom: 14, right: 18, color: 'var(--muted)', fontSize: 10.5 }}>click to {flipped ? 'see question' : 'reveal'}</div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
-                {[{ g: 'again', label: 'Again', sub: '<1m', tone: 'danger' }, { g: 'hard', label: 'Hard', sub: '6m', tone: 'warn' }, { g: 'good', label: 'Good', sub: '4d', tone: 'accent' }, { g: 'easy', label: 'Easy', sub: '12d', tone: 'good' }].map((b) => (
+                {[{ g: 'again', label: 'Again', tone: 'danger' }, { g: 'hard', label: 'Hard', tone: 'warn' }, { g: 'good', label: 'Good', tone: 'accent' }, { g: 'easy', label: 'Easy', tone: 'good' }].map((b) => (
                   <button key={b.g} onClick={() => grade(b.g)} disabled={!flipped} style={{ opacity: flipped ? 1 : 0.45, padding: 14, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', cursor: flipped ? 'pointer' : 'not-allowed', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
                     <Tag tone={b.tone}>{b.label}</Tag>
-                    <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>next in {b.sub}</span>
+                    {/* FSRS gives this card's real next-due per grade */}
+                    <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{card.preview?.[b.g] ? `next in ${card.preview[b.g]}` : '·'}</span>
                   </button>
                 ))}
               </div>
