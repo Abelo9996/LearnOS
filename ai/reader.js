@@ -34,6 +34,64 @@ function inlineText(html) {
   ).replace(/[ \t]+/g, ' ').trim();
 }
 
+/**
+ * Can this URL be shown in an <iframe> on our page?
+ *
+ * A course embeds its source directly, but a site can forbid that with
+ * `X-Frame-Options: DENY|SAMEORIGIN` or a CSP `frame-ancestors` that excludes
+ * us — the browser then paints a blank "refused to connect" box, which is worse
+ * than an honest link. So we ask the site first (one bounded, SSRF-guarded
+ * request) and let the UI embed only when it will actually render.
+ *
+ * Cached in-memory per URL: framing policy rarely changes and this runs on
+ * every lesson open. Failures resolve to "not framable" so the UI degrades to
+ * the link card rather than showing a broken frame.
+ */
+const _framableCache = new Map(); // url -> { at, framable }
+const FRAMABLE_TTL = 6 * 60 * 60 * 1000; // 6h
+
+export async function canBeFramed(url) {
+  const hit = _framableCache.get(url);
+  if (hit && (Date.now() - hit.at) < FRAMABLE_TTL) return hit.framable;
+
+  const decide = (framable) => { _framableCache.set(url, { at: Date.now(), framable }); return framable; };
+
+  if (!/^https:\/\//i.test(url)) return decide(false); // mixed content can't frame on an https page anyway
+  if (!isPublicUrl(url)) return decide(false);
+  let hostname;
+  try { hostname = new URL(url).hostname; } catch { return decide(false); }
+  if (!await resolvesToPublicIp(hostname)) return decide(false);
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  try {
+    // A ranged GET, not HEAD: some sites only set framing headers on GET, and
+    // many reject HEAD outright.
+    const resp = await fetch(url, {
+      redirect: 'follow', signal: controller.signal,
+      headers: { 'User-Agent': 'LearnOS-Reader/1.0', Range: 'bytes=0-1024' },
+    });
+    clearTimeout(timeout);
+    if (!resp.ok && resp.status !== 206) return decide(false);
+
+    const xfo = (resp.headers.get('x-frame-options') || '').toLowerCase();
+    if (xfo.includes('deny') || xfo.includes('sameorigin')) return decide(false);
+
+    const csp = resp.headers.get('content-security-policy') || '';
+    const fa = csp.match(/frame-ancestors([^;]*)/i);
+    if (fa) {
+      const v = fa[1].toLowerCase();
+      // Framable only if the directive is open (*) — anything else names hosts
+      // that won't include a localhost instance.
+      if (!/\*|https?:(?!\/\/)/.test(v) && !v.includes('*')) return decide(false);
+    }
+    return decide(true);
+  } catch {
+    clearTimeout(timeout);
+    return decide(false);
+  }
+}
+
 /** Extract {title, markdown} from raw HTML. Returns null when nothing useful. */
 export function extractReadable(html, url) {
   if (!html) return null;

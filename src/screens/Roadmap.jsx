@@ -816,6 +816,10 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, open
   const [proposing, setProposing] = React.useState(false);
   const [lesson, setLesson] = React.useState(null);
   const [building, setBuilding] = React.useState(false);
+  // The build job already reports progress (0..1) + a message per stage; this
+  // surfaces it so "Build course" isn't a multi-minute wait with no signal.
+  const [buildPct, setBuildPct] = React.useState(0);
+  const [buildMsg, setBuildMsg] = React.useState('');
   React.useEffect(() => {
     let alive = true;
     setResources([]); setLesson(null);
@@ -828,15 +832,17 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, open
   // Pathway nodes are whole courses, planned up front and built on demand.
   const isCourseNode = node.node_kind === 'course';
   const buildCourse = async () => {
-    setBuilding(true);
+    setBuilding(true); setBuildPct(0.02); setBuildMsg('Designing the course blueprint…');
     try {
       const res = await API.buildPathwayCourse(node.roadmap_id, node.id);
       if (res.alreadyBuilt) { onMasteryChange && onMasteryChange(); setBuilding(false); return; }
-      toast && toast('Building this course — a full syllabus takes a few minutes…', 'info');
-      for (let i = 0; i < 200; i++) {
-        await new Promise(r => setTimeout(r, 3000));
+      for (let i = 0; i < 400; i++) {
+        await new Promise(r => setTimeout(r, 1500));
         const j = await API.getJob(res.jobId).catch(() => null);
+        if (j && typeof j.progress === 'number') setBuildPct(j.progress);
+        if (j && j.progress_msg) setBuildMsg(j.progress_msg);
         if (j?.status === 'done') {
+          setBuildPct(1); setBuildMsg('Course ready');
           toast && toast('Course ready — opening it', 'success');
           onMasteryChange && onMasteryChange();
           if (j.result?.slug && onOpenCourse) onOpenCourse(j.result.slug);
@@ -902,6 +908,18 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, open
           ) : (
             <div style={{ fontSize: 13, color: 'var(--ink-2)', marginTop: 8, lineHeight: 1.55 }}>
               {isLocked ? 'Complete prerequisite modules to unlock this topic.' : isNext ? 'Start this module when you are ready to continue your learning path.' : isActive ? 'You are currently studying this module. Resume your session to continue.' : 'Master this topic to build towards the next module.'}
+            </div>
+          )}
+          {building && (
+            <div style={{ marginTop: 16, maxWidth: 520 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+                <span className="cap">Building this course</span>
+                <span className="mono" style={{ fontSize: 11, color: 'var(--brand)' }}>{Math.round((buildPct || 0) * 100)}%</span>
+              </div>
+              <ProgressBar value={buildPct || 0} height={7} />
+              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 7, lineHeight: 1.5 }}>
+                {buildMsg || 'Designing the syllabus…'} <span style={{ color: 'var(--faint)' }}>· a full course takes a few minutes</span>
+              </div>
             </div>
           )}
         </div>

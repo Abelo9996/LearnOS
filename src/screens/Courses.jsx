@@ -8,11 +8,24 @@ import MarkdownText from '../components/Markdown';
 import ModuleQuiz from '../components/ModuleQuiz.jsx';
 import LabRunner from '../components/LabRunner.jsx';
 
-// Extract a YouTube video id so lecture videos can be embedded inline.
+// Extract a YouTube video id so lecture videos play inline. Handles every URL
+// shape the generator (and people) actually produce: watch?v=, youtu.be short
+// links, /embed/, /v/, /shorts/, /live/, and ids buried behind other query
+// params (watch?feature=…&v=ID). Missing forms were silently falling through to
+// a "just a link" card instead of embedding — the core of the complaint.
 function youtubeId(url) {
   if (!url) return null;
-  const m = String(url).match(/(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
-  return m ? m[1] : null;
+  const s = String(url);
+  const path = s.match(/(?:youtube\.com\/(?:embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/);
+  if (path) return path[1];
+  try {
+    const u = new URL(s);
+    if (/(^|\.)youtube\.com$/.test(u.hostname)) {
+      const v = u.searchParams.get('v');
+      if (v && /^[\w-]{11}$/.test(v)) return v;
+    }
+  } catch { /* not a URL */ }
+  return null;
 }
 
 /**
@@ -29,7 +42,10 @@ function youtubeId(url) {
 function embedFor(url) {
   if (!url) return null;
   const yt = youtubeId(url);
-  if (yt) return { kind: 'video', src: `https://www.youtube-nocookie.com/embed/${yt}`, label: 'Lecture video' };
+  // rel=0 keeps "up next" suggestions within the same channel; modestbranding
+  // trims the chrome. Privacy-nocookie domain so watching a lesson doesn't set
+  // tracking cookies.
+  if (yt) return { kind: 'video', src: `https://www.youtube-nocookie.com/embed/${yt}?rel=0&modestbranding=1`, label: 'Lecture video' };
   let u;
   try { u = new URL(url); } catch { return null; }
   const host = u.hostname.replace(/^www\./, '');
@@ -65,35 +81,68 @@ const LESSON_KIND = {
 // "12 min" the way Coursera labels every item.
 const mins = (n) => (n ? (n >= 60 ? `${Math.round(n / 60)} h` : `${n} min`) : null);
 
-/* In-app reader view for external article/docs/paper resources: the server
-   fetches the page (SSRF-guarded, cached) and reduces it to Markdown so the
-   reference is studied here instead of only as an outbound link. Falls back
-   silently to the open-original card when the site resists extraction. */
-function ResourceReader({ lessonId }) {
-  const [state, setState] = React.useState({ status: 'loading' });
+const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } };
+
+/**
+ * Show an external article/doc as a live iframe of the real page, inside the
+ * lesson.
+ *
+ * The old approach fetched the page and re-rendered its text as Markdown, which
+ * mangled layout, code and figures and read as broken. This embeds the actual
+ * site instead — but only after the server confirms the site permits framing
+ * (many send X-Frame-Options), because a blocked frame is a blank grey box.
+ * When it can't be framed, fall back to a clean "open it" card rather than
+ * showing something broken.
+ */
+function FramedResource({ lessonId, url, meta }) {
+  const [status, setStatus] = React.useState('checking'); // checking | framable | blocked
   React.useEffect(() => {
     let alive = true;
-    setState({ status: 'loading' });
-    API.getReader(lessonId)
-      .then(r => { if (alive) setState(r?.ok ? { status: 'ok', ...r } : { status: 'none' }); })
-      .catch(() => { if (alive) setState({ status: 'none' }); });
+    setStatus('checking');
+    API.getFramable(lessonId)
+      .then(r => { if (alive) setStatus(r?.framable ? 'framable' : 'blocked'); })
+      .catch(() => { if (alive) setStatus('blocked'); });
     return () => { alive = false; };
   }, [lessonId]);
 
-  if (state.status === 'loading') return (
-    <div style={{ padding: '18px 0', textAlign: 'center', color: 'var(--muted)', fontSize: 12.5 }}>Loading a readable view…</div>
+  const openBtn = (
+    <a href={url} target="_blank" rel="noopener noreferrer"
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: meta.color, textDecoration: 'none', flexShrink: 0 }}>
+      Open in new tab {React.cloneElement(I.open || I.arrowR, { size: 13 })}
+    </a>
   );
-  if (state.status !== 'ok') return null;
+
+  if (status === 'checking') {
+    return <div style={{ padding: '22px 0', textAlign: 'center', color: 'var(--muted)', fontSize: 12.5 }}>Loading preview…</div>;
+  }
+
+  if (status === 'blocked') {
+    // The site refuses to be embedded — an honest link beats a broken frame.
+    return (
+      <a href={url} target="_blank" rel="noopener noreferrer" className="hover-card"
+        style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, marginBottom: 18, borderRadius: 12, background: 'var(--surface)', border: `1px solid color-mix(in oklch, ${meta.color} 30%, var(--border))`, textDecoration: 'none', color: 'var(--ink)' }}>
+        <span style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 10, background: `color-mix(in oklch, ${meta.color} 16%, transparent)`, color: meta.color, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: `1px solid color-mix(in oklch, ${meta.color} 35%, transparent)` }}>{React.cloneElement(I[meta.icon] || I.book, { size: 20 })}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>Open this {meta.label.toLowerCase()}</div>
+          <div className="mono" style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{hostOf(url)} · doesn't allow embedding</div>
+        </div>
+        <span style={{ color: meta.color, flexShrink: 0 }}>{React.cloneElement(I.open || I.arrowR, { size: 16 })}</span>
+      </a>
+    );
+  }
+
   return (
     <div style={{ marginBottom: 18, border: '1px solid var(--border)', borderRadius: 12, overflow: 'hidden' }}>
-      <div style={{ padding: '10px 16px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'baseline', gap: 10 }}>
-        <span className="cap">Reader view</span>
-        <span className="mono" style={{ fontSize: 10.5, color: 'var(--muted)' }}>{state.source}</span>
-        <span className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', marginLeft: 'auto' }}>extracted — open the original for full fidelity</span>
+      <div style={{ padding: '9px 14px', background: 'var(--surface)', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span style={{ color: meta.color, display: 'inline-flex' }}>{React.cloneElement(I[meta.icon] || I.book, { size: 14 })}</span>
+        <span className="mono" style={{ fontSize: 11, color: 'var(--muted)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hostOf(url)}</span>
+        {openBtn}
       </div>
-      <div style={{ padding: '16px 20px', maxHeight: '60vh', overflowY: 'auto' }} className="scroll">
-        <MarkdownText text={state.markdown} prose />
-      </div>
+      <iframe
+        title={`Embedded ${meta.label}`} src={url}
+        referrerPolicy="strict-origin-when-cross-origin"
+        allow="fullscreen"
+        style={{ display: 'block', width: '100%', height: '80vh', minHeight: 480, border: 0, background: '#fff' }} />
     </div>
   );
 }
@@ -327,20 +376,9 @@ export default function Courses() {
               </div>
               <h1 className="display" style={{ fontSize: 27, color: 'var(--ink)', margin: '4px 0 18px' }}>{lesson.title}</h1>
 
-              {/* Non-video external resource → rich open card */}
-              {lesson.url && !embed && (
-                <a href={lesson.url} target="_blank" rel="noopener noreferrer" className="hover-card" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, marginBottom: 18, borderRadius: 12, background: 'var(--surface)', border: `1px solid color-mix(in oklch, ${meta.color} 30%, var(--border))`, textDecoration: 'none', color: 'var(--ink)' }}>
-                  <span style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 10, background: `color-mix(in oklch, ${meta.color} 16%, transparent)`, color: meta.color, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: `1px solid color-mix(in oklch, ${meta.color} 35%, transparent)` }}>{React.cloneElement(I[meta.icon] || I.book, { size: 20 })}</span>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 600 }}>Open this {meta.label.toLowerCase()}</div>
-                    <div className="mono" style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(() => { try { return new URL(lesson.url).hostname.replace(/^www\./, ''); } catch { return lesson.url; } })()}</div>
-                  </div>
-                  <span style={{ color: meta.color, flexShrink: 0 }}>{React.cloneElement(I.open || I.arrowR, { size: 16 })}</span>
-                </a>
-              )}
-
-              {/* Readable in-app rendering of the external reference */}
-              {lesson.url && !embed && <ResourceReader lessonId={lesson.id} />}
+              {/* External article/doc → live embed of the real page (falls back
+                  to an open-in-new-tab card when the site forbids framing). */}
+              {lesson.url && !embed && <FramedResource lessonId={lesson.id} url={lesson.url} meta={meta} />}
 
               {lesson.body_md ? (
                 <MarkdownText text={lesson.body_md} prose stripTitle={lesson.title} />
@@ -396,11 +434,11 @@ export default function Courses() {
     }
 
     return (
-      <PageScroll>
+      <PageScroll wide>
         <button onClick={() => setSelectedCourse(null)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'none', border: 0, color: 'var(--muted)', fontSize: 12, marginBottom: 16, cursor: 'pointer' }}>
           {React.cloneElement(I.chevronL, { size: 14 })} Back to Courses
         </button>
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 360px', gap: 20 }}>
           <div>
             <Card pad={false} style={{ overflow: 'hidden' }}>
               <div className="viz-placeholder" style={{ height: 280, position: 'relative' }}>
@@ -531,8 +569,8 @@ export default function Courses() {
   }
 
   return (
-    <PageScroll>
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 340px', gap: 16 }}>
+    <PageScroll wide>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: 20 }}>
         <div>
           <div style={{ marginBottom: 24 }}>
             <Tag tone="accent" style={{ marginBottom: 12 }}>{I.spark} Yours · Open-source · AI-Powered</Tag>
@@ -595,7 +633,7 @@ export default function Courses() {
               {tab !== 'browse' && <Btn variant="outline" onClick={() => setTab('browse')}>Browse courses</Btn>}
             </Card>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginTop: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16, marginTop: 16 }}>
               {filtered.map((c) => <CourseCard key={c.slug} c={c} starred={!!starred[c.slug]} enrolled={!!enrolled[c.slug]} onToggleStar={() => toggleStar(c.slug)} onEnroll={() => enroll(c.slug, c.title)} onSelect={() => setSelectedCourse(c)} toast={toast} />)}
             </div>
           )}

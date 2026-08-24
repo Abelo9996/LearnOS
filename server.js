@@ -55,15 +55,14 @@ app.use(helmet({
       connectSrc: ["'self'"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       objectSrc: ["'none'"],
-      // Sources a lesson can embed in place rather than linking away to. Kept
-      // to providers that publish an embed endpoint and match embedFor() in
-      // src/screens/Courses.jsx — anything else falls back to a link.
-      frameSrc: [
-        "'self'",
-        "https://www.youtube-nocookie.com", "https://www.youtube.com",
-        "https://player.vimeo.com",
-        "https://arxiv.org",
-      ],
+      // A lesson embeds its source directly — the video plays, the article and
+      // the paper are read — inside the course, rather than bouncing the learner
+      // out to a tab. That means framing arbitrary https origins, so the policy
+      // is the scheme rather than a hand-maintained host list. Whether a given
+      // site actually permits framing is decided per-URL server-side (it may
+      // send X-Frame-Options / frame-ancestors), so the UI only ever embeds one
+      // that will render and falls back to a link otherwise.
+      frameSrc: ["'self'", "https:"],
       imgSrc: ["'self'", "data:", "blob:", "https://i.ytimg.com"],
     },
   },
