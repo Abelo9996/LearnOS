@@ -210,6 +210,26 @@ const H = {
 };
 
 /**
+ * Undo one erroneous JSON-escape layer when generated content was stored that
+ * way — the failure that showed a lesson as a wall of literal "\n" with
+ * "\\mathbf" in the maths.
+ *
+ * A model sometimes emits its body as if it would be JSON-parsed twice, so what
+ * lands in the DB has escaped newlines ("\n" as two characters), escaped tabs,
+ * and double-backslashed LaTeX commands. The tell is unmistakable: the string
+ * carries NO real newlines but DOES carry literal "\n". Only then do we reverse
+ * exactly one escape level — which turns "\n"→newline, "\t"→tab and
+ * "\\mathbf"→"\mathbf" (and a matrix's "\\\\"→"\\", still a valid LaTeX row
+ * break) all at once. Content that already has real newlines is left untouched,
+ * so a legitimate "\n" inside a code sample is never disturbed.
+ */
+function normalizeContent(text) {
+  if (/\n/.test(text) || !/\\n/.test(text)) return text;
+  const map = { '"': '"', '\\': '\\', '/': '/', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t' };
+  return text.replace(/\\(["\\/bfnrt])/g, (_, c) => map[c]);
+}
+
+/**
  * MarkdownText — renders generated content.
  *
  * `prose` turns on long-form reading: a measure of about 68 characters and a
@@ -220,7 +240,7 @@ const H = {
 export default function MarkdownText({ text, citationMap, prose = false, stripTitle }) {
   if (!text) return null;
 
-  const normalized = text.includes('```') ? text : text.replace(/\\n/g, '\n');
+  const normalized = normalizeContent(text);
   let lines = normalized.split('\n');
 
   // The generator usually opens a lesson body with an H1 repeating the lesson's
