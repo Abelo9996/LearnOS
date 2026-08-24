@@ -9,6 +9,9 @@ import { useUser } from '../UserContext.jsx';
 import MarkdownText from '../components/Markdown';
 import QuizModal from '../components/QuizModal.jsx';
 
+// Excalidraw is large — only pulled in when the Whiteboard tab is opened.
+const Whiteboard = React.lazy(() => import('../components/Whiteboard.jsx'));
+
 export default function Session({ setScreen }) {
   const { add: toast } = useToast();
   const { open: openModal, close: closeModal } = useModal();
@@ -564,7 +567,11 @@ function VisualizerColumn({ vizTab, setVizTab, complexity, setComplexity, sessio
         </div>
         {(vizTab === 'notes' || vizTab === 'visualizer') && <SessionNotes session={session} />}
         {vizTab === 'code' && <CodeView session={session} />}
-        {vizTab === 'whiteboard' && <WhiteboardView session={session} />}
+        {vizTab === 'whiteboard' && (
+          <React.Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Loading the whiteboard…</div>}>
+            <Whiteboard session={session} />
+          </React.Suspense>
+        )}
       </Card>
     </div>
   );
@@ -669,180 +676,8 @@ function CodeView({ session }) {
   );
 }
 
-function WhiteboardView({ session }) {
-  const canvasRef = React.useRef(null);
-  const [tool, setTool]       = React.useState('pen');
-  const [drawing, setDrawing] = React.useState(false);
-  const [lastPos, setLastPos] = React.useState(null);
-  const [strokes, setStrokes] = React.useState([]);
-  const [loading, setLoading] = React.useState(true);
-
-  const sid = session?.id || 'local';
-  const isOnline = sid && sid !== 'local';
-
-  React.useEffect(() => {
-    if (!isOnline) { setLoading(false); return; }
-    setLoading(true);
-    API.getWhiteboardStrokes(sid)
-      .then(rows => { setStrokes(rows || []); })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [sid, isOnline]);
-
-  const redrawCanvas = React.useCallback(() => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, 9999, 9999);
-    for (const s of strokes) {
-      try {
-        const st = JSON.parse(s.stroke_json);
-        if (!st.points || st.points.length < 2) continue;
-        ctx.beginPath();
-        ctx.moveTo(st.points[0].x, st.points[0].y);
-        for (let i = 1; i < st.points.length; i++) {
-          ctx.lineTo(st.points[i].x, st.points[i].y);
-        }
-        ctx.strokeStyle = st.color || 'oklch(0.78 0.16 195)';
-        ctx.lineWidth   = st.width || 2;
-        ctx.lineCap     = 'round';
-        ctx.lineJoin    = 'round';
-        ctx.stroke();
-      } catch {}
-    }
-  }, [strokes]);
-
-  React.useEffect(() => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const fit = () => {
-      const r = canvas.getBoundingClientRect();
-      if (!r.width) return;
-      const dpr = window.devicePixelRatio || 1;
-      canvas.width  = Math.round(r.width  * dpr);
-      canvas.height = Math.round(r.height * dpr);
-      const ctx = canvas.getContext('2d');
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      redrawCanvas();
-    };
-    fit();
-    window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
-  }, [redrawCanvas]);
-
-  React.useEffect(() => { redrawCanvas(); }, [strokes, redrawCanvas]);
-
-  const getPos = (e, canvas) => {
-    const r = canvas.getBoundingClientRect();
-    const src = e.touches ? e.touches[0] : e;
-    return { x: src.clientX - r.left, y: src.clientY - r.top };
-  };
-
-  const currentColor = () => tool === 'highlight' ? 'oklch(0.78 0.16 85 / 0.5)' : 'oklch(0.78 0.16 195)';
-  const currentWidth = () => tool === 'highlight' ? 12 : 2;
-
-  const startDraw = (e) => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    setDrawing(true);
-    const pos = getPos(e, canvas);
-    setLastPos(pos);
-    setStrokes(prev => [...prev, { id: `local-${Date.now()}`, stroke_json: JSON.stringify({ tool, points: [pos], color: currentColor(), width: currentWidth() }) }]);
-  };
-
-  const draw = (e) => {
-    if (!drawing) return;
-    const canvas = canvasRef.current; if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const pos = getPos(e, canvas);
-    if (tool === 'eraser') {
-      ctx.clearRect(pos.x - 10, pos.y - 10, 20, 20);
-    } else {
-      ctx.beginPath();
-      ctx.moveTo(lastPos.x, lastPos.y);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.strokeStyle = currentColor();
-      ctx.lineWidth   = currentWidth();
-      ctx.lineCap     = 'round';
-      ctx.stroke();
-    }
-    setStrokes(prev => {
-      const updated = [...prev];
-      const last = { ...updated[updated.length - 1] };
-      try {
-        const st = JSON.parse(last.stroke_json);
-        st.points.push(pos);
-        last.stroke_json = JSON.stringify(st);
-      } catch {}
-      updated[updated.length - 1] = last;
-      return updated;
-    });
-    setLastPos(pos);
-  };
-
-  const stopDraw = async () => {
-    if (!drawing) return;
-    setDrawing(false);
-    setLastPos(null);
-    if (isOnline && strokes.length > 0) {
-      const last = strokes[strokes.length - 1];
-      if (last.id.startsWith('local-')) {
-        try {
-          const res = await API.saveWhiteboardStroke(sid, { stroke_json: last.stroke_json });
-          setStrokes(prev => {
-            const updated = [...prev];
-            updated[updated.length - 1] = { ...updated[updated.length - 1], id: res.id };
-            return updated;
-          });
-        } catch {}
-      }
-    }
-  };
-
-  const handleUndo = async () => {
-    if (strokes.length === 0) return;
-    const last = strokes[strokes.length - 1];
-    setStrokes(prev => prev.slice(0, -1));
-    if (isOnline && !last.id.startsWith('local-')) {
-      try { await API.deleteWhiteboardStroke(sid, last.id); } catch {}
-    }
-  };
-
-  const handleClear = async () => {
-    setStrokes([]);
-    if (isOnline) {
-      try { await API.clearWhiteboardStrokes(sid); } catch {}
-    }
-  };
-
-  const tools = [
-    { id: 'pen',       label: 'Pen'       },
-    { id: 'highlight', label: 'Highlight' },
-    { id: 'eraser',    label: 'Eraser'    },
-  ];
-
-  return (
-    <div style={{ padding: 14 }}>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-        {tools.map(t => (
-          <button key={t.id} onClick={() => setTool(t.id)} style={{
-            padding: '4px 12px', borderRadius: 6, border: `1px solid ${tool === t.id ? 'var(--accent-line)' : 'var(--border)'}`,
-            background: tool === t.id ? 'var(--accent-soft)' : 'var(--surface)',
-            color: tool === t.id ? 'oklch(0.82 0.18 295)' : 'var(--muted)',
-            fontSize: 11.5, fontWeight: 600, cursor: 'pointer',
-          }}>{t.label}</button>
-        ))}
-        <button onClick={handleUndo} disabled={strokes.length === 0} style={{ marginLeft: 'auto', padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: strokes.length === 0 ? 'var(--faint)' : 'var(--muted)', fontSize: 11.5, cursor: strokes.length === 0 ? 'not-allowed' : 'pointer' }}>Undo</button>
-        <button onClick={handleClear} disabled={strokes.length === 0} style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)', background: 'var(--surface)', color: strokes.length === 0 ? 'var(--faint)' : 'var(--muted)', fontSize: 11.5, cursor: strokes.length === 0 ? 'not-allowed' : 'pointer' }}>Clear</button>
-      </div>
-      {loading && (
-        <div style={{ padding: '4px 0', fontSize: 11, color: 'var(--muted)' }}>Loading whiteboard…</div>
-      )}
-      <canvas
-        ref={canvasRef}
-        onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw}
-        style={{ width: '100%', height: 200, borderRadius: 8, background: 'oklch(0.16 0.025 270)', cursor: tool === 'eraser' ? 'cell' : 'crosshair', display: 'block' }}
-      />
-    </div>
-  );
-}
+// WhiteboardView (freehand canvas) was replaced by the Excalidraw-based
+// components/Whiteboard.jsx, lazy-loaded above.
 
 function RightRail({ onExport, setScreen, session }) {
   const [outline, setOutline] = React.useState([]);
