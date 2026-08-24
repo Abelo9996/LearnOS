@@ -1,9 +1,59 @@
 import { Router } from 'express';
+import { fsrs, generatorParameters, createEmptyCard, Rating, State } from 'ts-fsrs';
 import db, { awardXP } from '../db/database.js';
 
 const router = Router();
 
 const parse = (s, fb) => { try { return s ? JSON.parse(s) : fb; } catch { return fb; } };
+
+// FSRS-6 scheduler with default parameters. Those defaults already beat SM-2
+// out of the box; the optimizer only pays off after a few hundred reviews, so a
+// single self-hosted learner runs on the defaults indefinitely and it's still
+// better than what we hand-rolled. One shared instance — it's stateless.
+const scheduler = fsrs(generatorParameters({ enable_fuzz: true }));
+const GRADE_TO_RATING = { again: Rating.Again, hard: Rating.Hard, good: Rating.Good, easy: Rating.Easy };
+const dayStr = (d) => new Date(d).toISOString().slice(0, 10);
+
+/** Reconstruct an FSRS card from a stored row (or a fresh one if never reviewed). */
+function toFsrsCard(row) {
+  if (row.stability == null || row.state == null) return createEmptyCard(new Date());
+  return {
+    due: new Date((row.next_review ? row.next_review + 'T00:00:00Z' : new Date().toISOString())),
+    stability: row.stability,
+    difficulty: row.difficulty ?? 5,
+    elapsed_days: 0,
+    scheduled_days: row.interval_days || 0,
+    reps: row.reps || 0,
+    lapses: row.lapses || 0,
+    learning_steps: 0,
+    state: row.state ?? State.New,
+    last_review: row.last_review ? new Date(row.last_review) : undefined,
+  };
+}
+
+// Human "next due" for the review buttons — FSRS returns a real timestamp per
+// grade, so the labels reflect this card's actual schedule instead of fixed
+// guesses.
+function humanizeDue(due, now) {
+  const mins = Math.max(1, Math.round((new Date(due) - now) / 60000));
+  if (mins < 60) return `${mins}m`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h`;
+  const days = Math.round(hrs / 24);
+  if (days < 30) return `${days}d`;
+  const mo = Math.round(days / 30);
+  return mo < 12 ? `${mo}mo` : `${Math.round(mo / 12)}y`;
+}
+
+function previewFor(row, now) {
+  const sched = scheduler.repeat(toFsrsCard(row), now);
+  return {
+    again: humanizeDue(sched[Rating.Again].card.due, now),
+    hard: humanizeDue(sched[Rating.Hard].card.due, now),
+    good: humanizeDue(sched[Rating.Good].card.due, now),
+    easy: humanizeDue(sched[Rating.Easy].card.due, now),
+  };
+}
 
 /**
  * Turn a graded quiz item into a recall card: the question on the front, the
@@ -36,7 +86,10 @@ router.get('/', (req, res) => {
 
 router.get('/due', (req, res) => {
   const cards = db.prepare("SELECT * FROM flashcards WHERE user_id = ? AND (next_review IS NULL OR next_review <= date('now')) ORDER BY RANDOM()").all(req.userId);
-  res.json(cards);
+  const now = new Date();
+  // Attach FSRS's real per-grade schedule so the review buttons show what each
+  // answer will actually do to this card, not fixed guesses.
+  res.json(cards.map(c => ({ ...c, preview: previewFor(c, now) })));
 });
 
 router.post('/', (req, res) => {
@@ -48,50 +101,40 @@ router.post('/', (req, res) => {
   res.json({ ok: true, card: db.prepare('SELECT * FROM flashcards WHERE id = ?').get(id) });
 });
 
-// SM-2 algorithm: grade is 'again' | 'hard' | 'good' | 'easy'
+// FSRS-6 scheduling. grade is 'again' | 'hard' | 'good' | 'easy'.
 router.post('/:id/review', (req, res) => {
   const { grade } = req.body;
-  if (!grade) return res.status(400).json({ error: true, message: 'grade required' });
+  const rating = GRADE_TO_RATING[grade];
+  if (!rating) return res.status(400).json({ error: true, message: 'grade must be again|hard|good|easy' });
 
   const card = db.prepare('SELECT * FROM flashcards WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
   if (!card) return res.status(404).json({ error: true, message: 'Card not found' });
 
-  let { reps, ease_factor, interval_days } = card;
-  reps += 1;
+  const now = new Date();
+  // FSRS reads the card's stability/difficulty/state and elapsed time and
+  // returns the updated card plus a review log. It predicts recall probability
+  // rather than nudging a single ease factor, which is why its intervals hold
+  // up far better than SM-2's.
+  const { card: nc, log } = scheduler.next(toFsrsCard(card), now, rating);
+  const nextReview = dayStr(nc.due);
 
-  // SM-2 logic (simplified)
-  const qualityMap = { again: 0, hard: 3, good: 4, easy: 5 };
-  const q = qualityMap[grade] ?? 4;
+  db.prepare(`UPDATE flashcards SET reps = ?, interval_days = ?, next_review = ?,
+              stability = ?, difficulty = ?, state = ?, lapses = ?, last_review = ? WHERE id = ?`)
+    .run(nc.reps, nc.scheduled_days, nextReview, nc.stability, nc.difficulty, nc.state, nc.lapses, now.toISOString(), card.id);
 
-  ease_factor = Math.max(1.3, ease_factor + (0.1 - (5 - q) * (0.08 + (5 - q) * 0.02)));
+  // The review log keeps ease_factor/interval_days columns fed for anything
+  // still reading them; stability is the real signal now.
+  const rid = `fr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  try {
+    db.prepare('INSERT INTO flashcard_reviews (id, card_id, grade, ease_factor, interval_days) VALUES (?, ?, ?, ?, ?)')
+      .run(rid, card.id, grade, nc.difficulty, nc.scheduled_days);
+  } catch { /* logging is best-effort */ }
 
-  if (grade === 'again') {
-    reps = 0;
-    interval_days = 0; // < 1 min — re-queued now
-  } else if (reps === 1) {
-    interval_days = 1;
-  } else if (reps === 2) {
-    interval_days = 6;
-  } else {
-    interval_days = Math.round(interval_days * ease_factor);
-  }
-
-  const nextReview = interval_days === 0 ? new Date().toISOString().split('T')[0] : new Date(Date.now() + interval_days * 86400000).toISOString().split('T')[0];
-
-  db.prepare('UPDATE flashcards SET reps = ?, ease_factor = ?, interval_days = ?, next_review = ? WHERE id = ?')
-    .run(reps, ease_factor, interval_days, nextReview, card.id);
-
-  // Log review
-  const rid = `fr-${Date.now()}`;
-  db.prepare('INSERT INTO flashcard_reviews (id, card_id, grade, ease_factor, interval_days) VALUES (?, ?, ?, ?, ?)')
-    .run(rid, card.id, grade, ease_factor, interval_days);
-
-  // Award XP for reviewing (5 XP base + bonus for easy)
   const xpMap = { again: 2, hard: 5, good: 8, easy: 12 };
   const xp = xpMap[grade] || 5;
   awardXP(req.userId, xp);
 
-  res.json({ ok: true, xp_earned: xp, card: db.prepare('SELECT * FROM flashcards WHERE id = ?').get(card.id), next_review: nextReview });
+  res.json({ ok: true, xp_earned: xp, next_review: nextReview, interval_days: nc.scheduled_days, state: State[nc.state] });
 });
 
 router.delete('/:id', (req, res) => {

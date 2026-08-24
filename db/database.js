@@ -557,6 +557,17 @@ try {
   db.exec("CREATE INDEX IF NOT EXISTS idx_wb_strokes_session ON whiteboard_strokes(session_id)");
 } catch (e) { console.log('whiteboard_strokes migration:', e.message); }
 
+// ── Migration: FSRS spaced-repetition state on flashcards ────────────────────
+// The reviewer moved from a hand-rolled SM-2 to FSRS-6 (ts-fsrs), which tracks
+// per-card stability/difficulty/state rather than a single ease factor. These
+// columns hold that state; existing cards have them NULL and get a fresh FSRS
+// card on their next review. reps/interval_days/next_review already exist.
+try { db.exec("ALTER TABLE flashcards ADD COLUMN stability REAL"); } catch {}
+try { db.exec("ALTER TABLE flashcards ADD COLUMN difficulty REAL"); } catch {}
+try { db.exec("ALTER TABLE flashcards ADD COLUMN state INTEGER DEFAULT 0"); } catch {}
+try { db.exec("ALTER TABLE flashcards ADD COLUMN lapses INTEGER DEFAULT 0"); } catch {}
+try { db.exec("ALTER TABLE flashcards ADD COLUMN last_review TEXT"); } catch {}
+
 // ── Migration: roadmap node editing columns (§3.11) ───────────────────────────
 try { db.exec("ALTER TABLE roadmap_nodes ADD COLUMN last_replanned_at TEXT"); } catch {}
 // Quiz attempts — real, scored, persisted quiz results (feeds XP, activity, mastery).
