@@ -52,8 +52,11 @@ app.use(helmet({
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
+      // esm.sh serves the Excalidraw whiteboard fonts. LearnOS is self-hosted,
+      // not air-gapped, so a font CDN is acceptable — allow it for fonts and the
+      // fetch the font loader uses.
+      connectSrc: ["'self'", "https://esm.sh"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://esm.sh", "data:"],
       objectSrc: ["'none'"],
       // A lesson embeds its source directly — the video plays, the article and
       // the paper are read — inside the course, rather than bouncing the learner
@@ -84,7 +87,7 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Vary', 'Origin');
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,DELETE,OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   if (req.method === 'OPTIONS') return res.sendStatus(204);

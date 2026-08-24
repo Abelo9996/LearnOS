@@ -26,6 +26,7 @@ const API = {
 
   get:   (path)       => API.request('GET',    path),
   post:  (path, body) => API.request('POST',   path, body),
+  put:   (path, body) => API.request('PUT',    path, body),
   patch: (path, body) => API.request('PATCH',  path, body),
   del:   (path)       => API.request('DELETE', path),
 
@@ -239,6 +240,9 @@ const API = {
   saveWhiteboardStroke: (sid, stroke) => API.post(`/sessions/${sid}/whiteboard`, stroke),
   deleteWhiteboardStroke: (sid, strokeId) => API.del(`/sessions/${sid}/whiteboard/${strokeId}`),
   clearWhiteboardStrokes: (sid) => API.del(`/sessions/${sid}/whiteboard`),
+  // Excalidraw scene (the whole canvas as one JSON blob).
+  getWhiteboardScene:  (sid) => API.get(`/sessions/${sid}/whiteboard/scene`),
+  saveWhiteboardScene: (sid, scene) => API.put(`/sessions/${sid}/whiteboard/scene`, { scene }),
 
   // ── Roadmap node creation (§3.11) ──────────────────────────────────────────
   createRoadmapNode:    (rid, data) => API.post(`/roadmaps/${rid}/nodes`, data),

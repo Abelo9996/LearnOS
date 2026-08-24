@@ -27,6 +27,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "^0.18.1",
+    "@excalidraw/mermaid-to-excalidraw": "^2.2.2",
     "better-sqlite3": "^12.10.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",

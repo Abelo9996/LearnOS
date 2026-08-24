@@ -186,6 +186,25 @@ router.delete('/:id/whiteboard', (req, res) => {
   res.json({ ok: true });
 });
 
+// Excalidraw scene persistence. The whiteboard is now a full Excalidraw canvas,
+// whose state is one JSON scene rather than a list of freehand strokes — so it
+// is stored as a single upserted row keyed by the session, reusing this table.
+const sceneId = (sessionId) => `wb-scene-${sessionId}`;
+router.get('/:id/whiteboard/scene', (req, res) => {
+  const row = db.prepare('SELECT stroke_json FROM whiteboard_strokes WHERE id = ?').get(sceneId(req.params.id));
+  if (!row) return res.json({ ok: true, scene: null });
+  try { res.json({ ok: true, scene: JSON.parse(row.stroke_json) }); }
+  catch { res.json({ ok: true, scene: null }); }
+});
+router.put('/:id/whiteboard/scene', (req, res) => {
+  const scene = req.body?.scene;
+  if (!scene || typeof scene !== 'object') return res.status(400).json({ error: true, message: 'scene object required' });
+  db.prepare(`INSERT INTO whiteboard_strokes (id, session_id, stroke_json) VALUES (?, ?, ?)
+              ON CONFLICT(id) DO UPDATE SET stroke_json = excluded.stroke_json`)
+    .run(sceneId(req.params.id), req.params.id, JSON.stringify(scene));
+  res.json({ ok: true });
+});
+
 // Messages
 router.post('/:id/messages', (req, res) => {
   // The client sends `agent`; accept both so agent attribution is actually
