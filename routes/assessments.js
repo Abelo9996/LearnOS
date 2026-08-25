@@ -228,6 +228,25 @@ router.post('/assignment/:id/run', async (req, res) => {
 });
 
 /**
+ * POST /api/assessments/assignment/:id/step/:stepId/run  { source }
+ * Live "Run" for a coding step in an interactive assignment. Runs the learner's
+ * code against that step's VISIBLE test cases only — hidden cases are held back
+ * for grading, never returned here. This does not record a grade; submitting the
+ * whole assignment is what grades it (against visible + hidden cases).
+ */
+router.post('/assignment/:id/step/:stepId/run', async (req, res) => {
+  const a = db.prepare('SELECT steps_json FROM assignments WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
+  if (!a) return res.status(404).json({ error: true, message: 'Assignment not found' });
+  const steps = parse(a.steps_json, []);
+  const step = Array.isArray(steps) ? steps.find(s => s.id === req.params.stepId) : null;
+  if (!step || step.type !== 'code') return res.status(404).json({ error: true, message: 'Coding step not found' });
+
+  const visible = Array.isArray(step.tests) ? step.tests : [];
+  const result = await runLabWithTests({ source: req.body?.source ?? '', language: step.language || 'python', tests: visible });
+  res.json({ ok: true, ...result });
+});
+
+/**
  * GET /api/assessments/module/:moduleId/remediation
  *
  * The failure path. Coursera tells you that you scored 60% and leaves you to it;

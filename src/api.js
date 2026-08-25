@@ -160,6 +160,10 @@ const API = {
   submitModuleQuiz:   (moduleId, data) => API.post(`/assessments/module/${moduleId}/submit`, data),
   getModuleAttempts:  (moduleId) => API.get(`/assessments/module/${moduleId}/attempts`),
   runAssignmentTests: (id, source) => API.post(`/assessments/assignment/${id}/run`, { source }),
+  // Interactive step assignments (Phase 1): live-run a coding step's visible
+  // tests, and submit all step answers for composed grading.
+  runAssignmentStep:  (id, stepId, source) => API.post(`/assessments/assignment/${id}/step/${stepId}/run`, { source }),
+  submitAssignmentSteps: (id, answers) => API.post(`/assignments/${id}/submit-steps`, { answers }),
   getRemediation:     (moduleId) => API.get(`/assessments/module/${moduleId}/remediation`),
 
   // Executable labs (M8)

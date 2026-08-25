@@ -136,6 +136,13 @@ try { db.exec("ALTER TABLE assignments ADD COLUMN rubric_json TEXT"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN pass_threshold REAL"); } catch {}
 try { db.exec("ALTER TABLE assignments ADD COLUMN max_attempts INTEGER"); } catch {}
 
+// Interactive, multi-step assignments (Phase 1): instead of one free-text essay
+// box, a generated assignment is an ordered list of auto-gradeable steps — MCQs,
+// runnable coding tasks (judged against real test cases), and short focused
+// answers. The steps live here as JSON; a null column means a legacy
+// essay-style assignment, which the UI still renders via its fallback path.
+try { db.exec("ALTER TABLE assignments ADD COLUMN steps_json TEXT"); } catch {}
+
 // ── Community registry (opt-in, opt-out) ────────────────────────────────────
 // Where this instance publishes to, who it publishes as, and whether it talks
 // to a registry at all. registry_enabled defaults on but is genuinely
@@ -544,6 +551,12 @@ try {
   db.exec("CREATE INDEX IF NOT EXISTS idx_asgn_sub_user ON assignment_submissions(user_id)");
   db.exec("CREATE INDEX IF NOT EXISTS idx_asgn_sub_aid ON assignment_submissions(assignment_id)");
 } catch (e) { console.log('assignment_submissions migration:', e.message); }
+
+// Step-based submissions (Phase 1): the learner's per-step answers (selected MCQ
+// option, code, short text) and the composed per-step grading results. body_md
+// still holds a human-readable transcript for back-compat and the feed.
+try { db.exec("ALTER TABLE assignment_submissions ADD COLUMN answers_json TEXT"); } catch {}
+try { db.exec("ALTER TABLE assignment_submissions ADD COLUMN steps_result_json TEXT"); } catch {}
 
 // ── Migration: schedule reminder_sent_at (§3.8) ───────────────────────────────
 try { db.exec("ALTER TABLE schedule_events ADD COLUMN reminder_sent_at TEXT"); } catch {}
