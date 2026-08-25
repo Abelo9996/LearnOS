@@ -375,6 +375,12 @@ try {
     status TEXT DEFAULT 'queued',
     result_json TEXT,
     error TEXT,
+    -- progress (0..1) and progress_msg power the build progress bar. They MUST be
+    -- declared here, not only in the ALTER migrations above: those ALTERs run
+    -- before this CREATE, so on a fresh DB they throw (no table yet) and the
+    -- columns would otherwise never exist — leaving every build stuck at 0%.
+    progress REAL,
+    progress_msg TEXT,
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   )`);
