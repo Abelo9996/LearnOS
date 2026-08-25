@@ -268,16 +268,37 @@ export async function buildCourse({ userId, topic, level, pathwayContext, onProg
 
   onProgress(0.02, 'Designing the course blueprint…');
   const ctxLine = pathwayContext ? `\nPathway context: ${pathwayContext}` : '';
-  const bp = (await complete({
-    userId, agentCode: 'CR',
-    schema: blueprintSchema,
-    maxTokens: 4000,
-    system: BLUEPRINT_SYSTEM,
-    messages: `Topic: ${topic}\nTarget level: ${lvl}${ctxLine}\nDesign the blueprint.`,
-  })).json;
 
-  if (!bp || !bp.title || !Array.isArray(bp.modules) || !bp.modules.length) {
-    throw new Error('Curriculum agent returned an invalid blueprint');
+  // The blueprint is a single call that gates the ENTIRE build — one malformed
+  // or truncated JSON response would otherwise sink the whole course. It failed
+  // intermittently because a verbose model can run past the token budget and cut
+  // the JSON mid-object (parse → null). Retry a few times, raising the budget so
+  // a truncated response has room to complete on the next attempt.
+  const validBlueprint = (bp) => bp && bp.title && Array.isArray(bp.modules) && bp.modules.length > 0;
+  let bp = null, lastStop = null;
+  for (let attempt = 0; attempt < 3 && !validBlueprint(bp); attempt++) {
+    if (attempt > 0) onProgress(0.02, 'Refining the course blueprint…');
+    try {
+      const res = await complete({
+        userId, agentCode: 'CR',
+        schema: blueprintSchema,
+        maxTokens: 4000 + attempt * 2000, // 4k → 6k → 8k as we retry
+        system: BLUEPRINT_SYSTEM,
+        messages: `Topic: ${topic}\nTarget level: ${lvl}${ctxLine}\nDesign the blueprint.`,
+      });
+      bp = res.json;
+      lastStop = res.stopReason;
+    } catch (e) {
+      // A hard failure (e.g. no API key) should surface as itself, not as a
+      // generic "invalid blueprint".
+      if (attempt === 2) throw e;
+    }
+  }
+
+  if (!validBlueprint(bp)) {
+    throw new Error(lastStop === 'length'
+      ? 'The course blueprint was too long to finish generating — try a narrower topic.'
+      : 'Curriculum agent returned an invalid blueprint');
   }
 
   // Stage 2 — two calls per module. This is where the depth comes from, and it
