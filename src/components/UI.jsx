@@ -327,10 +327,12 @@ export function SectionHead({ title, action, subtitle }) {
 export function PageScroll({ children, wide = false }) {
   // Most screens read best at a fixed measure; browse-heavy ones (the course
   // catalog) should spread across the whole page instead of leaving big empty
-  // gutters on a wide monitor. `wide` opts into that without touching the rest.
+  // gutters on a wide monitor. `wide` fills the available width and lets the
+  // card grid flow more items per row as the window grows — the container's own
+  // 32px padding is the only gutter, so no dead whitespace is reserved.
   return (
     <div className="scroll" style={{ height: '100%', padding: '28px 32px 60px' }}>
-      <div style={{ maxWidth: wide ? 1760 : 1280, margin: '0 auto' }}>{children}</div>
+      <div style={{ maxWidth: wide ? '100%' : 1280, margin: '0 auto' }}>{children}</div>
     </div>
   );
 }
