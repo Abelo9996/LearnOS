@@ -237,23 +237,87 @@ function ChartBlock({ spec }) {
   );
 }
 
-/* ── Code block: says what language it is, and lets you take it away ───────── */
+/* ── Runnable Python (Pyodide) ──────────────────────────────────────────────
+   Python code blocks get a Run button that executes the snippet in the browser
+   via Pyodide (real CPython on WASM, numpy/pandas available), so a lesson's
+   examples are things you run, not just read. Pyodide is fetched from the CDN
+   on first Run, so it adds nothing to the bundle and works on existing lessons.
+   Imports are auto-installed; stdout/stderr stream into a console strip. */
+const PYODIDE_BASE = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
+let pyodidePromise = null;
+function loadPyodideRuntime() {
+  if (pyodidePromise) return pyodidePromise;
+  pyodidePromise = (async () => {
+    if (!window.loadPyodide) {
+      await new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = `${PYODIDE_BASE}pyodide.js`;
+        s.onload = resolve; s.onerror = reject;
+        document.head.appendChild(s);
+      });
+    }
+    return window.loadPyodide({ indexURL: PYODIDE_BASE });
+  })();
+  return pyodidePromise;
+}
+const isRunnablePython = (lang) => /^(py|python)$/i.test(lang || '');
+
+/* ── Code block: says what language it is, runs Python, and lets you copy it ── */
 function CodeBlock({ code, lang }) {
   const [copied, setCopied] = React.useState(false);
+  const [output, setOutput] = React.useState(null);
+  const [running, setRunning] = React.useState(false);
+  const runnable = isRunnablePython(lang);
+
   const copy = () => {
     navigator.clipboard?.writeText(code)
       .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1600); })
       .catch(() => {});
   };
+
+  const run = async () => {
+    setRunning(true);
+    setOutput('Loading Python…');
+    try {
+      const py = await loadPyodideRuntime();
+      let out = '';
+      py.setStdout({ batched: (s) => { out += s + '\n'; } });
+      py.setStderr({ batched: (s) => { out += s + '\n'; } });
+      try { await py.loadPackagesFromImports(code); } catch { /* best-effort auto-install */ }
+      setOutput('Running…');
+      try { await py.runPythonAsync(code); }
+      catch (e) { out += String(e?.message || e); }
+      setOutput(out.trim() || '(ran with no output)');
+    } catch {
+      setOutput('Could not load the Python runtime (needs a network connection). Try again.');
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const headBtn = { background: 'none', border: 0, cursor: 'pointer', fontSize: 11, padding: '2px 4px', transition: 'color var(--dur-fast)' };
   return (
     <div style={{ margin: '16px 0', borderRadius: 10, border: '1px solid oklch(0.30 0.02 270)', overflow: 'hidden', background: 'oklch(0.20 0.02 270)', boxShadow: 'var(--shadow-sm)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', borderBottom: '1px solid oklch(0.30 0.02 270)', background: 'oklch(0.25 0.02 270)' }}>
         <span className="mono" style={{ fontSize: 10, color: 'oklch(0.70 0.02 270)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{lang || 'code'}</span>
-        <button onClick={copy} style={{ background: 'none', border: 0, cursor: 'pointer', fontSize: 11, color: copied ? 'oklch(0.82 0.15 155)' : 'oklch(0.70 0.02 270)', padding: '2px 4px', transition: 'color var(--dur-fast)' }}>
-          {copied ? '✓ copied' : 'copy'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          {runnable && (
+            <button onClick={run} disabled={running} style={{ ...headBtn, color: running ? 'oklch(0.60 0.02 270)' : 'oklch(0.78 0.16 155)', cursor: running ? 'default' : 'pointer' }}>
+              {running ? 'running…' : '▶ run'}
+            </button>
+          )}
+          <button onClick={copy} style={{ ...headBtn, color: copied ? 'oklch(0.82 0.15 155)' : 'oklch(0.70 0.02 270)' }}>
+            {copied ? '✓ copied' : 'copy'}
+          </button>
+        </div>
       </div>
       <pre style={{ margin: 0, padding: '13px 15px', fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.65, color: 'oklch(0.90 0.015 270)', overflowX: 'auto', whiteSpace: 'pre', tabSize: 2 }}>{code}</pre>
+      {output != null && (
+        <div style={{ borderTop: '1px solid oklch(0.30 0.02 270)', background: 'oklch(0.16 0.02 270)', padding: '10px 15px', fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.55, color: 'oklch(0.86 0.02 270)', whiteSpace: 'pre-wrap', maxHeight: 260, overflow: 'auto' }}>
+          <span className="mono" style={{ fontSize: 9.5, color: 'oklch(0.60 0.02 270)', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 5 }}>output</span>
+          {output}
+        </div>
+      )}
     </div>
   );
 }
