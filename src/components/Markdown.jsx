@@ -180,6 +180,62 @@ function Mermaid({ code }) {
   );
 }
 
+/* ── Data charts (Observable Plot) ──────────────────────────────────────────
+   A ```chart fence carrying a small JSON spec ({type,x,y,series?,title?,data})
+   renders a real chart, so a trend in a stats/ML/econ lesson is shown rather
+   than described in another paragraph. Loaded on demand, and falls back to the
+   raw spec as a code block if the JSON or the render fails. */
+let plotMod = null, plotPromise = null;
+function loadPlot() {
+  if (plotMod) return Promise.resolve(plotMod);
+  plotPromise ||= import('@observablehq/plot').then(m => (plotMod = m));
+  return plotPromise;
+}
+function ChartBlock({ spec }) {
+  const ref = React.useRef(null);
+  const [failed, setFailed] = React.useState(false);
+  const [title, setTitle] = React.useState(null);
+  React.useEffect(() => {
+    let alive = true;
+    let p;
+    try { p = JSON.parse(spec); } catch { setFailed(true); return; }
+    setTitle(p.title || null);
+    loadPlot().then((Plot) => {
+      if (!alive || !ref.current) return;
+      try {
+        const data = Array.isArray(p.data) ? p.data : [];
+        const x = p.x, y = p.y, series = p.series || undefined;
+        const color = 'oklch(0.54 0.17 285)';
+        const common = { x, y };
+        const type = (p.type || 'line').toLowerCase();
+        const marks = [Plot.gridY({ stroke: 'oklch(0.90 0.008 85)' })];
+        if (type === 'bar') marks.push(Plot.barY(data, { ...common, fill: series || color }));
+        else if (type === 'scatter' || type === 'dot') marks.push(Plot.dot(data, { ...common, stroke: series || color, r: 3.5 }));
+        else if (type === 'area') { marks.push(Plot.areaY(data, { ...common, fill: series || color, fillOpacity: 0.16 })); marks.push(Plot.lineY(data, { ...common, stroke: series || color, strokeWidth: 2 })); }
+        else marks.push(Plot.lineY(data, { ...common, stroke: series || color, strokeWidth: 2 }));
+        const chart = Plot.plot({
+          width: 680, height: 320, marginLeft: 56, marginBottom: 44, marginRight: 16, marginTop: 12,
+          style: { background: 'transparent', color: 'oklch(0.42 0.012 75)', fontFamily: 'var(--font-body)', fontSize: '12px', overflow: 'visible' },
+          x: { label: x || null, labelAnchor: 'center' },
+          y: { label: y || null },
+          ...(series ? { color: { legend: true, scheme: 'tableau10' } } : {}),
+          marks,
+        });
+        ref.current.innerHTML = '';
+        ref.current.append(chart);
+      } catch { if (alive) setFailed(true); }
+    }).catch(() => { if (alive) setFailed(true); });
+    return () => { alive = false; };
+  }, [spec]);
+  if (failed) return <CodeBlock code={spec} lang="chart" />;
+  return (
+    <figure style={{ margin: '16px 0', padding: 14, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, overflowX: 'auto' }}>
+      <div ref={ref} style={{ minHeight: 60 }} />
+      {title && <figcaption style={{ marginTop: 8, textAlign: 'center', fontSize: 12, color: 'var(--muted)' }}>{title}</figcaption>}
+    </figure>
+  );
+}
+
 /* ── Code block: says what language it is, and lets you take it away ───────── */
 function CodeBlock({ code, lang }) {
   const [copied, setCopied] = React.useState(false);
@@ -333,9 +389,12 @@ export default function MarkdownText({ text, citationMap, prose = false, stripTi
       i++;
       while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) { code.push(lines[i]); i++; }
       const body = code.join('\n');
-      elements.push(fence[1] === 'mermaid'
-        ? <Mermaid key={`m-${i}`} code={body} />
-        : <CodeBlock key={`c-${i}`} code={body} lang={fence[1]} />);
+      const flang = (fence[1] || '').toLowerCase();
+      elements.push(
+        flang === 'mermaid' ? <Mermaid key={`m-${i}`} code={body} />
+        : (flang === 'chart' || flang === 'plot') ? <ChartBlock key={`ch-${i}`} spec={body} />
+        : <CodeBlock key={`c-${i}`} code={body} lang={fence[1]} />
+      );
       continue;
     }
 
