@@ -1,4 +1,4 @@
-# Round 4 Test Results — 2026-06-05
+# Round 4 Test Results, 2026-06-05
 
 ## Baseline: ✅ ALL PASSING
 - `npm install` → clean
@@ -15,7 +15,7 @@
 
 ## New Features: Issues Found
 
-### CRITICAL — Route Mounting Order in server.js
+### CRITICAL, Route Mounting Order in server.js
 **Problem:** `app.use('/api/courses', courseRoutes)` at line 67 is BEFORE `app.use('/api', requireAuth)` at line 70.
 **Effect:** ALL routes in courses.js that need `req.userId` fail (modules, lessons, progress, verification).
 **Fix:** Move `app.use('/api/courses', courseRoutes)` to after line 70, alongside other protected routes. The original `GET /` (course browse) in courses.js doesn't use requireAuth, and `GET /:slug` uses it but will now work correctly after the auth middleware runs.
@@ -24,7 +24,7 @@
 - **Backend:** ✅ `onboarded_at` column exists in user_settings
 - **Frontend:** ✅ `Onboarding.jsx` created and wired into `App.jsx`
 - **Test needed:** Register new account → verify onboarding appears → submit → verify roadmap generates
-- **Risk:** `checkOnboarding()` in App.jsx calls `API.getRoadmaps()` and `API.getUserSettings()` — both should work for new users (empty roadmaps, no settings row yet). The `getUserSettings` route in users.js should handle missing rows gracefully.
+- **Risk:** `checkOnboarding()` in App.jsx calls `API.getRoadmaps()` and `API.getUserSettings()`, both should work for new users (empty roadmaps, no settings row yet). The `getUserSettings` route in users.js should handle missing rows gracefully.
 
 ### §3.2 Course Modules/Lessons
 - **Backend:** Routes created in courses.js, tables created via migration
@@ -34,13 +34,13 @@
 
 ### §3.3 File Uploads
 - **Backend:** ✅ `POST /api/uploads` created with multer, mounted after `requireAuth`
-- **Issue:** Uploads route at `/api/uploads` IS after auth (line 73) — should work
+- **Issue:** Uploads route at `/api/uploads` IS after auth (line 73), should work
 - **Test:** `curl -X POST -H "Authorization: Bearer $TOKEN" -F "file=@test.png" /api/uploads`
 - **Frontend:** Not yet wired (file pickers needed in Community, Settings, CreateCourseModal)
 
 ### §3.5 LLM Grading
 - **Backend:** ✅ `assignment_submissions` table, `gradeSubmission()` function, `POST /api/assignments/:id/submit`
-- **Issue:** Assignment routes mounted at `/api/assignments` which IS after auth — should work
+- **Issue:** Assignment routes mounted at `/api/assignments` which IS after auth, should work
 - **Test:** `POST /api/assignments/a5/submit {"body_md":"test"}` → should return submission row
 - **Frontend:** Not yet wired (submission textarea not in AssignmentWorkModal)
 
@@ -77,32 +77,32 @@
 
 ### §3.13 Password Reset + Email
 - **Backend:** ✅ `email_verifications`, `password_resets` tables; `forgot`/`reset`/`verify` routes
-- **Issue:** `/api/auth/forgot` returned "Missing token" — needs investigation after server.js fix
+- **Issue:** `/api/auth/forgot` returned "Missing token", needs investigation after server.js fix
 - **Register:** Verification token generation added to register route
 - **Frontend:** Not yet wired (forgot password link, reset password form)
 
 ### §3.14 SSRF Protection
 - **Backend:** ✅ `isPublicUrl()` + `resolvesToPublicIp()` in research.js
-- **Issue:** Test resource seeding failed (node not found via API) — needs re-test after server.js fix
+- **Issue:** Test resource seeding failed (node not found via API), needs re-test after server.js fix
 - **Expected behavior:** Seeding `http://169.254.169.254/` and running verifier → `status='rejected'`
 
 ## Priority Fix List for Next Agent
 
-1. **Fix server.js route mounting** — Move `app.use('/api/courses', courseRoutes)` after `app.use('/api', requireAuth)` (around line 107, before `/api/schedule`)
+1. **Fix server.js route mounting**, Move `app.use('/api/courses', courseRoutes)` after `app.use('/api', requireAuth)` (around line 107, before `/api/schedule`)
 2. **Re-test all new endpoints** after fix
-3. **Wire frontend for §3.3** — file upload in Community thread form, course thumbnails, user avatar
-4. **Wire frontend for §3.8** — 60s polling in App.jsx for schedule reminders
-5. **Wire frontend for §3.13** — forgot password link on login form, reset password screen
-6. **Wire frontend for §3.2** — CourseDetail module/lesson editor for authors, lesson reader + progress for learners
-7. **Wire frontend for §3.5** — submission textarea in AssignmentWorkModal, grading poll + feedback display
-8. **Wire frontend for §3.9** — verify button for admin users
-9. **Wire frontend for §3.10** — whiteboard stroke persistence in Session.jsx
-10. **Wire frontend for §3.11** — add/edit/delete node modals in Roadmap.jsx
-11. **Wire frontend for §3.12** — profile form in Settings, Avatar component update
+3. **Wire frontend for §3.3**, file upload in Community thread form, course thumbnails, user avatar
+4. **Wire frontend for §3.8**, 60s polling in App.jsx for schedule reminders
+5. **Wire frontend for §3.13**, forgot password link on login form, reset password screen
+6. **Wire frontend for §3.2**, CourseDetail module/lesson editor for authors, lesson reader + progress for learners
+7. **Wire frontend for §3.5**, submission textarea in AssignmentWorkModal, grading poll + feedback display
+8. **Wire frontend for §3.9**, verify button for admin users
+9. **Wire frontend for §3.10**, whiteboard stroke persistence in Session.jsx
+10. **Wire frontend for §3.11**, add/edit/delete node modals in Roadmap.jsx
+11. **Wire frontend for §3.12**, profile form in Settings, Avatar component update
 
 ## Files Not Yet Fully Verified
-- `routes/uploads.js` — needs multer test
-- `routes/email.js` — needs Resend/dev test
-- `ai/agents/assessment.js` gradeSubmission() — needs job test
-- `ai/agents/curriculum.js` replanNode() — needs integration test
-- `ai/agents/research.js` SSRF check — needs verifier test
+- `routes/uploads.js`, needs multer test
+- `routes/email.js`, needs Resend/dev test
+- `ai/agents/assessment.js` gradeSubmission(), needs job test
+- `ai/agents/curriculum.js` replanNode(), needs integration test
+- `ai/agents/research.js` SSRF check, needs verifier test

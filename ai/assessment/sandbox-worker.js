@@ -5,7 +5,7 @@
  * buys two things node:vm alone cannot:
  *   1. a separate V8 isolate, so the submission has no reference to the server's
  *      objects, modules or scope;
- *   2. a hard kill — the parent can terminate() this thread, which stops async
+ *   2. a hard kill, the parent can terminate() this thread, which stops async
  *      hangs and event-loop starvation, not just synchronous infinite loops.
  *
  * Test cases arrive as DATA ({fn, args, expected}); nothing model-authored is

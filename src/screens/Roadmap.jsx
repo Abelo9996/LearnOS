@@ -88,7 +88,7 @@ export default function Roadmap({ onOpenSession, onOpenCourse }) {
   }, [loadAllRoadmaps, loadRoadmap]);
 
   // Generation lives in src/lib/generatePathway.js so that onboarding and this
-  // screen produce identical roadmaps — they used to differ.
+  // screen produce identical roadmaps, they used to differ.
   const handleGenerate = async ({ goal, level, hours }) => {
     closeModal();
     setGenerating(true);
@@ -188,7 +188,7 @@ export default function Roadmap({ onOpenSession, onOpenCourse }) {
     const n = node || sel;
     if (!n) return;
     if (n.status === 'locked') {
-      toast(`"${n.title}" is locked — complete prerequisites first.`, 'info');
+      toast(`"${n.title}" is locked, complete prerequisites first.`, 'info');
       return;
     }
     try {
@@ -299,7 +299,7 @@ export default function Roadmap({ onOpenSession, onOpenCourse }) {
           <span style={{ fontSize: 13, color: 'var(--ink)' }}>The Curriculum agent is designing your roadmap…</span>
         </Card>
       )}
-      {/* Placement diagnostic — a pathway starts where the learner actually is,
+      {/* Placement diagnostic, a pathway starts where the learner actually is,
           so surface it until they have demonstrated (completed) something. */}
       {r.kind === 'specialization' && r.placement_json && nodes.length > 0 && !nodes.some(n => n.status === 'done') && (
         <Card style={{ padding: 16, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 14, border: '1px solid var(--accent-line)' }}>
@@ -308,14 +308,14 @@ export default function Roadmap({ onOpenSession, onOpenCourse }) {
           </span>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)' }}>Find your starting point</div>
-            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>A short diagnostic checks what you already know — courses you can demonstrate get skipped.</div>
+            <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>A short diagnostic checks what you already know, courses you can demonstrate get skipped.</div>
           </div>
           <Btn variant="primary" size="md" onClick={() => openModal(
             <PlacementModal roadmapId={r.id} onCancel={closeModal} onDone={(res) => {
               closeModal();
               toast(res.skipped > 0
-                ? `Placement complete — ${res.skipped} course(s) skipped, starting at "${res.startNode}"`
-                : `Placement complete — starting from the beginning`, 'success');
+                ? `Placement complete, ${res.skipped} course(s) skipped, starting at "${res.startNode}"`
+                : `Placement complete, starting from the beginning`, 'success');
               loadRoadmap(r.id);
             }} />
           )}>Take the diagnostic</Btn>
@@ -358,7 +358,7 @@ function GenerateModal({ onGenerate, onCancel }) {
   return (
     <div style={{ minWidth: 440, maxWidth: 520 }}>
       <h3 className="display" style={{ fontSize: 22, marginBottom: 6 }}>Generate a roadmap</h3>
-      <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>Tell the Curriculum agent what you want to master — it designs an ordered sequence of courses that takes you there.</div>
+      <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16 }}>Tell the Curriculum agent what you want to master, it designs an ordered sequence of courses that takes you there.</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <div>
           <label className="cap" style={{ display: 'block', marginBottom: 4 }}>What do you want to master?</label>
@@ -457,7 +457,7 @@ function PlacementModal({ roadmapId, onDone, onCancel }) {
     <div style={{ minWidth: 480, maxWidth: 560 }}>
       <h3 className="display" style={{ fontSize: 22, marginBottom: 4 }}>Placement diagnostic</h3>
       <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 14 }}>
-        Answer what you can — courses you already demonstrate get marked done, and the pathway starts where you actually are. Skipping a question just counts it as "not yet".
+        Answer what you can, courses you already demonstrate get marked done, and the pathway starts where you actually are. Skipping a question just counts it as "not yet".
       </div>
       <div className="scroll" style={{ maxHeight: '50vh', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14, paddingRight: 6 }}>
         {questions.map((q, i) => (
@@ -523,7 +523,7 @@ function ViewToggle({ view, setView }) {
  * A pathway is a sequence of whole courses, so the map's job is to make the
  * route obvious: what comes first, what it unlocks, how far in you are, and how
  * much course sits behind each stage. The previous version drew 26px circles on
- * a serpentine grid — titles truncated to "Ethics and Political Philos…", an
+ * a serpentine grid, titles truncated to "Ethics and Political Philos…", an
  * unlabelled number inside each dot, a quarter of the canvas empty, and a long
  * sweeping arc wherever the snake wrapped. It looked like scattered dots rather
  * than a workflow.
@@ -693,7 +693,7 @@ function RoadmapGraph({ nodes, edges, selected, setSelected, highlightedIds = []
                       transition: 'background var(--dur) var(--ease), border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease), transform var(--dur) var(--ease)',
                     }}
                   >
-                    {/* status stripe — the one thing you should read at a glance */}
+                    {/* status stripe, the one thing you should read at a glance */}
                     <span style={{ position: 'absolute', left: 0, top: 12, bottom: 12, width: 3, borderRadius: 3, background: tone.line }} />
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
@@ -843,7 +843,7 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, open
         if (j && j.progress_msg) setBuildMsg(j.progress_msg);
         if (j?.status === 'done') {
           setBuildPct(1); setBuildMsg('Course ready');
-          toast && toast('Course ready — opening it', 'success');
+          toast && toast('Course ready, opening it', 'success');
           onMasteryChange && onMasteryChange();
           if (j.result?.slug && onOpenCourse) onOpenCourse(j.result.slug);
           setBuilding(false);
@@ -856,7 +856,7 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, open
           return;
         }
       }
-      toast && toast('Still building — the course will appear on this node when done', 'info');
+      toast && toast('Still building, the course will appear on this node when done', 'info');
     } catch (e) {
       toast && toast(e.message || 'Could not build course', 'error');
       setBuilding(false);
@@ -883,7 +883,7 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, open
       for (let i = 0; i < 10; i++) {
         const r = await API.getNodeResources(node.id).catch(() => []);
         setResources(r || []);
-        if ((r || []).length === count && i > 2) break; // stable — verifiers done
+        if ((r || []).length === count && i > 2) break; // stable, verifiers done
         count = (r || []).length;
         await new Promise(res => setTimeout(res, 2000));
       }
@@ -994,7 +994,7 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, open
           <div>
             <div className="cap" style={{ marginBottom: 8 }}>Prerequisites</div>
             {prereqs.length === 0 ? (
-              <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>None — you can start this any time.</div>
+              <div style={{ fontSize: 12.5, color: 'var(--muted)' }}>None, you can start this any time.</div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {prereqs.map(p => (
@@ -1019,11 +1019,11 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, open
             </div>
             {isLocked ? (
               <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5 }}>
-                Complete prerequisites — the Research agent will assemble vetted resources once this module unlocks.
+                Complete prerequisites, the Research agent will assemble vetted resources once this module unlocks.
               </div>
             ) : resources.length === 0 ? (
               <div style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5 }}>
-                No verified resources yet. Click <em>Propose more</em> to ask the Research agent — you'll need an OpenRouter key configured in Settings.
+                No verified resources yet. Click <em>Propose more</em> to ask the Research agent, you'll need an OpenRouter key configured in Settings.
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

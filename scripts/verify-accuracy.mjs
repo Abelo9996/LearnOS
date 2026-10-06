@@ -16,7 +16,7 @@ import { STATUS, verificationSummary } from '../ai/quality/factCheck.js';
 
 const BASE = process.argv[2] || 'http://localhost:3001';
 const results = [];
-const check = (id, name, pass, detail = '') => { results.push({ id, pass }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? ` — ${detail}` : ''}`); };
+const check = (id, name, pass, detail = '') => { results.push({ id, pass }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? `, ${detail}` : ''}`); };
 const api = async (path, opts = {}) => {
   const r = await fetch(`${BASE}${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts });
   return { status: r.status, body: await r.json().catch(() => ({})) };
@@ -24,7 +24,7 @@ const api = async (path, opts = {}) => {
 
 const mod = db.prepare(`SELECT m.id, m.title, COUNT(q.id) n FROM course_modules m JOIN quiz_items q ON q.module_id = m.id
                         GROUP BY m.id HAVING n >= 10 ORDER BY n DESC LIMIT 1`).get();
-if (!mod) { console.log('SKIP — no module with a question bank.'); process.exit(0); }
+if (!mod) { console.log('SKIP, no module with a question bank.'); process.exit(0); }
 console.log(`Using module: ${mod.title} (${mod.n} items)\n`);
 
 const allIds = db.prepare('SELECT id FROM quiz_items WHERE module_id = ?').all(mod.id).map(r => r.id);
@@ -112,7 +112,7 @@ const afterSummary = verificationSummary();
 // cannot be taken away from in here. Say so rather than claim a pass we did
 // not earn.
 check('V16a', 'a verifier that cannot run confirms nothing', afterSummary.confirmed <= before.confirmed,
-  envKeyed ? 'INCONCLUSIVE — an env key kept the verifier alive; unset OPENROUTER_API_KEY to test this'
+  envKeyed ? 'INCONCLUSIVE, an env key kept the verifier alive; unset OPENROUTER_API_KEY to test this'
     : threw ? `refused with no key (${String(threw.message).slice(0, 40)}…)`
       : 'ran with no key and confirmed nothing');
 check('V16b', 'unverified items remain usable for grading', afterSummary.gradeable > 0, `${afterSummary.gradeable} gradeable`);

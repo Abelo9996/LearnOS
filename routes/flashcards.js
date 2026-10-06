@@ -9,7 +9,7 @@ const parse = (s, fb) => { try { return s ? JSON.parse(s) : fb; } catch { return
 // FSRS-6 scheduler with default parameters. Those defaults already beat SM-2
 // out of the box; the optimizer only pays off after a few hundred reviews, so a
 // single self-hosted learner runs on the defaults indefinitely and it's still
-// better than what we hand-rolled. One shared instance — it's stateless.
+// better than what we hand-rolled. One shared instance, it's stateless.
 const scheduler = fsrs(generatorParameters({ enable_fuzz: true }));
 const GRADE_TO_RATING = { again: Rating.Again, hard: Rating.Hard, good: Rating.Good, easy: Rating.Easy };
 const dayStr = (d) => new Date(d).toISOString().slice(0, 10);
@@ -31,7 +31,7 @@ function toFsrsCard(row) {
   };
 }
 
-// Human "next due" for the review buttons — FSRS returns a real timestamp per
+// Human "next due" for the review buttons, FSRS returns a real timestamp per
 // grade, so the labels reflect this card's actual schedule instead of fixed
 // guesses.
 function humanizeDue(due, now) {
@@ -59,7 +59,7 @@ function previewFor(row, now) {
  * Turn a graded quiz item into a recall card: the question on the front, the
  * correct answer and its explanation on the back. The question bank is already
  * vetted content tied to a module, which makes it the natural, LLM-free source
- * for review — no key required, and the cards match exactly what the course
+ * for review, no key required, and the cards match exactly what the course
  * grades you on.
  */
 function cardFromItem(it) {
@@ -143,7 +143,7 @@ router.delete('/:id', (req, res) => {
 });
 
 /**
- * POST /generate  { course_slug, module_id? } — build a review deck from a
+ * POST /generate  { course_slug, module_id? }, build a review deck from a
  * course's question bank.
  *
  * Spaced review was empty until you hand-wrote cards, which is why it felt

@@ -15,7 +15,7 @@ const GOAL_CHIPS = ['Machine Learning', 'Generative AI', 'Data Science', 'Web de
 function explainKeyError(e) {
   const raw = String(e?.message || '');
   if (/401|unauthor|user not found|invalid api key/i.test(raw)) {
-    return 'OpenRouter rejected that key. Check you pasted the whole thing — it starts with "sk-or-v1-".';
+    return 'OpenRouter rejected that key. Check you pasted the whole thing, it starts with "sk-or-v1-".';
   }
   if (/402|insufficient credit|requires more credits/i.test(raw)) {
     return 'That key is valid but has no credit left. Add credit at openrouter.ai, then test again.';
@@ -24,7 +24,7 @@ function explainKeyError(e) {
     return 'That key has hit its spending limit. Raise the limit on the key at openrouter.ai, then test again.';
   }
   if (/429|rate limit/i.test(raw)) return 'OpenRouter is rate-limiting this key right now. Wait a moment and test again.';
-  if (/cannot reach the server/i.test(raw)) return 'Cannot reach the LearnOS server — is it still running?';
+  if (/cannot reach the server/i.test(raw)) return 'Cannot reach the LearnOS server, is it still running?';
   if (/fetch|network|ENOTFOUND|ETIMEDOUT/i.test(raw)) return 'Could not reach OpenRouter. Check your internet connection.';
   return raw.replace(/\s*\{.*$/s, '') || 'That key could not be verified.';
 }
@@ -48,7 +48,7 @@ export default function Onboarding({ onComplete }) {
   const [keyMsg, setKeyMsg] = React.useState('');
   const [skipKey, setSkipKey] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
-  const [jobStatus, setJobStatus] = React.useState(null); // null | { message } — live progress from the job
+  const [jobStatus, setJobStatus] = React.useState(null); // null | { message }, live progress from the job
   const [error, setError] = React.useState(null);
   const [pollProgress, setPollProgress] = React.useState(0);
 
@@ -60,7 +60,7 @@ export default function Onboarding({ onComplete }) {
   const canPassIntro = name.trim().length >= 1;
 
   // A key that is merely stored is not a key that works. Save it, then make a
-  // real call — otherwise the first thing the learner discovers is a silent
+  // real call, otherwise the first thing the learner discovers is a silent
   // fallback to a template roadmap, which is exactly what this step exists to
   // prevent.
   const saveAndTestKey = async () => {
@@ -72,7 +72,7 @@ export default function Onboarding({ onComplete }) {
       createdId = saved?.key?.id || null;
       const ping = await API.pingAI();
       setKeyState('ok');
-      setKeyMsg(`Connected — replied using ${ping.model || model}.`);
+      setKeyMsg(`Connected, replied using ${ping.model || model}.`);
       setSkipKey(false);
     } catch (e) {
       // A key that failed its test must not be left configured: the app would
@@ -113,14 +113,14 @@ export default function Onboarding({ onComplete }) {
           if (msg) setJobStatus({ message: msg });
         },
       });
-      if (!result?.roadmapId) throw new Error('Generation timed out — try again from Roadmaps');
+      if (!result?.roadmapId) throw new Error('Generation timed out, try again from Roadmaps');
 
       // F-02: Only mark onboarded AFTER successful generation
       await API.patchUserSettings({ onboarded_at: new Date().toISOString() }).catch(() => {});
 
       onComplete(result.roadmapId, { source: result.source });
     } catch (e) {
-      // F-02: On error, do NOT set onboarded_at — user stays on intake with retry
+      // F-02: On error, do NOT set onboarded_at, user stays on intake with retry
       setError(e.message || 'Something went wrong');
       setSubmitting(false);
     }
@@ -169,7 +169,7 @@ export default function Onboarding({ onComplete }) {
           <StepDot n={5} />
         </div>
 
-        {/* Step 1 — Who you are.
+        {/* Step 1, Who you are.
             The greeting, certificates and the coach all read the user's name, and
             without this every install addressed the learner as "You". Background is
             optional but genuinely used: it is passed to the Curriculum agent so the
@@ -177,9 +177,9 @@ export default function Onboarding({ onComplete }) {
         {step === 1 && (
           <div style={{ animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
             <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 1 of 5</div>
-            <h2 className="display" style={{ fontSize: 20, marginBottom: 6 }}>First — what should we call you?</h2>
+            <h2 className="display" style={{ fontSize: 20, marginBottom: 6 }}>First, what should we call you?</h2>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
-              This stays on your machine. LearnOS has no accounts and no sign-up — it is
+              This stays on your machine. LearnOS has no accounts and no sign-up, it is
               only used to make the app feel like yours.
             </div>
 
@@ -198,7 +198,7 @@ export default function Onboarding({ onComplete }) {
             />
 
             <label className="cap" style={{ display: 'block', marginBottom: 6, fontSize: 10.5 }}>
-              What do you do? <span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--faint)', fontWeight: 400 }}>— optional</span>
+              What do you do? <span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--faint)', fontWeight: 400 }}>- optional</span>
             </label>
             <textarea
               value={background}
@@ -223,13 +223,13 @@ export default function Onboarding({ onComplete }) {
           </div>
         )}
 
-        {/* Step 2 — Goal */}
+        {/* Step 2, Goal */}
         {step === 2 && (
           <div style={{ animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
             <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 2 of 5</div>
             <h2 className="display" style={{ fontSize: 20, marginBottom: 6 }}>What do you want to learn?</h2>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
-              Describe your learning goal — be as specific or broad as you like.
+              Describe your learning goal, be as specific or broad as you like.
             </div>
             <input
               autoFocus
@@ -260,7 +260,7 @@ export default function Onboarding({ onComplete }) {
           </div>
         )}
 
-        {/* Step 3 — Level + time */}
+        {/* Step 3, Level + time */}
         {step === 3 && (
           <div style={{ animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
             <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 3 of 5</div>
@@ -302,7 +302,7 @@ export default function Onboarding({ onComplete }) {
           </div>
         )}
 
-        {/* Step 4 — Style */}
+        {/* Step 4, Style */}
         {step === 4 && (
           <div style={{ animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
             <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 4 of 5</div>
@@ -335,19 +335,19 @@ export default function Onboarding({ onComplete }) {
 
         {/* Submitting / polling state */}
 
-        {/* Step 5 — Connect the AI.
+        {/* Step 5, Connect the AI.
             Without a key, generateRoadmap silently falls back to a generic
             template. That fallback used to happen invisibly: the learner
             finished onboarding believing they had a personalised roadmap when
-            they had a canned one. Asking here — and saying plainly what
-            skipping costs — is the honest version. */}
+            they had a canned one. Asking here, and saying plainly what
+            skipping costs, is the honest version. */}
         {step === 5 && (
           <div style={{ animation: 'pageEnter var(--dur-normal) var(--ease-out)' }}>
             <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 5 of 5</div>
             <h2 className="display" style={{ fontSize: 20, marginBottom: 6 }}>Connect your AI</h2>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18, lineHeight: 1.6 }}>
               LearnOS runs on your own OpenRouter key. It is encrypted and stored on this
-              machine — there is no LearnOS server to send it to.{' '}
+              machine, there is no LearnOS server to send it to.{' '}
               <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand)' }}>
                 Get a key →
               </a>
@@ -381,7 +381,7 @@ export default function Onboarding({ onComplete }) {
               />
             </div>
             <div style={{ fontSize: 11.5, color: 'var(--muted)', marginTop: -4, marginBottom: 12, lineHeight: 1.5 }}>
-              Any model on OpenRouter, priced per million tokens. There are free ones —
+              Any model on OpenRouter, priced per million tokens. There are free ones -
               filter by <strong style={{ color: 'var(--good)', fontWeight: 500 }}>Free only</strong> if you would rather not
               spend anything. You can change this per agent later in Settings.
             </div>
@@ -406,7 +406,7 @@ export default function Onboarding({ onComplete }) {
               }}>
                 <input type="checkbox" checked={skipKey} onChange={e => setSkipKey(e.target.checked)} style={{ marginTop: 2 }} />
                 <span style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.55 }}>
-                  Continue without a key — I understand LearnOS will build a{' '}
+                  Continue without a key, I understand LearnOS will build a{' '}
                   <strong style={{ color: 'var(--ink)' }}>generic starter roadmap from a template</strong>, not one
                   personalised to my goal, and that course generation, tutoring and grading stay unavailable
                   until I add a key in Settings.
@@ -458,7 +458,7 @@ export default function Onboarding({ onComplete }) {
           </div>
         )}
 
-        {/* Error — F-02: keeps user on intake screen with Retry button */}
+        {/* Error, F-02: keeps user on intake screen with Retry button */}
         {error && (
           <div style={{ marginTop: 16 }}>
             <div style={{ padding: '12px 16px', background: 'oklch(0.7 0.2 25 / 0.12)', border: '1px solid oklch(0.7 0.2 25 / 0.4)', borderRadius: 10, color: 'var(--bad)', fontSize: 13 }}>

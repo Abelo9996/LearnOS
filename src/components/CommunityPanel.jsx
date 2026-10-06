@@ -9,7 +9,7 @@ import { useToast } from '../App';
  *
  * Strictly a convenience layered on top of file sharing. If the registry is
  * unreachable, misconfigured, or switched off, everything here degrades to a
- * message and export/import by file keeps working exactly as before — the app
+ * message and export/import by file keeps working exactly as before, the app
  * must never need a network to be useful.
  */
 export function CommunityBrowse({ onImported }) {
@@ -46,7 +46,7 @@ export function CommunityBrowse({ onImported }) {
     setImporting(c.id);
     try {
       // Fetch the bundle, then push it through the SAME import path a
-      // hand-dropped file uses — community content gets no special trust.
+      // hand-dropped file uses, community content gets no special trust.
       const { bundle } = await API.importFromRegistry(c.id);
       const r = await API.importCourse(bundle);
       toast(`Imported "${r.title}" · ${r.lessons} lessons`, 'success');
@@ -61,7 +61,7 @@ export function CommunityBrowse({ onImported }) {
       <Card style={{ marginBottom: 20 }}>
         <SectionHead title="Community courses" subtitle="Currently switched off for this instance" />
         <div style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.65, marginTop: 8 }}>
-          LearnOS is not contacting any registry. Export and import by file still work — turn the
+          LearnOS is not contacting any registry. Export and import by file still work, turn the
           registry back on in Settings if you want to browse published courses.
         </div>
       </Card>
@@ -73,7 +73,7 @@ export function CommunityBrowse({ onImported }) {
       <Card style={{ marginBottom: 20 }}>
         <SectionHead title="Community courses" subtitle="No registry connected yet" />
         <div style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.65, marginTop: 8 }}>
-          Nothing to browse yet — LearnOS is looking for a registry on this machine and none is
+          Nothing to browse yet, LearnOS is looking for a registry on this machine and none is
           running. That is the normal starting state: a registry is an optional server people run to
           publish courses to each other, and LearnOS is complete without one.
           <div style={{ marginTop: 10 }}>
@@ -141,7 +141,7 @@ export function CommunityBrowse({ onImported }) {
 
 /**
  * Publishing. A handle is claimed on first publish and the registry issues a
- * token which the server stores — it never reaches this component, because the
+ * token which the server stores, it never reaches this component, because the
  * only thing it authorises is changing your own published work.
  */
 export function PublishPanel({ courses, onPublished }) {
@@ -166,13 +166,13 @@ export function PublishPanel({ courses, onPublished }) {
       const r = await API.publishToRegistry(c.slug, h);
       toast(`${r.updated ? 'Updated' : 'Published'} "${c.title}" as @${h}`, 'success');
       if (r.tokenSaved) {
-        setNotice(`The handle @${h} is now yours on this registry. Its token is stored locally — keep this LearnOS install and you keep the ability to update what you publish.`);
+        setNotice(`The handle @${h} is now yours on this registry. Its token is stored locally, keep this LearnOS install and you keep the ability to update what you publish.`);
       }
       loadConfig();
       onPublished && onPublished();
     } catch (e) {
       if (e.code === 'HANDLE_TAKEN') {
-        toast(`"${h}" is already claimed by someone else — pick another handle.`, 'error');
+        toast(`"${h}" is already claimed by someone else, pick another handle.`, 'error');
       } else {
         toast(e.message || 'Publish failed', 'error');
       }
@@ -184,7 +184,7 @@ export function PublishPanel({ courses, onPublished }) {
       <div style={{ padding: 'var(--pad)' }}>
         <SectionHead title="Publish to the community" subtitle="Make one of your courses available for anyone to import" />
         <label className="cap" style={{ display: 'block', margin: '12px 0 6px', fontSize: 10.5 }}>
-          Publisher handle {config?.handle && <span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--good)', fontWeight: 400 }}>— claimed</span>}
+          Publisher handle {config?.handle && <span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--good)', fontWeight: 400 }}>- claimed</span>}
         </label>
         <input
           value={handle}
@@ -210,7 +210,7 @@ export function PublishPanel({ courses, onPublished }) {
       </div>
 
       {courses.length === 0 ? (
-        <div style={{ padding: '0 var(--pad) var(--pad)', fontSize: 13, color: 'var(--muted)' }}>No courses yet — generate one first.</div>
+        <div style={{ padding: '0 var(--pad) var(--pad)', fontSize: 13, color: 'var(--muted)' }}>No courses yet, generate one first.</div>
       ) : (
         <div>
           {courses.map(c => (

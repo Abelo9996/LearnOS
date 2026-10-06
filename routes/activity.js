@@ -12,7 +12,7 @@ router.get('/', (req, res) => {
 // Unread notification count, tracked server-side so it survives reloads,
 // browser switches, and cleared localStorage.
 /**
- * Notifications — the few things worth interrupting for.
+ * Notifications, the few things worth interrupting for.
  *
  * This endpoint used to count every activity_log row since you last looked, so
  * ticking a lesson raised a "notification". Alerts now come from their own
@@ -31,7 +31,7 @@ router.get('/notifications', (req, res) => {
   res.json({ ok: true, unread, notifications: rows });
 });
 
-// Kept for the badge poll — cheap COUNT rather than fetching every row.
+// Kept for the badge poll, cheap COUNT rather than fetching every row.
 router.get('/unread-count', (req, res) => {
   const count = db.prepare(
     'SELECT COUNT(*) c FROM notifications WHERE user_id = ? AND read_at IS NULL AND dismissed_at IS NULL'

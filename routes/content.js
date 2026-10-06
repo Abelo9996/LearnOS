@@ -1,5 +1,5 @@
 /**
- * Content reporting — M7 of docs/MASTERY_SPEC_V2.md.
+ * Content reporting, M7 of docs/MASTERY_SPEC_V2.md.
  *
  * Generated content can be confidently wrong in ways no automated check catches.
  * The person actually working through the course is the last line of defence, so
@@ -19,7 +19,7 @@ router.use(requireAuth);
 const REASONS = ['wrong_answer', 'factual_error', 'unclear', 'dead_link', 'other'];
 const TARGETS = ['quiz_item', 'lesson'];
 
-/** POST /api/content/report — flag something as wrong. */
+/** POST /api/content/report, flag something as wrong. */
 router.post('/report', (req, res) => {
   const { target_type, target_id, reason, detail } = req.body || {};
   if (!TARGETS.includes(target_type)) return res.status(400).json({ error: true, message: `target_type must be one of ${TARGETS.join(', ')}` });
@@ -39,17 +39,17 @@ router.post('/report', (req, res) => {
   let quarantined = false;
   if (target_type === 'quiz_item') {
     db.prepare("UPDATE quiz_items SET verification_status = ?, verification_note = ? WHERE id = ?")
-      .run(STATUS.FLAGGED, `Reported by learner: ${reason}${detail ? ` — ${String(detail).slice(0, 200)}` : ''}`, target_id);
+      .run(STATUS.FLAGGED, `Reported by learner: ${reason}${detail ? `, ${String(detail).slice(0, 200)}` : ''}`, target_id);
     quarantined = true;
   }
 
   res.json({ ok: true, id, quarantined,
     message: quarantined
-      ? 'Thanks — that question is now excluded from graded assessments until it is reviewed.'
-      : 'Thanks — this has been recorded for review.' });
+      ? 'Thanks, that question is now excluded from graded assessments until it is reviewed.'
+      : 'Thanks, this has been recorded for review.' });
 });
 
-/** GET /api/content/reports — open reports, newest first. */
+/** GET /api/content/reports, open reports, newest first. */
 router.get('/reports', (req, res) => {
   const status = req.query.status || 'open';
   const rows = db.prepare('SELECT * FROM content_reports WHERE status = ? ORDER BY created_at DESC LIMIT 200').all(status);
@@ -62,7 +62,7 @@ router.get('/reports', (req, res) => {
   res.json({ ok: true, reports: enriched });
 });
 
-/** PATCH /api/content/reports/:id — resolve or dismiss. */
+/** PATCH /api/content/reports/:id, resolve or dismiss. */
 router.patch('/reports/:id', (req, res) => {
   const { status, restore } = req.body || {};
   if (!['resolved', 'dismissed', 'open'].includes(status)) return res.status(400).json({ error: true, message: 'status must be resolved, dismissed or open' });
@@ -72,7 +72,7 @@ router.patch('/reports/:id', (req, res) => {
   db.prepare("UPDATE content_reports SET status = ?, resolved_at = CASE WHEN ? = 'open' THEN NULL ELSE datetime('now') END WHERE id = ?")
     .run(status, status, req.params.id);
 
-  // Dismissing a report (or explicitly restoring) puts the item back in play —
+  // Dismissing a report (or explicitly restoring) puts the item back in play -
   // but only back to 'unverified', never straight to 'confirmed'. Deciding a
   // complaint was unfounded is not the same as having checked the item.
   if (report.target_type === 'quiz_item' && (status === 'dismissed' || restore)) {
@@ -113,7 +113,7 @@ router.get('/course/:slug/translation-status', (req, res) => {
   res.json({ ok: true, language, ...courseTranslationStatus(req.params.slug, language) });
 });
 
-/** GET /api/content/verification — how much of the catalog has been checked. */
+/** GET /api/content/verification, how much of the catalog has been checked. */
 router.get('/verification', (req, res) => {
   const slug = req.query.slug || null;
   const summary = verificationSummary(slug);
@@ -124,10 +124,10 @@ router.get('/verification', (req, res) => {
 });
 
 /**
- * GET /api/content/reader/:lessonId — readable in-app view of an external
+ * GET /api/content/reader/:lessonId, readable in-app view of an external
  * resource lesson. The URL is looked up server-side from the lesson row (never
  * taken from the client), fetched behind the SSRF guard, reduced to Markdown,
- * and cached. Returns {ok:false} when the site resists extraction — the UI
+ * and cached. Returns {ok:false} when the site resists extraction, the UI
  * falls back to the open-original card.
  */
 router.get('/reader/:lessonId', async (req, res) => {
@@ -145,7 +145,7 @@ router.get('/reader/:lessonId', async (req, res) => {
 });
 
 /**
- * GET /api/content/framable/:lessonId — may the UI embed this lesson's external
+ * GET /api/content/framable/:lessonId, may the UI embed this lesson's external
  * source in an iframe? The URL is read from the lesson row server-side, checked
  * behind the SSRF guard, and probed for framing headers. The client embeds when
  * true and falls back to a link card when false, so a blocked frame is never

@@ -12,8 +12,8 @@ import { spawn } from 'node:child_process';
 const SUITES = [
   // Tolerated because it grades whatever courses happen to be in this database,
   // so it says as much about your library as about the code. It is NOT a
-  // standing exemption: a failure here is a real gap in a real course — usually
-  // a module the builder left without assessment, or a reading under the floor —
+  // standing exemption: a failure here is a real gap in a real course, usually
+  // a module the builder left without assessment, or a reading under the floor -
   // and `npm run enrich -- <slug>` is how you close it.
   { name: 'Depth floors (V1, V2)',        script: 'scripts/depth-check.mjs',          args: ['--summary'], tolerateFail: true,
     note: 'run `node scripts/depth-check.mjs` for the per-module breakdown, then enrich the courses it names' },

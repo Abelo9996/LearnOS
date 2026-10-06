@@ -2,8 +2,8 @@
 /**
  * Independently verify quiz answer keys (M7).
  *
- * Poses every unverified question COLD to a separate pass — no answer key, no
- * explanation — and disputes anything where the independent answer differs, more
+ * Poses every unverified question COLD to a separate pass, no answer key, no
+ * explanation, and disputes anything where the independent answer differs, more
  * than one option is defensible, or the question is ambiguous. Disputed items are
  * immediately excluded from graded assessment.
  *
@@ -44,7 +44,7 @@ try {
 } catch (e) {
   console.error(`\nVerification stopped: ${e?.message || e}`);
   if (/402|credit/i.test(e?.message || '')) {
-    console.error('Add OpenRouter credits and re-run — already-verified items are skipped, so it resumes where it stopped.');
+    console.error('Add OpenRouter credits and re-run, already-verified items are skipped, so it resumes where it stopped.');
   }
 }
 report();

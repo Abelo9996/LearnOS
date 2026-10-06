@@ -1,14 +1,14 @@
 /**
- * Retention — M10 of docs/MASTERY_SPEC_V2.md §3.7.
+ * Retention, M10 of docs/MASTERY_SPEC_V2.md §3.7.
  *
  * Passing an assessment once is not mastery. A certificate records that you
- * could do something in March, not that you can do it in September — and
+ * could do something in March, not that you can do it in September, and
  * Coursera does not solve this either, which makes it a winnable axis.
  *
  * Two ideas, deliberately kept separate:
  *
  *   mastery    what you DEMONSTRATED. Earned, recorded, never silently taken
- *              away — it is the evidence a certificate rests on, and gating uses
+ *              away, it is the evidence a certificate rests on, and gating uses
  *              it, so passing a module can't lock itself again while you sleep.
  *   retention  what you can PROBABLY still do today: mastery decayed by time
  *              since you last practised. This is what the learner should act on.
@@ -20,7 +20,7 @@ import db from '../../db/database.js';
 
 // Ebbinghaus-ish exponential decay. Half-life scales with how well the material
 // was learned: barely-passed material fades fast, thoroughly-mastered material
-// is much stickier. Retention never falls below RETENTION_FLOOR — once you have
+// is much stickier. Retention never falls below RETENTION_FLOOR, once you have
 // genuinely understood something you rarely return to zero.
 export const HALFLIFE_MIN_DAYS = 14;    // mastery 0.0 → forgotten quickly
 export const HALFLIFE_MAX_DAYS = 180;   // mastery 1.0 → sticks for months
@@ -102,7 +102,7 @@ export function cardFromMissedItem(userId, item, deck) {
   const today = new Date().toISOString().split('T')[0];
 
   if (existing) {
-    // Missed again — pull it back to the front of the queue and make it harder.
+    // Missed again, pull it back to the front of the queue and make it harder.
     db.prepare('UPDATE flashcards SET back = ?, next_review = ?, interval_days = 0, ease_factor = MAX(1.3, ease_factor - 0.2) WHERE id = ?')
       .run(back, today, existing.id);
     return { id: existing.id, created: false };

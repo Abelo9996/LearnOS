@@ -1,6 +1,6 @@
 /**
- * CR — Curriculum agent (CR-1/2). Turns a goal + profile into a real, persisted
- * roadmap: a COURSE PATHWAY — an ordered sequence of courses from where the
+ * CR, Curriculum agent (CR-1/2). Turns a goal + profile into a real, persisted
+ * roadmap: a COURSE PATHWAY, an ordered sequence of courses from where the
  * learner is to their goal.
  *
  * This used to emit a DAG of concept nodes laid out in parallel lanes: a concept
@@ -37,7 +37,7 @@ export async function generateRoadmap({ userId, goal, profile }) {
       userId, agentCode: 'CR', schema: roadmapSchema, maxTokens: 4096,
       system: SYSTEM,
       // Background and preferred style are collected during onboarding, so they
-      // must actually reach the prompt — asking someone about their experience
+      // must actually reach the prompt, asking someone about their experience
       // and then ignoring it is worse than not asking at all.
       messages: [
         `Goal: ${goal}`,
@@ -71,7 +71,7 @@ export function persistRoadmap(userId, spec, source, goal) {
   const courses = spec.courses;
   const authored = source === 'ai'
     ? 'AI Curriculum agent'
-    : 'offline template — add an API key for AI-generated pathways';
+    : 'offline template, add an API key for AI-generated pathways';
   const colors = ['#7c3aed', '#06b6d4', '#10b981', '#e0476a'];
   const color = colors[Math.abs(hash(goal || spec.title)) % colors.length];
 
@@ -83,7 +83,7 @@ export function persistRoadmap(userId, spec, source, goal) {
 
     // Strictly sequential: stage i is position i, one per row, and depends only
     // on stage i-1. col/row are kept because the schema has them, but they now
-    // encode ORDER rather than a layout — there is no second lane to be in.
+    // encode ORDER rather than a layout, there is no second lane to be in.
     courses.forEach((c, i) => {
       const nid = `${roadmapId}:c${i}`;
       const status = i === 0 ? 'active' : i === 1 ? 'next' : 'locked';
@@ -110,7 +110,7 @@ export function persistRoadmap(userId, spec, source, goal) {
 
 function hash(s) { let h = 0; for (const c of String(s || '')) h = (h * 31 + c.charCodeAt(0)) | 0; return h; }
 
-// Deterministic, goal-flavored fallback — real structure, no LLM, clearly
+// Deterministic, goal-flavored fallback, real structure, no LLM, clearly
 // labeled. Like the AI path it produces a strictly linear pathway of courses;
 // it previously emitted two parallel nodes per stage, which is a concept map.
 function templateSpec(goal, prof) {
@@ -131,7 +131,7 @@ function templateSpec(goal, prof) {
   return {
     title: titleCase(topic),
     subtitle: `A ${level}-level pathway through ${topic}, from foundations to a capstone.`,
-    courses: stages.map(st => ({ title: st.title, topic: `${st.title} — ${topic}`, why: st.why, objectives: st.objectives })),
+    courses: stages.map(st => ({ title: st.title, topic: `${st.title}, ${topic}`, why: st.why, objectives: st.objectives })),
   };
 }
 function cleanTopic(g) { return String(g || 'your topic').replace(/^(learn|master|how to|study|understand)\s+/i, '').trim() || 'your topic'; }
@@ -188,7 +188,7 @@ registerJobHandler('replan-node', async ({ userId, input }) => {
     db.prepare('UPDATE roadmap_nodes SET col = col + 1 WHERE roadmap_id = ? AND col >= ?').run(roadmapId, node.col);
 
     // Insert the remedial stage at the position the failing node just vacated.
-    // It is a course node like every other stage — a pathway never mixes a
+    // It is a course node like every other stage, a pathway never mixes a
     // "concept" node in among its courses.
     db.prepare(`INSERT INTO roadmap_nodes (id, roadmap_id, title, col, row_idx, mastery, status, node_kind, course_topic, build_status)
                 VALUES (?, ?, ?, ?, 0, 0, 'next', 'course', ?, 'planned')`)

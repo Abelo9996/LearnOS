@@ -9,7 +9,7 @@ npm run build     →  compiles the React app into dist/
 npm start         →  Express serves dist/ + /api on one port (default 3001)
 ```
 
-Any host that can run a Node 18+ process works — a VPS, Railway, Render, Fly.io, a container, etc.
+Any host that can run a Node 18+ process works, a VPS, Railway, Render, Fly.io, a container, etc.
 
 ---
 
@@ -43,7 +43,7 @@ OPENROUTER_API_KEY=sk-or-...
 LEARNOS_DEFAULT_MODEL=anthropic/claude-haiku-4.5
 ```
 
-LearnOS is single-user and self-hosted — there is no login. If you don't set `OPENROUTER_API_KEY`, add a key in-app under **Settings → API Keys**.
+LearnOS is single-user and self-hosted, there is no login. If you don't set `OPENROUTER_API_KEY`, add a key in-app under **Settings → API Keys**.
 
 ## 3. Run
 
@@ -95,10 +95,10 @@ curl https://learnos.example.com/api/health
 
 ## Data & Persistence
 
-- The SQLite database lives under `db/` and is **gitignored** — make sure your host has a persistent volume there (and for `uploads/`) so data survives restarts and redeploys.
+- The SQLite database lives under `db/` and is **gitignored**, make sure your host has a persistent volume there (and for `uploads/`) so data survives restarts and redeploys.
 - Back up `db/learnos.db` and the `uploads/` directory as your source of truth.
 
 ## Notes
 
-- **HTTPS is required in production** — the app expects to sit behind a TLS-terminating proxy.
+- **HTTPS is required in production**, the app expects to sit behind a TLS-terminating proxy.
 - Rate limiting and Helmet are on by default; review `server.js` before exposing publicly.

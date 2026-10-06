@@ -15,7 +15,7 @@ import { retentionFor, daysUntilReview, halfLifeDays, cardFromMissedItem, markPr
 
 const BASE = process.argv[2] || 'http://localhost:3001';
 const results = [];
-const check = (id, name, pass, detail = '') => { results.push({ id, pass }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? ` — ${detail}` : ''}`); };
+const check = (id, name, pass, detail = '') => { results.push({ id, pass }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? `, ${detail}` : ''}`); };
 const api = async (path, opts = {}) => {
   const r = await fetch(`${BASE}${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts });
   return { status: r.status, body: await r.json().catch(() => ({})) };

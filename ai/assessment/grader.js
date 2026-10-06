@@ -1,9 +1,9 @@
 /**
- * Grading engine — M3 of docs/MASTERY_SPEC_V2.md §3.2.
+ * Grading engine, M3 of docs/MASTERY_SPEC_V2.md §3.2.
  *
  * Two tiers, matching how Coursera actually works:
- *   practice — ungraded, unlimited attempts, every answer explained
- *   graded   — attempt-limited, pass threshold, counts toward mastery/progression
+ *   practice, ungraded, unlimited attempts, every answer explained
+ *   graded  , attempt-limited, pass threshold, counts toward mastery/progression
  *
  * Quiz grading is deterministic (answers come from our own item bank, so no LLM
  * is involved and a score is reproducible). Programming assignments are graded
@@ -54,7 +54,7 @@ export function gradeQuiz(items, answers, mode = 'practice', passThreshold = DEF
  * Run a learner's JavaScript submission against declared test cases.
  *
  * Tests are DATA, never code: {name, fn, args, expected}. Only the learner's own
- * source runs, and it runs inside a worker thread — a separate V8 isolate with
+ * source runs, and it runs inside a worker thread, a separate V8 isolate with
  * no reference to the server's scope, which the parent can hard-terminate. That
  * covers async hangs and event-loop starvation, which a bare vm timeout does not.
  *

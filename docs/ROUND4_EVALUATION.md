@@ -1,4 +1,4 @@
-# Round 4 — Full Evaluation Against Spec (2026-06-05)
+# Round 4, Full Evaluation Against Spec (2026-06-05)
 
 ## Overall Status: Backend 100% complete, Frontend wiring ~30% complete
 
@@ -9,8 +9,8 @@ All 14 spec items have complete backend implementations (routes, DB tables, AI a
 ## §3.1 PR Onboarding Wizard
 
 ### Spec Requirements
-1. ✅ New screen `src/screens/Onboarding.jsx` — 3-step wizard created
-2. ✅ Wire into App.jsx `RootApp` — `checkOnboarding()` gate implemented
+1. ✅ New screen `src/screens/Onboarding.jsx`, 3-step wizard created
+2. ✅ Wire into App.jsx `RootApp`, `checkOnboarding()` gate implemented
 3. ✅ On submit: calls `postIntake()` → `genRoadmap()` → polls `getJob()` → routes to `/roadmap`
 4. ✅ Edge case: existing users (roadmaps.length > 0) skip onboarding
 5. ✅ Degrades gracefully without API key (uses template roadmap)
@@ -34,8 +34,8 @@ All 14 spec items have complete backend implementations (routes, DB tables, AI a
 2. ✅ `module_lessons` table created
 3. ✅ Migration to backfill from `syllabus` JSON (with `courses.migrated_modules` flag)
 4. ✅ Routes: GET/POST/PATCH/DELETE for modules; GET/POST/PATCH/DELETE for lessons
-5. ❌ **Frontend: CourseDetail editor** — No "Edit course" button in CourseDetail. No module/lesson tree UI.
-6. ❌ **Frontend: Learner view** — No lesson reader, no "Mark complete" button
+5. ❌ **Frontend: CourseDetail editor**, No "Edit course" button in CourseDetail. No module/lesson tree UI.
+6. ❌ **Frontend: Learner view**, No lesson reader, no "Mark complete" button
 7. ✅ `enrollment_progress` table created
 8. ✅ Mark-complete endpoint at `POST /api/courses/:slug/progress/:lessonId`
 9. ✅ Course progress endpoints
@@ -57,9 +57,9 @@ All 14 spec items have complete backend implementations (routes, DB tables, AI a
 ### Spec Requirements
 1. ✅ Storage: `./uploads/` directory served statically at `/uploads` (server.js line 59-61)
 2. ✅ Endpoint: `POST /api/uploads` with multer in `routes/uploads.js`
-3. ❌ **Frontend: Community image upload** — Still URL-only input at Extras.jsx line 858
-4. ❌ **Frontend: Course thumbnails** — No thumbnail upload in CreateCourseModal
-5. ❌ **Frontend: User avatars** — No upload field in Settings→Account
+3. ❌ **Frontend: Community image upload**, Still URL-only input at Extras.jsx line 858
+4. ❌ **Frontend: Course thumbnails**, No thumbnail upload in CreateCourseModal
+5. ❌ **Frontend: User avatars**, No upload field in Settings→Account
 6. ✅ `users.avatar_url TEXT` column
 7. ✅ `courses.thumbnail_url TEXT` column
 8. ❌ **Avatar component** in `UI.jsx` still uses initials/hue fallback only
@@ -80,8 +80,8 @@ All 14 spec items have complete backend implementations (routes, DB tables, AI a
 ### Spec Requirements
 1. ✅ `enrollment_progress` table created
 2. ✅ Mark-complete endpoint fires `logActivity`
-3. ❌ **Frontend: "Mark complete" button** — No lesson reader UI to mark complete
-4. ❌ **Frontend: Progress % in EnrolledTab** — Not displayed
+3. ❌ **Frontend: "Mark complete" button**, No lesson reader UI to mark complete
+4. ❌ **Frontend: Progress % in EnrolledTab**, Not displayed
 
 ### Verdict: 🔌 BACKEND COMPLETE, DEPENDS ON §3.2 FRONTEND
 
@@ -94,9 +94,9 @@ All 14 spec items have complete backend implementations (routes, DB tables, AI a
 2. ✅ Route: `POST /api/assignments/:id/submit`
 3. ✅ `gradeSubmission()` in `ai/agents/assessment.js` with structured-output grading + heuristic fallback
 4. ✅ `grade-assignment` job registered
-5. ❌ **Frontend: Submission textarea** — AssignmentWorkModal still uses checklist-only heuristic grading
-6. ❌ **Frontend: "Grading…" spinner + poll** — Not implemented
-7. ❌ **Frontend: Structured feedback display** — Not implemented
+5. ❌ **Frontend: Submission textarea**, AssignmentWorkModal still uses checklist-only heuristic grading
+6. ❌ **Frontend: "Grading…" spinner + poll**, Not implemented
+7. ❌ **Frontend: Structured feedback display**, Not implemented
 
 ### Evidence
 - `ai/agents/assessment.js`: `gradeSubmission()` function with `gradeSchema`
@@ -111,8 +111,8 @@ All 14 spec items have complete backend implementations (routes, DB tables, AI a
 ## §3.6 AN-Driven Roadmap Re-planning
 
 ### Spec Requirements
-1. ✅ `checkAndReplan()` in `ai/agents/analytics.js` — calls `replan-node` CR job after 2+ low-mastery sessions
-2. ✅ `replanNode()` in `ai/agents/curriculum.js` — inserts remedial node, shifts cols, rewires edges
+1. ✅ `checkAndReplan()` in `ai/agents/analytics.js`, calls `replan-node` CR job after 2+ low-mastery sessions
+2. ✅ `replanNode()` in `ai/agents/curriculum.js`, inserts remedial node, shifts cols, rewires edges
 3. ✅ Rate-limited: `last_replanned_at` column + 1/week check
 4. ✅ Activity feed entry on re-plan
 5. ✅ Remedial node set to `status='next'`, failing node locked until remedial done
@@ -130,7 +130,7 @@ All 14 spec items have complete backend implementations (routes, DB tables, AI a
 
 ### Spec Requirements
 1. ✅ TU system prompt augmented with `node_resources` (routes/ai.js lines ~56-72)
-2. ⚠️ **Frontend passes `nodeId`** — Session.jsx `sessionContext` needs `nodeId` field
+2. ⚠️ **Frontend passes `nodeId`**, Session.jsx `sessionContext` needs `nodeId` field
 3. ✅ `MarkdownText` renders `[N]` as clickable superscript chips with `citationMap`
 4. ✅ System prompt rule: "Prefer citing provided sources over making claims from memory"
 
@@ -150,9 +150,9 @@ All 14 spec items have complete backend implementations (routes, DB tables, AI a
 ### Spec Requirements
 1. ✅ `GET /api/schedule/due` endpoint in `routes/schedule.js`
 2. ✅ `reminder_sent_at` column on `schedule_events`
-3. ❌ **Frontend: 60s polling** in App.jsx — Not implemented
-4. ❌ **Frontend: Toast notification** — Not implemented
-5. ❌ **Frontend: Deep-link "Open" button** — Not implemented
+3. ❌ **Frontend: 60s polling** in App.jsx, Not implemented
+4. ❌ **Frontend: Toast notification**, Not implemented
+5. ❌ **Frontend: Deep-link "Open" button**, Not implemented
 
 ### Verdict: 🔌 BACKEND COMPLETE, FRONTEND WIRING MISSING
 **Missing:** Polling interval, toast, deep-link in App.jsx
@@ -165,8 +165,8 @@ All 14 spec items have complete backend implementations (routes, DB tables, AI a
 1. ✅ `POST /api/courses/:slug/verify` with admin role guard
 2. ✅ `POST /api/courses/:slug/unverify` with admin role guard
 3. ✅ `verified_by` and `verified_at` columns
-4. ❌ **Frontend: "Verify course" button** — Not in CourseDetail
-5. ❌ **Frontend: Admin badge in topbar** — Not implemented
+4. ❌ **Frontend: "Verify course" button**, Not in CourseDetail
+5. ❌ **Frontend: Admin badge in topbar**, Not implemented
 
 ### Evidence
 - `routes/courses.js` lines ~252-275: Verify/unverify routes
@@ -183,11 +183,11 @@ All 14 spec items have complete backend implementations (routes, DB tables, AI a
 ### Spec Requirements
 1. ✅ `whiteboard_strokes` table created
 2. ✅ GET/POST/DELETE routes in `routes/sessions.js`
-3. ❌ **Frontend: Stroke state management** — WhiteboardView still in-memory only
-4. ❌ **Frontend: Save on stopDraw** — Not implemented
-5. ❌ **Frontend: Load on mount** — Not implemented
-6. ❌ **Frontend: Undo button** — Not implemented
-7. ❌ **Frontend: Clear deletes all strokes** — Current clear only clears canvas
+3. ❌ **Frontend: Stroke state management**, WhiteboardView still in-memory only
+4. ❌ **Frontend: Save on stopDraw**, Not implemented
+5. ❌ **Frontend: Load on mount**, Not implemented
+6. ❌ **Frontend: Undo button**, Not implemented
+7. ❌ **Frontend: Clear deletes all strokes**, Current clear only clears canvas
 
 ### Evidence
 - `routes/sessions.js`: Whiteboard stroke routes at lines ~118-145
@@ -204,9 +204,9 @@ All 14 spec items have complete backend implementations (routes, DB tables, AI a
 1. ✅ `POST /api/roadmaps/:id/nodes` route
 2. ✅ `DELETE /api/roadmaps/:id/nodes/:nid` route
 3. ✅ Transaction: inserts node + objectives + edges
-4. ❌ **Frontend: [+ Add node] button** — Not in Roadmap.jsx
-5. ❌ **Frontend: Add node modal** — Not implemented
-6. ❌ **Frontend: [Edit]/[Delete] on node hover** — Not implemented
+4. ❌ **Frontend: [+ Add node] button**, Not in Roadmap.jsx
+5. ❌ **Frontend: Add node modal**, Not implemented
+6. ❌ **Frontend: [Edit]/[Delete] on node hover**, Not implemented
 
 ### Evidence
 - `routes/roadmaps.js`: POST and DELETE node routes
@@ -224,9 +224,9 @@ All 14 spec items have complete backend implementations (routes, DB tables, AI a
 2. ✅ `users.avatar_url TEXT` column
 3. ✅ `users.links_json TEXT` column
 4. ✅ `roadmaps.is_public INTEGER` column
-5. ❌ **Frontend: Profile form in Settings** — Only display name + email, no bio/avatar/links
-6. ❌ **Frontend: Avatar upload** — Not implemented
-7. ❌ **Frontend: Public profile page** — Not implemented
+5. ❌ **Frontend: Profile form in Settings**, Only display name + email, no bio/avatar/links
+6. ❌ **Frontend: Avatar upload**, Not implemented
+7. ❌ **Frontend: Public profile page**, Not implemented
 
 ### Evidence
 - `db/database.js`: All profile columns added
@@ -243,16 +243,16 @@ All 14 spec items have complete backend implementations (routes, DB tables, AI a
 1. ✅ `email_verifications` table
 2. ✅ `password_resets` table
 3. ✅ `users.email_verified` column
-4. ✅ `POST /api/auth/forgot` — sends reset email (always returns 200)
-5. ✅ `POST /api/auth/reset` — verifies token, bcrypt new pass
-6. ✅ `GET /api/auth/verify` — verifies email token
+4. ✅ `POST /api/auth/forgot`, sends reset email (always returns 200)
+5. ✅ `POST /api/auth/reset`, verifies token, bcrypt new pass
+6. ✅ `GET /api/auth/verify`, verifies email token
 7. ✅ `POST /api/auth/resend-verification`
 8. ✅ Email verification token generated on register
 9. ✅ `routes/email.js` with Resend + dev fallback
-10. ❌ **Frontend: "Forgot password" link** — Not on login form
-11. ❌ **Frontend: Reset password screen** — Not implemented
-12. ❌ **Frontend: Email verification banner** — Not implemented
-13. ❌ **Frontend: Gate community posting on email_verified** — Not implemented
+10. ❌ **Frontend: "Forgot password" link**, Not on login form
+11. ❌ **Frontend: Reset password screen**, Not implemented
+12. ❌ **Frontend: Email verification banner**, Not implemented
+13. ❌ **Frontend: Gate community posting on email_verified**, Not implemented
 
 ### Evidence
 - `routes/auth.js`: All reset/verify routes
@@ -268,8 +268,8 @@ All 14 spec items have complete backend implementations (routes, DB tables, AI a
 ## §3.14 SSRF Allow-List on RE Verifier
 
 ### Spec Requirements
-1. ✅ `isPublicUrl()` function — rejects private IPs, internal hostnames
-2. ✅ `resolvesToPublicIp()` — DNS resolution + RFC 1918/4193 check
+1. ✅ `isPublicUrl()` function, rejects private IPs, internal hostnames
+2. ✅ `resolvesToPublicIp()`, DNS resolution + RFC 1918/4193 check
 3. ✅ Returns `status='rejected'` with `reason='private_target'`
 4. ✅ Also guards `proposeResources()` (not just `verifyResource()`)
 5. ✅ Tested: `http://169.254.169.254/` → `rejected: private_target`
@@ -303,13 +303,13 @@ All 14 spec items have complete backend implementations (routes, DB tables, AI a
 
 ## Priority Fix List
 
-1. **Fix §3.7 sessionContext** — Pass `nodeId` in chat payload
-2. **Wire §3.5 AssignmentWorkModal** — Add submission textarea, grading poll, feedback display
-3. **Wire §3.3 file uploads** — Community image picker, course thumbnail, avatar upload
-4. **Wire §3.8 schedule reminders** — 60s polling + toast in App.jsx
-5. **Wire §3.2 course editor** — Module/lesson editor in CourseDetail, lesson reader for learners
-6. **Wire §3.13 password reset** — Forgot link on login, reset screen
-7. **Wire §3.9 admin verify** — Verify button in CourseDetail
-8. **Wire §3.10 whiteboard** — Stroke persistence in Session.jsx
-9. **Wire §3.11 node editing** — Add/edit/delete modals in Roadmap.jsx
-10. **Wire §3.12 profile** — Bio/avatar/links form in Settings
+1. **Fix §3.7 sessionContext**, Pass `nodeId` in chat payload
+2. **Wire §3.5 AssignmentWorkModal**, Add submission textarea, grading poll, feedback display
+3. **Wire §3.3 file uploads**, Community image picker, course thumbnail, avatar upload
+4. **Wire §3.8 schedule reminders**, 60s polling + toast in App.jsx
+5. **Wire §3.2 course editor**, Module/lesson editor in CourseDetail, lesson reader for learners
+6. **Wire §3.13 password reset**, Forgot link on login, reset screen
+7. **Wire §3.9 admin verify**, Verify button in CourseDetail
+8. **Wire §3.10 whiteboard**, Stroke persistence in Session.jsx
+9. **Wire §3.11 node editing**, Add/edit/delete modals in Roadmap.jsx
+10. **Wire §3.12 profile**, Bio/avatar/links form in Settings

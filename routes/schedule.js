@@ -67,7 +67,7 @@ router.post('/:id/reminder-sent', (req, res) => {
 });
 
 /**
- * GET /agenda — the work that is actually waiting, in the order it is due.
+ * GET /agenda, the work that is actually waiting, in the order it is due.
  *
  * The schedule used to be a weekly grid of blocks you typed in yourself, with
  * no idea that 31 assignments had due dates, that reviews were coming due, or
@@ -83,7 +83,7 @@ router.get('/agenda', (req, res) => {
   const days = Math.min(Math.max(parseInt(req.query.days, 10) || 14, 1), 60);
   const items = [];
 
-  // Assignments — the only thing here with a real deadline attached.
+  // Assignments, the only thing here with a real deadline attached.
   for (const a of db.prepare(
     `SELECT id, title, course, due_date, status, priority, estimated_minutes
        FROM assignments
@@ -100,7 +100,7 @@ router.get('/agenda', (req, res) => {
     });
   }
 
-  // Spaced review — one entry for the whole batch; a hundred separate cards
+  // Spaced review, one entry for the whole batch; a hundred separate cards
   // would drown everything else.
   const dueCards = db.prepare(
     "SELECT COUNT(*) c FROM flashcards WHERE user_id = ? AND (next_review IS NULL OR next_review <= date('now'))"
@@ -113,7 +113,7 @@ router.get('/agenda', (req, res) => {
     });
   }
 
-  // Courses in progress — the next unfinished lesson, so "carry on" is one
+  // Courses in progress, the next unfinished lesson, so "carry on" is one
   // click rather than a hunt through the syllabus.
   for (const e of db.prepare(
     `SELECT e.course_slug, c.title FROM enrollments e JOIN courses c ON c.slug = e.course_slug

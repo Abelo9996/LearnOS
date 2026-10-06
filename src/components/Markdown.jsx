@@ -5,14 +5,14 @@ import 'katex/dist/katex.min.css';
  * Markdown rendering for generated course content.
  *
  * The generator writes real teaching material: the 424 lessons in this database
- * carry 554 code fences, 520 table rows, 1200+ list items — and 773 pieces of
+ * carry 554 code fences, 520 table rows, 1200+ list items, and 773 pieces of
  * LaTeX. Maths was the glaring hole. Every `$V^\pi(s)$` and every
  * `\begin{cases}` block was printed to the learner as raw source, which on a
  * reinforcement-learning course is most of the actual content.
  *
  * KaTeX is loaded on demand rather than bundled into the main chunk, because a
  * philosophy lesson should not pay for a renderer it never uses. Until it
- * resolves — milliseconds, from local disk — a formula shows as monospace
+ * resolves, milliseconds, from local disk, a formula shows as monospace
  * source, which is what it looked like before and is honest about what it is.
  */
 let katexMod = null;
@@ -46,14 +46,14 @@ function TeX({ tex, display }) {
 
 /**
  * `$…$` is ambiguous with prices, so treat it as maths only when it looks like
- * maths — a backslash command, a sub/superscript, braces, or a lone symbol —
+ * maths, a backslash command, a sub/superscript, braces, or a lone symbol -
  * and leave "it costs $30 to $40" as text.
  */
 const MATH_INLINE = /\$(?!\s)((?:[^$\n\\]|\\.)+?)(?<!\s)\$/;
 const looksMathy = (s) => /[\\^_{}]/.test(s) || /^[A-Za-z]'?$/.test(s.trim());
 
 /**
- * formatInline — bold, italic, strikethrough, code, links, images, citations
+ * formatInline, bold, italic, strikethrough, code, links, images, citations
  * and inline maths. Maths is matched first so `**` or `_` inside a formula is
  * never mistaken for emphasis.
  */
@@ -112,7 +112,7 @@ export function formatInline(text, citationMap) {
       // inner asterisks literally because the bold match swallowed the span.
       parts.push(<strong key={key++} style={{ fontWeight: 650, color: 'var(--ink)' }}>{formatInline(firstMatch[1], citationMap)}</strong>);
     } else if (type === 'code') {
-      // Code is literal by definition — never recurse into it.
+      // Code is literal by definition, never recurse into it.
       parts.push(
         <code key={key++} style={{ fontFamily: 'var(--font-mono)', fontSize: '0.88em', padding: '1.5px 5px', borderRadius: 5, background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--ink)' }}>{firstMatch[1]}</code>
       );
@@ -135,7 +135,7 @@ export function formatInline(text, citationMap) {
  * something you can see. Loaded on demand (a philosophy lesson shouldn't pay
  * for a diagram engine), rendered with securityLevel 'strict' since the source
  * is model-generated, and it falls back to the raw fence if the diagram doesn't
- * parse — a broken diagram should never blank the lesson.
+ * parse, a broken diagram should never blank the lesson.
  */
 let mermaidMod = null, mermaidPromise = null;
 function loadMermaid() {
@@ -157,7 +157,7 @@ function Mermaid({ code }) {
     loadMermaid()
       .then(async (mm) => {
         try {
-          // parse() throws on invalid syntax without touching the DOM — check
+          // parse() throws on invalid syntax without touching the DOM, check
           // first so a bad diagram falls back cleanly instead of leaving mermaid
           // error markup on the page.
           await mm.parse(code);
@@ -211,14 +211,14 @@ const H = {
 
 /**
  * Undo one erroneous JSON-escape layer when generated content was stored that
- * way — the failure that showed a lesson as a wall of literal "\n" with
+ * way, the failure that showed a lesson as a wall of literal "\n" with
  * "\\mathbf" in the maths.
  *
  * A model sometimes emits its body as if it would be JSON-parsed twice, so what
  * lands in the DB has escaped newlines ("\n" as two characters), escaped tabs,
  * and double-backslashed LaTeX commands. The tell is unmistakable: the string
  * carries NO real newlines but DOES carry literal "\n". Only then do we reverse
- * exactly one escape level — which turns "\n"→newline, "\t"→tab and
+ * exactly one escape level, which turns "\n"→newline, "\t"→tab and
  * "\\mathbf"→"\mathbf" (and a matrix's "\\\\"→"\\", still a valid LaTeX row
  * break) all at once. Content that already has real newlines is left untouched,
  * so a legitimate "\n" inside a code sample is never disturbed.
@@ -230,11 +230,11 @@ function normalizeContent(text) {
 }
 
 /**
- * MarkdownText — renders generated content.
+ * MarkdownText, renders generated content.
  *
  * `prose` turns on long-form reading: a measure of about 68 characters and a
  * larger body size. Lesson bodies ran the full width of the window at roughly
- * 150 characters a line — twice what is comfortable — which is the main reason
+ * 150 characters a line, twice what is comfortable, which is the main reason
  * a well-written lesson still felt like a wall of text.
  */
 export default function MarkdownText({ text, citationMap, prose = false, stripTitle }) {
@@ -261,7 +261,7 @@ export default function MarkdownText({ text, citationMap, prose = false, stripTi
 
   const flushPara = () => {
     if (!para.length) return;
-    // Consecutive lines are one paragraph — hard-wrapped source should not turn
+    // Consecutive lines are one paragraph, hard-wrapped source should not turn
     // into one <p> per line.
     elements.push(
       <p key={`p-${elements.length}`} style={{ ...body, color: 'var(--ink)', margin: '0 0 14px' }}>
@@ -306,7 +306,7 @@ export default function MarkdownText({ text, citationMap, prose = false, stripTi
       continue;
     }
 
-    // Display maths — `$$ … $$`, on one line or spanning several.
+    // Display maths, `$$ … $$`, on one line or spanning several.
     const dollars = line.match(/^\s*\$\$(.*)$/);
     if (dollars) {
       flushAll();
@@ -379,7 +379,7 @@ export default function MarkdownText({ text, citationMap, prose = false, stripTi
       continue;
     }
 
-    // Blockquote — consecutive `>` lines are one quote.
+    // Blockquote, consecutive `>` lines are one quote.
     if (/^\s*>\s?/.test(line)) {
       flushAll();
       const quote = [line.replace(/^\s*>\s?/, '')];
@@ -392,7 +392,7 @@ export default function MarkdownText({ text, citationMap, prose = false, stripTi
       continue;
     }
 
-    // Lists — indentation becomes nesting, `[ ]` / `[x]` become checkboxes.
+    // Lists, indentation becomes nesting, `[ ]` / `[x]` become checkboxes.
     const ul = line.match(/^(\s*)[-*•]\s+(.*)$/);
     const ol = line.match(/^(\s*)\d+\.\s+(.*)$/);
     if (ul || ol) {

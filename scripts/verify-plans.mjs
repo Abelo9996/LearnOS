@@ -12,7 +12,7 @@ import db from '../db/database.js';
 
 const BASE = process.argv[2] || 'http://localhost:3001';
 const results = [];
-const check = (id, name, pass, detail = '') => { results.push({ id, pass }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? ` — ${detail}` : ''}`); };
+const check = (id, name, pass, detail = '') => { results.push({ id, pass }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? `, ${detail}` : ''}`); };
 const api = async (path, opts = {}) => {
   const r = await fetch(`${BASE}${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts });
   return { status: r.status, body: await r.json().catch(() => ({})) };
@@ -22,7 +22,7 @@ const inDays = (n) => new Date(Date.now() + n * 86400000).toISOString().split('T
 db.prepare("DELETE FROM learning_plans WHERE user_id = 'user-1'").run();
 
 const course = db.prepare('SELECT slug, title, hours FROM courses ORDER BY hours DESC LIMIT 1').get();
-if (!course) { console.log('SKIP — no courses.'); process.exit(0); }
+if (!course) { console.log('SKIP, no courses.'); process.exit(0); }
 console.log(`Using course: ${course.title} (${course.hours}h)\n`);
 
 // ── V27: the maths reflects real remaining work ─────────────────────────────

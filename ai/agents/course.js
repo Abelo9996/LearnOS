@@ -1,5 +1,5 @@
 /**
- * Course generator — the "AI university" centerpiece. Given a topic, the
+ * Course generator, the "AI university" centerpiece. Given a topic, the
  * Curriculum agent designs a rigorous, multi-module course comparable to a top
  * Coursera specialization: substantial readings, a diverse mix of real
  * external resources (lecture videos, papers, books, blogs, docs), a hands-on
@@ -76,12 +76,12 @@ const courseSchema = {
   required: ['title', 'blurb', 'tags', 'hours', 'modules', 'capstone'],
 };
 
-const SYSTEM = `You are the Curriculum agent for LearnOS. Design a rigorous, university-grade course on the requested topic — comparable in depth and structure to a top Coursera specialization, but better because it weaves in the best of the open web.
+const SYSTEM = `You are the Curriculum agent for LearnOS. Design a rigorous, university-grade course on the requested topic, comparable in depth and structure to a top Coursera specialization, but better because it weaves in the best of the open web.
 
 Produce 5-6 modules in a sensible learning order. For EACH module:
-- "reading_md": a substantial original lesson in Markdown (250-450 words) that actually teaches the concept — headings, worked intuition, and why it matters. This is the core reading, not a summary.
+- "reading_md": a substantial original lesson in Markdown (250-450 words) that actually teaches the concept, headings, worked intuition, and why it matters. This is the core reading, not a summary.
 - "objectives": 2-4 concrete learning objectives.
-- "resources": 3-5 REAL, canonical external resources that genuinely exist at long-stable URLs. Diversify "kind" across lecture videos (prefer YouTube: MIT OCW, Stanford, 3Blue1Brown, conference talks), scientific papers (arXiv, ACL, NeurIPS), canonical books, high-signal blogs (e.g. distill.pub), reputable articles/docs, and key repos. NEVER invent URLs — omit anything you are not confident exists; a verifier drops dead links.
+- "resources": 3-5 REAL, canonical external resources that genuinely exist at long-stable URLs. Diversify "kind" across lecture videos (prefer YouTube: MIT OCW, Stanford, 3Blue1Brown, conference talks), scientific papers (arXiv, ACL, NeurIPS), canonical books, high-signal blogs (e.g. distill.pub), reputable articles/docs, and key repos. NEVER invent URLs, omit anything you are not confident exists; a verifier drops dead links.
 - "assignment": one hands-on assignment (coding/project/homework/analysis) with a concrete 4-7 step task checklist that applies the module's objectives.
 
 Then a "capstone": a substantial final project that synthesizes the whole course into something the learner builds and can show off.

@@ -1,4 +1,4 @@
-// Depth floors — the mechanism that makes "thorough" enforceable.
+// Depth floors, the mechanism that makes "thorough" enforceable.
 //
 // Measured against Coursera (docs/MASTERY_SPEC_V2.md §1): a single reference
 // course ships 42 videos, 9 practice quizzes, 2 graded programming assignments
@@ -15,10 +15,10 @@ import db from '../../db/database.js';
 export const FLOORS = {
   modulesPerCourse:       6,     // Coursera courses run 3–8 modules; a full pathway needs breadth
   lessonsPerModule:       6,     // reference module: ~14 videos + quizzes + labs
-  readingChars:        1500,     // our old median was 451 — a paragraph, not a lesson
+  readingChars:        1500,     // our old median was 451, a paragraph, not a lesson
   quizItemsPerModule:     8,     // reference: 10–30 questions per graded quiz
   gradedPerModule:        1,     // something that actually counts
-  practicalPerModule:     1,     // lab / exercise / programming — "doing", not watching
+  practicalPerModule:     1,     // lab / exercise / programming, "doing", not watching
   resourcesPerModule:     2,     // verified, embeddable, free
   timeHonestyTolerance: 0.20,    // Σ item minutes vs declared course hours (±20%)
 };
@@ -51,7 +51,7 @@ export function validateCourseDepth(slug, floors = FLOORS) {
     totalLessons += lessons.length;
 
     // A capstone is one culminating project by design, not a teaching module, so
-    // the per-module content floors don't apply — it only has to actually be graded.
+    // the per-module content floors don't apply, it only has to actually be graded.
     const isCapstone = /-capstone$/.test(m.id) || /^capstone\b/i.test(m.title || '');
     if (isCapstone) {
       for (const l of lessons) totalMinutes += Number(l.estimated_minutes) || 0;
@@ -88,7 +88,7 @@ export function validateCourseDepth(slug, floors = FLOORS) {
     if (items     < floors.quizItemsPerModule) fail('QUIZ_ITEMS', m.title, `${items} quiz items in bank`, items, floors.quizItemsPerModule);
   }
 
-  // V2 — time honesty: declared hours should match the sum of per-item estimates.
+  // V2, time honesty: declared hours should match the sum of per-item estimates.
   const declaredMinutes = (Number(course.hours) || 0) * 60;
   if (declaredMinutes > 0 && totalMinutes > 0) {
     const drift = Math.abs(totalMinutes - declaredMinutes) / declaredMinutes;
@@ -129,7 +129,7 @@ export function formatReport(results) {
   for (const r of results) {
     const s = r.stats || {};
     lines.push(`${r.ok ? 'PASS' : 'FAIL'}  ${r.slug}  (${s.modules ?? 0} modules, ${s.lessons ?? 0} lessons, ${s.quizItems ?? 0} items)`);
-    for (const v of r.violations) lines.push(`        ${v.code.padEnd(14)} ${v.scope} — ${v.message} (floor ${v.floor})`);
+    for (const v of r.violations) lines.push(`        ${v.code.padEnd(14)} ${v.scope}, ${v.message} (floor ${v.floor})`);
   }
   const failed = results.filter(r => !r.ok).length;
   lines.push(`\n${results.length - failed}/${results.length} courses meet the depth floors.`);

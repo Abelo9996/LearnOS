@@ -1,12 +1,12 @@
 /**
- * AN — Analytics agent (P9). Runs after session completion to:
+ * AN, Analytics agent (P9). Runs after session completion to:
  *   1. Score each learning objective from the conversation transcript
  *   2. Produce a written session summary
  *   3. Seed extra spaced-review cards for weak objectives
  *   4. Enqueue an RE proposal for additional resources on weak objectives
  *
  * Falls back to deterministic, heuristic analysis (no LLM) so the loop still
- * runs without a key — the user just gets a less-polished summary.
+ * runs without a key, the user just gets a less-polished summary.
  */
 import db from '../../db/database.js';
 import { complete } from '../llm.js';

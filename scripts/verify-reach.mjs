@@ -7,7 +7,7 @@
  *   V34 safety         a translation never overwrites the source content
  *
  * The mobile checks drive a real browser; the translation checks are written so
- * that they pass whether or not an LLM is reachable — a translation feature that
+ * that they pass whether or not an LLM is reachable, a translation feature that
  * silently corrupts content when the provider is down would be worse than one
  * that simply isn't available.
  *
@@ -19,7 +19,7 @@ import { getTranslation, saveTranslation, courseTranslationStatus } from '../ai/
 const BASE = process.argv[2] || 'http://localhost:3001';
 const FRONT = process.argv[3] || 'http://localhost:3000';
 const results = [];
-const check = (id, name, pass, detail = '') => { results.push({ id, pass }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? ` — ${detail}` : ''}`); };
+const check = (id, name, pass, detail = '') => { results.push({ id, pass }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? `, ${detail}` : ''}`); };
 const api = async (path, opts = {}) => {
   const r = await fetch(`${BASE}${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts });
   return { status: r.status, body: await r.json().catch(() => ({})) };

@@ -26,7 +26,7 @@ We take security seriously. If you discover a vulnerability in LearnOS, please r
 LearnOS ships with hardening built in:
 
 ### Accounts
-- LearnOS is **single-user and self-hosted** — there is no login, registration, or password storage by design. It's meant to run on your own machine or a private instance you control, so exposure of an authentication surface is avoided entirely.
+- LearnOS is **single-user and self-hosted**, there is no login, registration, or password storage by design. It's meant to run on your own machine or a private instance you control, so exposure of an authentication surface is avoided entirely.
 - If you expose an instance to a network, put it behind your own access control (reverse-proxy auth, VPN, or firewall).
 
 ### API Keys
@@ -47,7 +47,7 @@ LearnOS ships with hardening built in:
 ### Data
 - **SQLite** is used for storage; database files (`db/*.db*`) are gitignored.
 - Secrets live in `.env` (gitignored). Use [`.env.example`](.env.example) as a template and rotate keys regularly.
-- No third-party telemetry is collected — learning data belongs to the learner.
+- No third-party telemetry is collected, learning data belongs to the learner.
 
 ## Dependencies
 

@@ -17,19 +17,19 @@ const KEEP = process.argv.includes('--keep');
 
 // Real, long-stable URLs so reachability verification exercises the real path.
 const URLS = [
-  { title: '3Blue1Brown — But what is a neural network?', url: 'https://www.youtube.com/watch?v=aircAruvnKk', kind: 'video', source: 'YouTube' },
+  { title: '3Blue1Brown, But what is a neural network?', url: 'https://www.youtube.com/watch?v=aircAruvnKk', kind: 'video', source: 'YouTube' },
   { title: 'Attention Is All You Need', url: 'https://arxiv.org/abs/1706.03762', kind: 'paper', source: 'arXiv' },
-  { title: 'Machine learning — overview', url: 'https://en.wikipedia.org/wiki/Machine_learning', kind: 'article', source: 'Wikipedia' },
-  { title: 'Linear algebra — overview', url: 'https://en.wikipedia.org/wiki/Linear_algebra', kind: 'article', source: 'Wikipedia' },
+  { title: 'Machine learning, overview', url: 'https://en.wikipedia.org/wiki/Machine_learning', kind: 'article', source: 'Wikipedia' },
+  { title: 'Linear algebra, overview', url: 'https://en.wikipedia.org/wiki/Linear_algebra', kind: 'article', source: 'Wikipedia' },
   { title: 'Gradient descent', url: 'https://en.wikipedia.org/wiki/Gradient_descent', kind: 'article', source: 'Wikipedia' },
 ];
 
 const reading = (topic, n) => ({
-  title: `${topic} — part ${n}`,
+  title: `${topic}, part ${n}`,
   minutes: 12,
   // >= 1500 chars of structured instruction, matching the floor.
   body_md: [
-    `# ${topic} — part ${n}`, '',
+    `# ${topic}, part ${n}`, '',
     `## Why this matters`, '',
     `Understanding ${topic.toLowerCase()} is what separates being able to recite a definition from being able to apply it under pressure. `.repeat(4), '',
     `## The core idea`, '',
@@ -109,7 +109,7 @@ if (!KEEP) {
     db.prepare('DELETE FROM roadmaps WHERE id = ?').run(res.roadmap_id);
   }
   db.prepare("DELETE FROM assignments WHERE course = ?").run(blueprint.title);
-  console.log('(test course removed — pass --keep to inspect it in the app)');
+  console.log('(test course removed, pass --keep to inspect it in the app)');
 }
 
 process.exit(depth.ok ? 0 : 1);

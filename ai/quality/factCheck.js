@@ -1,10 +1,10 @@
 /**
- * Independent answer verification — M7 of docs/MASTERY_SPEC_V2.md.
+ * Independent answer verification, M7 of docs/MASTERY_SPEC_V2.md.
  *
  * The generator that wrote a question also wrote its answer key. Asking it "is
  * this right?" mostly gets agreement, so that is worth very little. Instead we
- * pose the question COLD — no answer key, no explanation, no hint that anything
- * is being checked — and see which option an independent pass picks. If it
+ * pose the question COLD, no answer key, no explanation, no hint that anything
+ * is being checked, and see which option an independent pass picks. If it
  * disagrees, or reports that the question is ambiguous or has several defensible
  * answers, the item is DISPUTED and is kept out of graded assessment until a
  * human resolves it.
@@ -29,12 +29,12 @@ const answerSchema = {
   required: ['answer_idx', 'confident', 'single_correct_answer', 'concern'],
 };
 
-const SYSTEM = `You are an independent subject-matter examiner. You are shown a multiple-choice question with its options — NOT the answer key.
+const SYSTEM = `You are an independent subject-matter examiner. You are shown a multiple-choice question with its options, NOT the answer key.
 
 Do three things:
 1. "answer_idx": pick the single best option (0-based). Answer it yourself, on the merits.
 2. "single_correct_answer": false if more than one option is defensibly correct, if none is, or if the question is ambiguous or depends on unstated assumptions.
-3. "concern": if anything is wrong with the question — ambiguity, a factual error in an option, two right answers, a trick of wording — say so in one sentence. Empty string if it is a clean question.
+3. "concern": if anything is wrong with the question, ambiguity, a factual error in an option, two right answers, a trick of wording, say so in one sentence. Empty string if it is a clean question.
 
 Be exacting. You are the check that stops a plausible-sounding but wrong question from being used to grade a learner.`;
 
@@ -100,7 +100,7 @@ export async function verifyCourseItems({ userId = 'user-1', slug = null, limit 
         applyVerdict(it.id, verdict);
         tally[verdict.status] = (tally[verdict.status] || 0) + 1;
       } catch (e) {
-        // A verification that cannot run leaves the item UNVERIFIED — never
+        // A verification that cannot run leaves the item UNVERIFIED, never
         // silently "confirmed". Unverified items stay out of graded assessment.
         tally.unverified++;
         if (/402|credit/i.test(e?.message || '')) throw e; // no point continuing

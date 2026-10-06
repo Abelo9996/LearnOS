@@ -1,8 +1,8 @@
-# LearnOS v2 — "Coursera, but it adapts to you"
+# LearnOS v2, "Coursera, but it adapts to you"
 
 **North star:** a free, self-hosted product where anyone can say *"I want to go from
 knowing nothing about X to being genuinely good at X"* and get a rigorous,
-media-rich, assessment-heavy pathway that **adapts to them** — the thoroughness of
+media-rich, assessment-heavy pathway that **adapts to them**, the thoroughness of
 Coursera plus the flexibility only generative AI can provide.
 
 Parity v1 (`COURSERA_PARITY_SPEC.md`) closed the *surface* gaps: embedded video,
@@ -11,15 +11,15 @@ gap, which is the real one. It is written against measured data, not impressions
 
 ---
 
-## Part 1 — What Coursera actually does (measured)
+## Part 1, What Coursera actually does (measured)
 
 Reference course: **Supervised Machine Learning: Regression and Classification**
-(DeepLearning.AI / Stanford, Andrew Ng) — 3 modules, ~33 hours.
+(DeepLearning.AI / Stanford, Andrew Ng), 3 modules, ~33 hours.
 
 | Module | Videos | Readings | Practice quizzes | Graded programming | Ungraded labs | Time |
 |--------|--------|----------|------------------|--------------------|---------------|------|
-| 1. Introduction to ML | 20 videos / 147 min | 1 | 3 quizzes / 35 min | — | 4 labs / 240 min | 7 h |
-| 2. Multiple variables | 10 videos / 66 min | — | 2 quizzes / 45 min | 1 lab / 180 min | 5 labs / 300 min | 10 h |
+| 1. Introduction to ML | 20 videos / 147 min | 1 | 3 quizzes / 35 min |, | 4 labs / 240 min | 7 h |
+| 2. Multiple variables | 10 videos / 66 min |, | 2 quizzes / 45 min | 1 lab / 180 min | 5 labs / 300 min | 10 h |
 | 3. Classification | 12 videos / 140 min | 2 | 4 quizzes / 120 min | 1 lab / 180 min | 9 labs / 540 min | 16 h |
 | **Total** | **42 videos / 353 min** | **3** | **9 quizzes** | **2 graded** | **18 labs / 1080 min** | **33 h** |
 
@@ -28,22 +28,22 @@ Reference course: **Supervised Machine Learning: Regression and Classification**
 1. **Two-tier assessment.** *Practice* quizzes are ungraded with unlimited
    attempts and immediate explanations; *graded* quizzes/assignments carry attempt
    limits and a pass threshold. Learners rehearse safely, then prove it.
-2. **Hands-on labs dominate.** 1080 min of labs vs 353 min of video — **3× more
+2. **Hands-on labs dominate.** 1080 min of labs vs 353 min of video, **3× more
    doing than watching**. Optional-but-expected, sandboxed, worked.
 3. **Auto-graded programming.** Code runs against visible *and hidden* test cases;
    score = % of tests passed.
 4. **Peer review with rubrics** for work requiring judgment (essays, projects,
-   design) — ~25% of courses. Each rubric item scored numerically. Coursera now
+   design), ~25% of courses. Each rubric item scored numerically. Coursera now
    augments this with AI grading for faster feedback.
 5. **Per-item time estimates and explicit learning objectives** on every module.
-6. **In-video retrieval practice** — questions posed mid-lecture, answered in the
+6. **In-video retrieval practice**, questions posed mid-lecture, answered in the
    following video.
 7. **Specializations**: 3–6 courses sequenced into one credential, terminating in a
    **capstone** that synthesizes everything.
 
 ---
 
-## Part 2 — Where we actually are (measured today)
+## Part 2, Where we actually are (measured today)
 
 Query against our live DB:
 
@@ -74,17 +74,17 @@ Seed assignments: **description 0 chars, 0 tasks** for 5 of 6.
 | Per-item time estimates | every item | module-level only | partial |
 | In-lesson retrieval practice | yes | no | missing |
 | Multi-course specialization | 3–6 courses + capstone | 1 course = 1 roadmap | missing |
-| Placement / diagnostic | — *(Coursera lacks this)* | none | **our opportunity** |
-| Adaptive re-planning | — *(Coursera lacks this)* | heuristic coach only | **our opportunity** |
+| Placement / diagnostic |, *(Coursera lacks this)* | none | **our opportunity** |
+| Adaptive re-planning |, *(Coursera lacks this)* | heuristic coach only | **our opportunity** |
 
 **Verdict:** we have the right *skeleton* and none of the *muscle*. A user opening
 `ml-foundations` today gets six paragraphs. Coursera gives them 33 hours. The
 single biggest reason is that we generate an entire course in **one 8000-token LLM
-call** — that ceiling makes shallowness structural, not incidental.
+call**, that ceiling makes shallowness structural, not incidental.
 
 ---
 
-## Part 3 — Target architecture
+## Part 3, Target architecture
 
 ### 3.1 Content model (what a course must contain)
 
@@ -122,15 +122,15 @@ Course
 
 ### 3.2 Assessment engine
 
-- **Practice** — ungraded, unlimited attempts, explanation revealed per question.
-- **Graded** — attempt limit (default 3), pass threshold (default 80%), recorded to
+- **Practice**, ungraded, unlimited attempts, explanation revealed per question.
+- **Graded**, attempt limit (default 3), pass threshold (default 80%), recorded to
   mastery, blocks progression until passed.
-- **Programming** — learner code run against declared test cases; score = % passed.
+- **Programming**, learner code run against declared test cases; score = % passed.
   Visible tests shown, hidden tests withheld.
-- **Project** — AI rubric review: each criterion scored 0–4 with written
+- **Project**, AI rubric review: each criterion scored 0–4 with written
   justification, replacing Coursera's peer review with something *faster and
   always available*.
-- **Item bank** — questions persist per module and are drawn from, so retakes
+- **Item bank**, questions persist per module and are drawn from, so retakes
   aren't identical and spaced review can reuse them.
 
 ### 3.3 Roadmap = specialization (A → B)
@@ -158,32 +158,32 @@ Runs as background jobs with progress, so a course takes minutes and arrives
 
 ---
 
-## Part 4 — Milestones (sequenced, each independently shippable)
+## Part 4, Milestones (sequenced, each independently shippable)
 
-**M1 — Content model & depth floors.** Schema for lesson kinds, per-item time,
+**M1, Content model & depth floors.** Schema for lesson kinds, per-item time,
 graded/optional flags, checkpoints, item bank, module objectives as first-class.
 Depth-floor validator + tests. *Unblocks everything else.*
 
-**M2 — Staged generation pipeline.** Blueprint → module → lesson calls as jobs
+**M2, Staged generation pipeline.** Blueprint → module → lesson calls as jobs
 with progress. Retry thin output against the floors. *This is what makes courses
 genuinely thorough.*
 
-**M3 — Assessment engine.** Practice/graded tiers, attempt limits, pass
+**M3, Assessment engine.** Practice/graded tiers, attempt limits, pass
 thresholds, item bank, programming auto-grade, rubric project review, mastery
 write-back and gating.
 
-**M4 — Specialization roadmaps.** Multi-course pathways, diagnostic placement,
+**M4, Specialization roadmaps.** Multi-course pathways, diagnostic placement,
 mastery gates, remediation loops.
 
-**M5 — Learner experience.** Per-item time in the UI, in-lesson checkpoints,
+**M5, Learner experience.** Per-item time in the UI, in-lesson checkpoints,
 progress that reflects graded completion, schedule/pacing with deadlines.
 
-**M6 — Verification harness.** Depth assertions, workflow E2E, grading
+**M6, Verification harness.** Depth assertions, workflow E2E, grading
 correctness, no-key degradation.
 
 ---
 
-## Part 5 — Verification (what "done" means)
+## Part 5, Verification (what "done" means)
 
 Run everything with **`npm run verify`** (server must be up). Individual suites:
 `depth:check`, `verify:assessment`, `verify:specialization`, `verify:integrity`.
@@ -204,7 +204,7 @@ Run everything with **`npm run verify`** (server must be up). Individual suites:
 | V12 | No fabrication | No placeholder/lorem content ships | ✅ 150 lessons, 96 items scanned |
 
 **Current verdict:** 41/41 blocking checks pass. The one known failure is the six
-hand-written seed courses, which predate the depth model — they clear once
+hand-written seed courses, which predate the depth model, they clear once
 regenerated through the builder.
 
 ### Measured before/after
@@ -220,7 +220,7 @@ regenerated through the builder.
 
 ---
 
-## Part 6 — Principles
+## Part 6, Principles
 
 - **Measured, not asserted.** Every depth claim is a query or a test.
 - **Doing > watching.** Labs and assessment outweigh passive content, as Coursera

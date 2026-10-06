@@ -53,13 +53,13 @@ app.use(helmet({
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       // esm.sh serves the Excalidraw whiteboard fonts. LearnOS is self-hosted,
-      // not air-gapped, so a font CDN is acceptable — allow it for fonts and the
+      // not air-gapped, so a font CDN is acceptable, allow it for fonts and the
       // fetch the font loader uses.
       connectSrc: ["'self'", "https://esm.sh"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "https://esm.sh", "data:"],
       objectSrc: ["'none'"],
-      // A lesson embeds its source directly — the video plays, the article and
-      // the paper are read — inside the course, rather than bouncing the learner
+      // A lesson embeds its source directly, the video plays, the article and
+      // the paper are read, inside the course, rather than bouncing the learner
       // out to a tab. That means framing arbitrary https origins, so the policy
       // is the scheme rather than a hand-maintained host list. Whether a given
       // site actually permits framing is decided per-URL server-side (it may
@@ -78,7 +78,7 @@ app.use(helmet({
 app.use(express.json({ limit: '1mb' }));
 app.use(requestLogger);
 
-// ── S-04: CORS — restrict to APP_URL in prod, open in dev ─────────────────────
+// ── S-04: CORS, restrict to APP_URL in prod, open in dev ─────────────────────
 app.use((req, res, next) => {
   const origin = isProd
     ? (process.env.APP_URL || '')
@@ -97,7 +97,7 @@ app.use((req, res, next) => {
 // ── S-02: Rate limiting ───────────────────────────────────────────────────────
 // General API rate limit. LearnOS is a single-user, self-hosted app and a single
 // screen can legitimately fire a dozen calls, so this is a runaway-loop backstop
-// rather than a tight quota — 100/15min throttled normal navigation.
+// rather than a tight quota, 100/15min throttled normal navigation.
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,
@@ -152,10 +152,10 @@ app.use('/uploads', express.static(uploadsPath, { maxAge: '7d' }));
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 app.get('/api/info',   (_req, res) => res.json({ name: 'LearnOS', version: '1.0.0', status: 'running' }));
 
-// ── Local-user middleware — resolves the single implicit user (no login) ──────
+// ── Local-user middleware, resolves the single implicit user (no login) ──────
 app.use('/api', requireAuth);
 
-// Current user (single local user — replaces the old /api/auth/me).
+// Current user (single local user, replaces the old /api/auth/me).
 app.get('/api/me', (req, res) => {
   const u = db.prepare(
     'SELECT id, name, email, role, avatar_hue, avatar_url, bio, links_json, level, xp, xp_to_next, streak, best_streak FROM users WHERE id = ?'
@@ -208,7 +208,7 @@ app.get('/api/stats', (req, res) => {
   const pendingAssignments= db.prepare("SELECT COUNT(*) as c FROM assignments WHERE user_id = ? AND status != 'graded'").get(uid).c;
   const dueFlashcards     = db.prepare("SELECT COUNT(*) as c FROM flashcards WHERE user_id = ? AND (next_review IS NULL OR next_review <= date('now'))").get(uid).c;
   // course_slug IS NULL excludes the private per-course companion roadmaps
-  // (see GET /api/roadmaps) — counting those averaged every course in twice.
+  // (see GET /api/roadmaps), counting those averaged every course in twice.
   const avgMastery        = db.prepare("SELECT AVG(mastery) as m FROM roadmaps WHERE user_id = ? AND status = 'active' AND course_slug IS NULL").get(uid);
   res.json({
     level:              user.level,
@@ -276,6 +276,6 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('\n  ✅ LearnOS running at http://localhost:' + PORT);
   const keyed = !!(process.env.OPENROUTER_API_KEY || process.env.LEARNOS_OPENROUTER_KEY);
   console.log(keyed
-    ? '  OpenRouter key detected — AI features are live.\n'
+    ? '  OpenRouter key detected, AI features are live.\n'
     : '  Tip: set OPENROUTER_API_KEY (or add one in Settings → API Keys) to enable AI features.\n');
 });

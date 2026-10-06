@@ -12,7 +12,7 @@ import LabRunner from '../components/LabRunner.jsx';
 // shape the generator (and people) actually produce: watch?v=, youtu.be short
 // links, /embed/, /v/, /shorts/, /live/, and ids buried behind other query
 // params (watch?feature=…&v=ID). Missing forms were silently falling through to
-// a "just a link" card instead of embedding — the core of the complaint.
+// a "just a link" card instead of embedding, the core of the complaint.
 function youtubeId(url) {
   if (!url) return null;
   const s = String(url);
@@ -31,7 +31,7 @@ function youtubeId(url) {
 /**
  * What can we actually show in place, rather than sending the learner away?
  *
- * Only sources that publish an embed endpoint are framed — guessing gets you a
+ * Only sources that publish an embed endpoint are framed, guessing gets you a
  * box showing "refused to connect", which is worse than an honest link. Every
  * frame is sandboxed and referrer-trimmed; anything unrecognised falls through
  * to the link card and the in-app reader below it.
@@ -89,7 +89,7 @@ const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, '
  *
  * The old approach fetched the page and re-rendered its text as Markdown, which
  * mangled layout, code and figures and read as broken. This embeds the actual
- * site instead — but only after the server confirms the site permits framing
+ * site instead, but only after the server confirms the site permits framing
  * (many send X-Frame-Options), because a blocked frame is a blank grey box.
  * When it can't be framed, fall back to a clean "open it" card rather than
  * showing something broken.
@@ -117,7 +117,7 @@ function FramedResource({ lessonId, url, meta }) {
   }
 
   if (status === 'blocked') {
-    // The site refuses to be embedded — an honest link beats a broken frame.
+    // The site refuses to be embedded, an honest link beats a broken frame.
     return (
       <a href={url} target="_blank" rel="noopener noreferrer" className="hover-card"
         style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, marginBottom: 18, borderRadius: 12, background: 'var(--surface)', border: `1px solid color-mix(in oklch, ${meta.color} 30%, var(--border))`, textDecoration: 'none', color: 'var(--ink)' }}>
@@ -170,7 +170,7 @@ export default function Courses() {
   const [progress, setProgress] = React.useState(null);
   const [verifying, setVerifying] = React.useState(false);
   const [selectedLesson, setSelectedLesson] = React.useState(null);
-  // The server returns { total, completed: <count>, completedIds: [...] } —
+  // The server returns { total, completed: <count>, completedIds: [...] } -
   // `completed` is a NUMBER, so treating it as an array silently broke progress
   // and threw on .includes().
   const completedIds = progress?.completedIds || [];
@@ -319,7 +319,7 @@ export default function Courses() {
     // `user.role === 'admin'` check was never true, so verify/edit were dead.)
     const isAdmin = true;
 
-    // Rich lesson reader — embeds lecture videos, renders resource cards by kind,
+    // Rich lesson reader, embeds lecture videos, renders resource cards by kind,
     // markdown readings, with prev/next navigation across the whole course.
     if (selectedLesson) {
       const lesson = selectedLesson;
@@ -348,15 +348,15 @@ export default function Courses() {
             {React.cloneElement(I.chevronL, { size: 14 })} {c.title}
           </button>
           <Card style={{ padding: 0, overflow: 'hidden' }}>
-            {/* Embedded source — video plays in place, a paper or PDF reads in
+            {/* Embedded source, video plays in place, a paper or PDF reads in
                 place. Sandboxed, and with the referrer trimmed to the origin. */}
             {embed && (
               <div style={{ position: 'relative', width: '100%', background: '#000', ...(embed.kind === 'video' ? { aspectRatio: '16 / 9' } : { height: '78vh', minHeight: 420 }) }}>
                 {/* Deliberately not sandboxed: Chrome refuses to run its PDF
                     viewer inside a sandboxed frame, so `sandbox` turned every
                     embedded paper into a blocked-content icon. The real control
-                    is the CSP frame-src allowlist in server.js — only four
-                    trusted hosts can be framed at all — and same-origin policy
+                    is the CSP frame-src allowlist in server.js, only four
+                    trusted hosts can be framed at all, and same-origin policy
                     keeps the frame away from this page either way. */}
                 <iframe
                   title={lesson.title} src={embed.src}
@@ -394,7 +394,7 @@ export default function Courses() {
                 return (
                   <div style={{ marginTop: 20, padding: 18, borderRadius: 12, background: 'var(--surface)', border: `1px solid color-mix(in oklch, ${meta.color} 30%, var(--border))` }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>
-                      {isGraded ? 'This one counts' : 'Practice — no pressure'}
+                      {isGraded ? 'This one counts' : 'Practice, no pressure'}
                     </div>
                     <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 5, lineHeight: 1.6 }}>
                       {isGraded
@@ -579,7 +579,7 @@ export default function Courses() {
             </h1>
             <div style={{ fontSize: 14, color: 'var(--muted)' }}>Courses you generated, plus any you imported. Build one on any subject, then share it as a file or publish it.</div>
           </div>
-          {/* Enrolled vs Explore vs Starred — separate, not blended (#24) */}
+          {/* Enrolled vs Explore vs Starred, separate, not blended (#24) */}
           <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 16, marginBottom: 14, flexWrap: 'wrap' }}>
             {tabs.map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{
@@ -624,8 +624,8 @@ export default function Courses() {
           ) : filtered.length === 0 ? (
             <Card style={{ padding: 48, textAlign: 'center' }}>
               <div style={{ fontSize: 16, color: 'var(--muted)', marginBottom: 12 }}>
-                {tab === 'enrolled' ? "You haven't enrolled in any courses yet — browse and enroll to see them here."
-                  : tab === 'starred' ? "No starred courses yet — tap the ★ on any course to save it."
+                {tab === 'enrolled' ? "You haven't enrolled in any courses yet, browse and enroll to see them here."
+                  : tab === 'starred' ? "No starred courses yet, tap the ★ on any course to save it."
                   : search ? `No courses match "${search}"`
                   : 'No courses found.'}
               </div>
@@ -663,7 +663,7 @@ function CourseStats({ courses = [], enrolled = {} }) {
   const enrolledCount = courses.filter(c => enrolled[c.slug]).length;
   return (
     <Card style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, alignItems: 'center' }}>
-      <Stat icon={I.book}   color="var(--brand)"        value={total || '—'}      label="Courses Available" delta="Open source" />
+      <Stat icon={I.book}   color="var(--brand)"        value={total || '-'}      label="Courses Available" delta="Open source" />
       <Stat icon={I.check}  color="var(--brand-3)"      value={verified}          label="LearnOS-Verified"  delta="issue certificates" />
       <Stat icon={I.people} color="oklch(0.78 0.16 85)" value={enrolledCount}     label="You're Enrolled In" delta="across the catalog" />
     </Card>
@@ -797,7 +797,7 @@ function FeaturedThisWeek({ courses = [], onSelect }) {
 
 
 
-// AI course generator — the Curriculum agent designs a full Coursera-grade
+// AI course generator, the Curriculum agent designs a full Coursera-grade
 // course (readings, verified resources, per-module assignments, capstone).
 function GenerateCourseModal({ onDone }) {
   const { add: toast } = useToast();
@@ -834,7 +834,7 @@ function GenerateCourseModal({ onDone }) {
     } catch (e) {
       setErrMsg(e.code === 'NO_KEY' || /key/i.test(e.message || '')
         ? 'Add an OpenRouter key in Settings → API Keys to build courses.'
-        : (e.message || 'Course build failed — try again.'));
+        : (e.message || 'Course build failed, try again.'));
       setPhase('error');
     }
   };
@@ -853,7 +853,7 @@ function GenerateCourseModal({ onDone }) {
           </div>
         </div>
         <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 12, lineHeight: 1.6, maxWidth: 400, margin: '12px auto 0' }}>
-          Each module is written in full — readings, ten practice questions, a hands-on lab and a graded assessment — then every external resource is reachability-verified. This takes a few minutes and is why the result has real depth.
+          Each module is written in full, readings, ten practice questions, a hands-on lab and a graded assessment, then every external resource is reachability-verified. This takes a few minutes and is why the result has real depth.
         </div>
       </div>
     );
@@ -872,7 +872,7 @@ function GenerateCourseModal({ onDone }) {
     <div style={{ minWidth: 460, maxWidth: 540, display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div>
         <h3 className="display" style={{ fontSize: 22, margin: 0 }}>Generate a course with AI</h3>
-        <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>A full, Coursera-grade course — readings, lecture videos, papers, assignments and a capstone — built for your topic.</div>
+        <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>A full, Coursera-grade course, readings, lecture videos, papers, assignments and a capstone, built for your topic.</div>
       </div>
       <div>
         <label className="cap" style={{ display: 'block', marginBottom: 6 }}>What do you want a course on?</label>

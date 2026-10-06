@@ -1,5 +1,5 @@
 /**
- * Staged course builder — M2 of docs/MASTERY_SPEC_V2.md.
+ * Staged course builder, M2 of docs/MASTERY_SPEC_V2.md.
  *
  * The old generator asked one 8000-token call to produce an entire course. That
  * made shallowness *structural*: our courses averaged 370 characters of body per
@@ -11,8 +11,8 @@
  *   Stage 1  blueprint      1 call   outcomes, prerequisites, skills, module plan
  *   Stage 2  module content N calls  per module: full readings, 10 quiz items,
  *                                    a hands-on lab, a graded assessment, resources
- *   Stage 3  verify         —        every external URL reachability-checked
- *   Stage 4  assemble       —        persist, compute honest hours, validate floors
+ *   Stage 3  verify        ,        every external URL reachability-checked
+ *   Stage 4  assemble      ,        persist, compute honest hours, validate floors
  *
  * Each module therefore yields ~8-10 real lessons instead of ~2, and the result
  * is validated against ai/quality/depthFloors.js before it is called done.
@@ -87,7 +87,7 @@ const blueprintSchema = {
 
 const BLUEPRINT_SYSTEM = `You are the Curriculum agent for LearnOS, designing a course that must stand next to a top Coursera specialization and win.
 
-Design the BLUEPRINT only — no lesson bodies yet.
+Design the BLUEPRINT only, no lesson bodies yet.
 
 Requirements:
 - ${FLOORS.modulesPerCourse}-9 modules in a genuine learning order, where each module depends on the one before it. Cover the topic from its foundations through to advanced, applied practice. Do not stop at an introductory survey.
@@ -97,7 +97,7 @@ Requirements:
 - Each module: a clear title, a 1-2 sentence summary, and 3-5 measurable objectives.
 - "capstone": a substantial final project synthesizing the whole course into something the learner builds and can show off.
 
-If a "Pathway context" is provided (the specialization this course belongs to and the learner's end goal), anchor the whole course to it: module topics, examples and terminology must serve that goal. An "OOP" course inside a C++ pathway is a C++ OOP course — never drift to a different language or domain.
+If a "Pathway context" is provided (the specialization this course belongs to and the learner's end goal), anchor the whole course to it: module topics, examples and terminology must serve that goal. An "OOP" course inside a C++ pathway is a C++ OOP course, never drift to a different language or domain.
 
 Calibrate scope and rigor to the requested level. Return only the structured object.`;
 
@@ -184,8 +184,8 @@ const assessmentSchema = {
               fn: { type: 'string' },
               // Args and expected values are arbitrary JSON, but a schema of `{}`
               // (or an array with no item type) is rejected outright by strict
-              // providers — "Empty schema that accepts any JSON value is not
-              // supported" — which failed the WHOLE assessment call and silently
+              // providers, "Empty schema that accepts any JSON value is not
+              // supported", which failed the WHOLE assessment call and silently
               // cost every module its quiz items. Carrying them as JSON strings
               // keeps the schema concrete and portable.
               args_json: { type: 'string' },
@@ -232,17 +232,17 @@ const assessmentSchema = {
 const READINGS_SYSTEM = `You are the Curriculum agent for LearnOS writing the TEACHING CONTENT of one module. This module must be as substantial as a week of a top university course. Thin output is a failure.
 
 Produce:
-- "readings": 3-4 original lessons that actually TEACH. Each body_md must be at least 450 words (${FLOORS.readingChars}+ characters) of real instruction in Markdown. Do not summarize — teach. Never use placeholder text.
-- "resources": 5-7 REAL, canonical external resources at long-stable URLs — and AT LEAST 2 must be kind "video" (YouTube lecture videos: MIT OCW, Stanford, 3Blue1Brown, StatQuest, freeCodeCamp, Computerphile, conference talks — only videos famous enough that you are certain of the exact URL). Diversify the rest across papers (arXiv), canonical books, high-signal blogs, docs and key repos. NEVER invent a URL — omit anything you are not confident exists; a verifier drops dead links, and a module with no surviving resources is a failure.
+- "readings": 3-4 original lessons that actually TEACH. Each body_md must be at least 450 words (${FLOORS.readingChars}+ characters) of real instruction in Markdown. Do not summarize, teach. Never use placeholder text.
+- "resources": 5-7 REAL, canonical external resources at long-stable URLs, and AT LEAST 2 must be kind "video" (YouTube lecture videos: MIT OCW, Stanford, 3Blue1Brown, StatQuest, freeCodeCamp, Computerphile, conference talks, only videos famous enough that you are certain of the exact URL). Diversify the rest across papers (arXiv), canonical books, high-signal blogs, docs and key repos. NEVER invent a URL, omit anything you are not confident exists; a verifier drops dead links, and a module with no surviving resources is a failure.
 
 Readings must be VISUALLY STRUCTURED, never a wall of text:
 - A ### heading every 150-250 words; no paragraph longer than 4 sentences.
 - At least one fenced code block per reading: a worked, runnable example for code topics.
-- At least one DIAGRAM per reading as a \`\`\`mermaid fenced block — the reader renders it visually. Use whichever Mermaid diagram type fits: flowchart for processes/decisions, sequenceDiagram for interactions, graph for relationships/architecture, timeline for history, mindmap for concept breakdowns. Keep labels short and the syntax valid. A picture of how the pieces connect is worth more than another paragraph.
-- At least one Markdown table per reading (comparison, decision guide, or summary — | Col | Col | rows).
+- At least one DIAGRAM per reading as a \`\`\`mermaid fenced block, the reader renders it visually. Use whichever Mermaid diagram type fits: flowchart for processes/decisions, sequenceDiagram for interactions, graph for relationships/architecture, timeline for history, mindmap for concept breakdowns. Keep labels short and the syntax valid. A picture of how the pieces connect is worth more than another paragraph.
+- At least one Markdown table per reading (comparison, decision guide, or summary, | Col | Col | rows).
 - Bold the key terms on first use. End every reading with a "**Key takeaways**" bullet list of 3-5 points.
 
-If the course context names a target language, tool, or domain (e.g. a C++ pathway), EVERY example, code block, and idiom must use that language/tool — never substitute another one.
+If the course context names a target language, tool, or domain (e.g. a C++ pathway), EVERY example, code block, and idiom must use that language/tool, never substitute another one.
 
 "minutes" fields are honest time estimates for a learner at the stated level.`;
 
@@ -252,8 +252,8 @@ Produce ALL THREE:
 - "quiz_items": exactly 10 practice questions with 4 choices each, the correct "answer_idx" (0-based), and an "explanation" that teaches why the answer is right and why the tempting distractor is wrong. Vary difficulty across easy/medium/hard. Tag each with the "skill" it tests.
 - "lab": a hands-on exercise the learner actually performs, with 4-8 concrete steps. This is the "doing" half of the module.
   Whenever the topic admits code, make the lab RUNNABLE. Choose "language" to MATCH the course: a C++ course gets "cpp", a Java course "java", a C course "c", a Go course "go"; use "javascript" or "python" for everything else. Mark 1-2 tests hidden. Each test is {name, fn, args_json, expected_json, hidden}, and its meaning depends on the language:
-  · javascript/python — function labs: "starter_code" defines the required function(s) with a clear TODO body; "fn" names the function under test, "args_json" is a JSON ARRAY of call arguments (e.g. "[2, 3]"), "expected_json" is the JSON value it must return (e.g. "5" or "[1,2]") — both JSON-encoded STRINGS describing values, never prose.
-  · cpp/c/java/go — I/O labs, judged like a programming contest: "starter_code" is a COMPLETE compilable program skeleton with a TODO section (for Java the public class MUST be named Main) that reads its input from stdin and prints the answer to stdout. Set "fn" to "main". "args_json" is a JSON array with EXACTLY ONE string: the exact stdin for the case (e.g. "[\"3 4\"]"); "expected_json" is a JSON string of the exact expected stdout (e.g. "\"7\""). Trailing whitespace is ignored.
+  · javascript/python, function labs: "starter_code" defines the required function(s) with a clear TODO body; "fn" names the function under test, "args_json" is a JSON ARRAY of call arguments (e.g. "[2, 3]"), "expected_json" is the JSON value it must return (e.g. "5" or "[1,2]"), both JSON-encoded STRINGS describing values, never prose.
+  · cpp/c/java/go, I/O labs, judged like a programming contest: "starter_code" is a COMPLETE compilable program skeleton with a TODO section (for Java the public class MUST be named Main) that reads its input from stdin and prints the answer to stdout. Set "fn" to "main". "args_json" is a JSON array with EXACTLY ONE string: the exact stdin for the case (e.g. "[\"3 4\"]"); "expected_json" is a JSON string of the exact expected stdout (e.g. "\"7\""). Trailing whitespace is ignored.
   If the topic genuinely has no code (a design or writing exercise), set "language" to "none", "starter_code" to "" and "tests" to [].
 - "graded": the assessment that counts, with a 4-7 step task list and a 3-5 criterion rubric whose weights sum to 1.
 
@@ -274,7 +274,7 @@ export async function buildCourse({ userId, topic, level, pathwayContext, learni
   onProgress(0.02, 'Designing the course blueprint…');
   const ctxLine = pathwayContext ? `\nPathway context: ${pathwayContext}` : '';
 
-  // The blueprint is a single call that gates the ENTIRE build — one malformed
+  // The blueprint is a single call that gates the ENTIRE build, one malformed
   // or truncated JSON response would otherwise sink the whole course. It failed
   // intermittently because a verbose model can run past the token budget and cut
   // the JSON mid-object (parse → null). Retry a few times, raising the budget so
@@ -302,11 +302,11 @@ export async function buildCourse({ userId, topic, level, pathwayContext, learni
 
   if (!validBlueprint(bp)) {
     throw new Error(lastStop === 'length'
-      ? 'The course blueprint was too long to finish generating — try a narrower topic.'
+      ? 'The course blueprint was too long to finish generating, try a narrower topic.'
       : 'Curriculum agent returned an invalid blueprint');
   }
 
-  // Stage 2 — two calls per module. This is where the depth comes from, and it
+  // Stage 2, two calls per module. This is where the depth comes from, and it
   // is also the whole cost of a build, so modules are written CONCURRENTLY.
   // Sequentially a 9-module course took ~13 minutes; the modules don't depend on
   // each other's output (only on the blueprint), so a bounded pool cuts that to
@@ -361,7 +361,7 @@ export async function buildCourse({ userId, topic, level, pathwayContext, learni
       return { ...m, ...teaching, ...assessment };
     } catch (e) {
       // One weak module must not sink the course, but the failure must be
-      // visible — silently pushing an empty module is how a "successful" build
+      // visible, silently pushing an empty module is how a "successful" build
       // shipped 1 lesson across 8 modules.
       console.warn(`[courseBuilder] module ${i + 1} (${m.title}) failed: ${e?.message || e}`);
       failures.push({ module: m.title, stage: 'teaching', error: e?.message || String(e) });
@@ -371,7 +371,7 @@ export async function buildCourse({ userId, topic, level, pathwayContext, learni
     }
   };
 
-  // Order is preserved regardless of completion order — a course's modules must
+  // Order is preserved regardless of completion order, a course's modules must
   // stay in their taught sequence.
   const modules = await mapWithConcurrency(bp.modules, MODULE_CONCURRENCY, buildModule);
 
@@ -389,8 +389,8 @@ export async function buildCourse({ userId, topic, level, pathwayContext, learni
 
 // ── Enrichment ───────────────────────────────────────────────────────────────
 // Deepens an EXISTING course in place rather than regenerating it. This is how a
-// thin course — the hand-written seed courses, an imported one, anything that
-// predates the depth model — is brought up to the floors without losing what it
+// thin course, the hand-written seed courses, an imported one, anything that
+// predates the depth model, is brought up to the floors without losing what it
 // already has or changing its slug.
 
 const expandSchema = {
@@ -440,7 +440,7 @@ export async function enrichCourse({ userId, slug, onProgress = () => {} }) {
     try {
       const ext = (await complete({
         userId, agentCode: 'CR', schema: extendSchema, maxTokens: 2500,
-        system: `You are the Curriculum agent extending an EXISTING course. Propose exactly ${needed} additional modules that continue the course beyond what it already covers — deeper, more applied, or the natural next topics. Do not repeat existing modules. Each needs a title, a 1-2 sentence summary and 3-5 measurable objectives.`,
+        system: `You are the Curriculum agent extending an EXISTING course. Propose exactly ${needed} additional modules that continue the course beyond what it already covers, deeper, more applied, or the natural next topics. Do not repeat existing modules. Each needs a title, a 1-2 sentence summary and 3-5 measurable objectives.`,
         messages: `Course: ${course.title} (${lvl})\n${course.blurb || ''}\nExisting modules:\n${teaching.map((m, i) => `${i + 1}. ${m.title}`).join('\n')}\n\nPropose ${needed} more.`,
       })).json;
       let idx = modules.length;
@@ -476,7 +476,7 @@ export async function enrichCourse({ userId, slug, onProgress = () => {} }) {
       `Module objectives: ${objectives.join('; ')}`,
     ].join('\n');
 
-    // Fill only what's missing, and append — never destroy existing content.
+    // Fill only what's missing, and append, never destroy existing content.
     // IDs must be unique BY CONSTRUCTION, not derived from a positional counter:
     // enrichment is re-runnable, and a count-based id collides with rows a
     // previous pass already inserted (which aborted whole modules mid-run).
@@ -552,7 +552,7 @@ export async function enrichCourse({ userId, slug, onProgress = () => {} }) {
     }
 
     // Existing readings that are below the floor must be EXPANDED, not just
-    // supplemented — otherwise a deepened course still serves its original
+    // supplemented, otherwise a deepened course still serves its original
     // 400-character stubs alongside the new material.
     const thin = db.prepare("SELECT id, title, body_md FROM module_lessons WHERE module_id = ? AND kind = 'reading' AND LENGTH(COALESCE(body_md,'')) < ?").all(m.id, FLOORS.readingChars);
     for (const t of thin) {
@@ -612,7 +612,7 @@ registerJobHandler('enrich-course', async ({ userId, input, jobId }) =>
 
 // ── Resource top-up ──────────────────────────────────────────────────────────
 // Models confidently cite URLs that don't exist. We never ship a dead link, so
-// those get dropped — which left real builds with modules holding 0 verified
+// those get dropped, which left real builds with modules holding 0 verified
 // resources. This pass re-asks for *canonical* sources (the kind that genuinely
 // have stable URLs) for any module still under the floor.
 
@@ -643,12 +643,12 @@ const topUpSchema = {
 const TOPUP_SYSTEM = `You are the Research agent for LearnOS. A module currently has too few WORKING external resources, because previously suggested URLs failed a reachability check.
 
 Suggest 8 resources whose URLs you are certain exist and are stable. Nobody learns from an encyclopedia dump, so prefer sources that actively TEACH, in this order:
-- Well-known LECTURE VIDEOS on long-established channels (3Blue1Brown, MIT OpenCourseWare, Stanford, StatQuest, freeCodeCamp, Computerphile, conference talks) — only videos famous enough that you are certain of the exact URL.
+- Well-known LECTURE VIDEOS on long-established channels (3Blue1Brown, MIT OpenCourseWare, Stanford, StatQuest, freeCodeCamp, Computerphile, conference talks), only videos famous enough that you are certain of the exact URL.
 - Interactive or visual explainers and tutorials (official "learn"/"getting started" guides, well-regarded course pages).
 - Official documentation root pages of well-known projects.
 - Canonical textbook or course homepages at university domains, and arXiv papers whose real ID you know (https://arxiv.org/abs/XXXX.XXXXX).
 
-Use Wikipedia ONLY as a last resort for a concept that genuinely has no better teaching source — never as the default. Accuracy of the URL matters more than novelty: do not invent article titles, paper IDs or video IDs. Omit anything you are not sure exists.`;
+Use Wikipedia ONLY as a last resort for a concept that genuinely has no better teaching source, never as the default. Accuracy of the URL matters more than novelty: do not invent article titles, paper IDs or video IDs. Omit anything you are not sure exists.`;
 
 /**
  * A resource has to load AND be the thing it claims to be.
@@ -673,7 +673,7 @@ async function verifyReachable(resources, context = '') {
 }
 
 // Lecture videos carry a course visually, but they are also the resource kind
-// the model most often hallucinates — so verified-video count gets its own
+// the model most often hallucinates, so verified-video count gets its own
 // floor (raised for visual learners) and its own dedicated top-up ask.
 
 async function topUpResources({ userId, bp, modules, level, learningStyle = '', onProgress }) {
@@ -715,7 +715,7 @@ async function topUpResources({ userId, bp, modules, level, learningStyle = '', 
           schema: topUpSchema,
           maxTokens: 2000,
           system: TOPUP_SYSTEM,
-          messages: `Course: ${bp.title} (${level})\nModule: ${m.title}\nObjectives: ${(m.objectives || []).join('; ')}\n\nSuggest 6-8 LECTURE VIDEOS ONLY (kind "video", YouTube) covering this module. Only include videos famous enough that you are certain of the exact URL — well-known channels: MIT OpenCourseWare, Stanford, 3Blue1Brown, StatQuest, freeCodeCamp, Computerphile, Fireship, CppCon, conference keynotes. A verifier checks each video actually exists.`,
+          messages: `Course: ${bp.title} (${level})\nModule: ${m.title}\nObjectives: ${(m.objectives || []).join('; ')}\n\nSuggest 6-8 LECTURE VIDEOS ONLY (kind "video", YouTube) covering this module. Only include videos famous enough that you are certain of the exact URL, well-known channels: MIT OpenCourseWare, Stanford, 3Blue1Brown, StatQuest, freeCodeCamp, Computerphile, Fireship, CppCon, conference keynotes. A verifier checks each video actually exists.`,
         })).json;
         const okExtra = await verifyReachable((extra?.resources || []).filter(r => r?.kind === 'video'), m.title);
         const seen = new Set(m.resources.map(r => r.url));
@@ -761,7 +761,7 @@ export async function persistRichCourse(userId, c, level = 'intermediate') {
     const objectives = Array.isArray(m.objectives) ? m.objectives : [];
     let li = 0, moduleMinutes = 0;
 
-    // The module row must exist before its lessons — module_lessons.module_id is
+    // The module row must exist before its lessons, module_lessons.module_id is
     // a foreign key. Its estimated_minutes is filled in once the lessons are known.
     db.prepare('INSERT INTO course_modules (id, course_slug, title, summary, order_idx, estimated_minutes, objectives) VALUES (?, ?, ?, ?, ?, 0, ?)')
       .run(mid, slug, m.title, m.summary || objectives.join(' · ') || null, i, J(objectives));
@@ -797,7 +797,7 @@ export async function persistRichCourse(userId, c, level = 'intermediate') {
       }
     }
 
-    // 3. Hands-on lab — the "doing" half, runnable where the topic allows it.
+    // 3. Hands-on lab, the "doing" half, runnable where the topic allows it.
     if (m.lab && m.lab.title) {
       const steps = (m.lab.steps || []).map((s, k) => `${k + 1}. ${s}`).join('\n');
       const lid = addLesson(m.lab.title, `# ${m.lab.title}\n\n${m.lab.description || ''}\n\n## Steps\n\n${steps}`, 'lab',
@@ -805,11 +805,11 @@ export async function persistRichCourse(userId, c, level = 'intermediate') {
       attachLabCode(lid, m.lab);
     }
 
-    // 4. Practice quiz — ungraded, drawn from the item bank below.
+    // 4. Practice quiz, ungraded, drawn from the item bank below.
     const items = Array.isArray(m.quiz_items) ? m.quiz_items.filter(q => q && q.question && Array.isArray(q.choices) && q.choices.length >= 2) : [];
     if (items.length) {
       const quizLessonId = addLesson(`Practice quiz · ${m.title}`,
-        `Check your understanding of **${m.title}**. This is practice — unlimited attempts, and every answer is explained.`,
+        `Check your understanding of **${m.title}**. This is practice, unlimited attempts, and every answer is explained.`,
         'practice_quiz', { minutes: Math.max(5, Math.round(items.length * 1.5)) });
       items.forEach((q, k) => {
         try {
@@ -823,7 +823,7 @@ export async function persistRichCourse(userId, c, level = 'intermediate') {
       });
     }
 
-    // 5. Graded assessment — the thing that counts, with a real rubric.
+    // 5. Graded assessment, the thing that counts, with a real rubric.
     const g = m.graded;
     if (g && g.title && Array.isArray(g.tasks) && g.tasks.length) {
       const body = `# ${g.title}\n\n${g.description || ''}\n\n## Your tasks\n\n${g.tasks.map((t, k) => `${k + 1}. ${t}`).join('\n')}`;
@@ -872,7 +872,7 @@ export async function persistRichCourse(userId, c, level = 'intermediate') {
   try {
     notify(userId, {
       kind: 'job', priority: 'normal',
-      title: `Course ready — ${c.title}`,
+      title: `Course ready, ${c.title}`,
       body: `${c.modules.length} modules · ${lessonCount} lessons · ${itemCount} practice questions.`,
       actionScreen: 'courses', actionId: slug,
     });

@@ -3,7 +3,7 @@
  * Deepen an existing course until it clears the depth floors.
  *
  * `npm run verify` names the courses that fall short and `depth-check.mjs`
- * says why, per module — but until now there was no way to act on that without
+ * says why, per module, but until now there was no way to act on that without
  * the UI. This is that way. It runs the same enrichCourse() the app's job queue
  * runs, in place, so a course that shipped with an unassessed module or a thin
  * reading gets repaired rather than regenerated from scratch.
@@ -34,14 +34,14 @@ if (args.includes('--failing')) {
   slugs = args.filter(a => !a.startsWith('-'));
 }
 
-if (!slugs.length) { console.log('Nothing to enrich — every course meets the floors.'); process.exit(0); }
+if (!slugs.length) { console.log('Nothing to enrich, every course meets the floors.'); process.exit(0); }
 
 console.log(`Enriching ${slugs.length} course(s). This makes real model calls and is not quick.\n`);
 
 let failed = 0;
 for (const slug of slugs) {
   const course = db.prepare('SELECT title FROM courses WHERE slug = ?').get(slug);
-  if (!course) { console.error(`SKIP  ${slug} — no such course`); failed++; continue; }
+  if (!course) { console.error(`SKIP  ${slug}, no such course`); failed++; continue; }
   console.log(`── ${course.title}`);
   let lastPct = -1;
   try {
@@ -56,10 +56,10 @@ for (const slug of slugs) {
         (SELECT COUNT(*) FROM course_modules WHERE course_slug = ?) modules,
         (SELECT COUNT(*) FROM module_lessons l JOIN course_modules m ON m.id = l.module_id WHERE m.course_slug = ?) lessons,
         (SELECT COUNT(*) FROM quiz_items WHERE course_slug = ?) items`).get(slug, slug, slug);
-    console.log(`   done — ${after.modules} modules, ${after.lessons} lessons, ${after.items} questions\n`);
+    console.log(`   done, ${after.modules} modules, ${after.lessons} lessons, ${after.items} questions\n`);
   } catch (e) {
     failed++;
-    console.error(`   FAILED — ${e.message}\n`);
+    console.error(`   FAILED, ${e.message}\n`);
   }
 }
 

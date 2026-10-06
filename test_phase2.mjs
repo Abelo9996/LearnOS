@@ -13,13 +13,13 @@ ok(t.includes('user_profiles'), 'user_profiles table');
 ok(t.includes('node_objectives'), 'node_objectives table');
 ok(db.prepare('PRAGMA table_info(roadmaps)').all().some(c => c.name === 'course_slug'), 'roadmaps.course_slug column');
 
-// PR — heuristic profile (no key)
+// PR, heuristic profile (no key)
 const prof = await runIntake({ userId: U, goal: 'Learn Rust', answers: { level: 'intermediate', time_per_week: 6, learning_style: 'projects', motivation: 'career' } });
 ok(prof.level === 'intermediate' && prof.time_per_week === 6, 'runIntake builds profile from answers');
 const stored = getProfile(U);
 ok(stored && stored.goal === 'Learn Rust' && stored.level === 'intermediate', 'profile persisted (upsert)');
 
-// CR — generate via template fallback, end to end
+// CR, generate via template fallback, end to end
 const res = await generateRoadmap({ userId: U, goal: 'Master Rust ownership', profile: stored });
 ok(res.roadmapId && res.source === 'template' && res.nodeCount >= 8, 'generateRoadmap → template roadmap (>=8 nodes)');
 const rm = db.prepare('SELECT * FROM roadmaps WHERE id=?').get(res.roadmapId);
@@ -35,7 +35,7 @@ ok(edges.length > 0 && edges.every(e => nodeIds.has(e.from_node) && nodeIds.has(
 const objs = db.prepare('SELECT * FROM node_objectives WHERE roadmap_id=?').all(res.roadmapId);
 ok(objs.length > 0, 'node objectives written');
 
-// CR — AI-path persistence with a simulated LLM spec
+// CR, AI-path persistence with a simulated LLM spec
 const sampleSpec = { title: 'Sample', subtitle: 's', nodes: [
   { id: 'n1', title: 'A', col: 0, row: 0, objectives: ['o1'], prereqs: [] },
   { id: 'n2', title: 'B', col: 1, row: 0, objectives: ['o2', 'o3'], prereqs: ['n1'] },

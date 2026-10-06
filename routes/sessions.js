@@ -24,7 +24,7 @@ router.post('/', (req, res) => {
   const total = db.prepare('SELECT COUNT(*) as c FROM sessions WHERE user_id = ? AND roadmap_id = ?').get(req.userId, roadmap_id || '')?.c || 0;
   db.prepare("INSERT INTO sessions (id, user_id, roadmap_id, roadmap_node_id, title, subtitle, agent, course, level, session_index, total_sessions, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')")
     .run(id, req.userId, roadmap_id || null, roadmap_node_id || null, title, subtitle || '', agent || 'TU', course, level, total + 1, 12);
-  // Starting a session on a not-yet-done node makes it the active module — this
+  // Starting a session on a not-yet-done node makes it the active module, this
   // is the only thing that restores 'active' status, so the roadmap's active
   // ring/state was otherwise unreachable after the first completion.
   if (roadmap_node_id) {
@@ -115,7 +115,7 @@ router.patch('/:id', (req, res) => {
         if (!has) {
           const cid = 'ce-' + Date.now();
           // `verified` means "this instance verified the work was actually done"
-          // — internally checkable, never externally accredited. The evidence
+          //, internally checkable, never externally accredited. The evidence
           // record is what the credential actually rests on, so it is captured
           // at issue time rather than reconstructed later.
           const evidence = {
@@ -132,7 +132,7 @@ router.patch('/:id', (req, res) => {
           // Finishing an entire pathway is the biggest thing that happens here.
           notify(req.userId, {
             kind: 'milestone', priority: 'high',
-            title: `Certificate earned — ${rm.title}`,
+            title: `Certificate earned, ${rm.title}`,
             body: 'You completed every stage of this pathway. The certificate records exactly what you were assessed on.',
             actionScreen: 'certificates',
           });
@@ -187,7 +187,7 @@ router.delete('/:id/whiteboard', (req, res) => {
 });
 
 // Excalidraw scene persistence. The whiteboard is now a full Excalidraw canvas,
-// whose state is one JSON scene rather than a list of freehand strokes — so it
+// whose state is one JSON scene rather than a list of freehand strokes, so it
 // is stored as a single upserted row keyed by the session, reusing this table.
 const sceneId = (sessionId) => `wb-scene-${sessionId}`;
 router.get('/:id/whiteboard/scene', (req, res) => {
@@ -211,7 +211,7 @@ router.post('/:id/messages', (req, res) => {
   // persisted (it was always NULL, so every reloaded message showed as "Tutor").
   const { role, agent_code, agent, body, kind, quiz } = req.body;
   if (!role) return res.status(400).json({ error: true, message: 'role required' });
-  // Structured turns (e.g. an AS quiz card) legitimately have no prose body —
+  // Structured turns (e.g. an AS quiz card) legitimately have no prose body -
   // requiring one made every quiz message 400 and vanish on reload.
   const text = body != null ? body : '';
   if (!text && !quiz) return res.status(400).json({ error: true, message: 'body or quiz required' });

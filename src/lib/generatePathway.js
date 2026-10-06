@@ -5,15 +5,15 @@ import API from '../api.js';
  *
  * Onboarding and the Roadmaps page used to generate roadmaps differently:
  * onboarding called genRoadmap directly, while the Roadmaps page planned a full
- * specialization first. The results behaved differently — different node kinds,
- * no course topics to build from, no placement diagnostic — so the roadmap you
+ * specialization first. The results behaved differently, different node kinds,
+ * no course topics to build from, no placement diagnostic, so the roadmap you
  * got on day one was not the roadmap the rest of the product expects. Both now
  * come through here, so they cannot drift apart again.
  *
  * Order matters: a specialization is the richer artifact (each stage carries a
  * topic the course builder can expand on demand, plus a placement diagnostic),
  * so it is always tried first. The Curriculum agent's pathway is the fallback,
- * and ONLY for key/credit problems — a genuine planning failure must surface
+ * and ONLY for key/credit problems, a genuine planning failure must surface
  * rather than be quietly downgraded to a template.
  */
 
@@ -27,7 +27,7 @@ async function pollJob(jobId, { tries, everyMs, onProgress }) {
     if (job?.status === 'done') return job.result;
     if (job?.status === 'failed') throw new Error(job.error || 'Generation failed');
   }
-  throw new Error('Generation timed out — try again');
+  throw new Error('Generation timed out, try again');
 }
 
 /**
@@ -68,7 +68,7 @@ export function describePathway(result, goal) {
     return {
       tone: 'success',
       message: `Pathway planned · ${result.stages} courses toward "${goal}"` +
-        (result.diagnosticQuestions ? ' — take the placement diagnostic to skip what you already know' : ''),
+        (result.diagnosticQuestions ? ', take the placement diagnostic to skip what you already know' : ''),
     };
   }
   if (result.source === 'ai') {
@@ -76,7 +76,7 @@ export function describePathway(result, goal) {
   }
   return {
     tone: 'info',
-    message: `Pathway created from an offline template · ${result.stages} courses — add an API key in Settings for one built around your goal`,
+    message: `Pathway created from an offline template · ${result.stages} courses, add an API key in Settings for one built around your goal`,
   };
 }
 

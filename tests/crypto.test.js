@@ -17,7 +17,7 @@ describe('crypto', () => {
 
   it('passes through legacy plaintext values', () => {
     // Decrypting something that wasn't encrypted with this scheme returns it
-    // unchanged — this is the documented "legacy seed placeholder" passthrough.
+    // unchanged, this is the documented "legacy seed placeholder" passthrough.
     expect(decryptSecret('sk-legacy-plaintext')).toBe('sk-legacy-plaintext');
     expect(isEncrypted('sk-legacy-plaintext')).toBe(false);
   });

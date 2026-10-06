@@ -1,7 +1,7 @@
 /**
  * AES-256-GCM encryption for secrets at rest (PLAT-04).
  * Key from env LEARNOS_ENC_KEY (32-byte base64 or hex). Dev fallback derives
- * from JWT_SECRET via scrypt — NOT for production.
+ * from JWT_SECRET via scrypt, NOT for production.
  */
 import crypto from 'crypto';
 

@@ -55,7 +55,7 @@ router.post('/', (req, res) => {
     }
     if (!req.file) return res.status(400).json({ error: true, message: 'No file provided' });
 
-    // S-08: Magic-byte sniff — the multer mime is client-asserted. Read the
+    // S-08: Magic-byte sniff, the multer mime is client-asserted. Read the
     // first bytes and verify the real format matches the allowlist. If
     // mismatched (e.g. a JS file renamed to .png), delete and 400.
     try {

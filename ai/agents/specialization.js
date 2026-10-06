@@ -1,12 +1,12 @@
 /**
- * Specialization planner — M4 of docs/MASTERY_SPEC_V2.md §3.3.
+ * Specialization planner, M4 of docs/MASTERY_SPEC_V2.md §3.3.
  *
  * A Coursera Specialization sequences 3-6 whole courses into one credential.
  * Ours goes further: the pathway starts where the learner *actually* is, not at
  * lesson one. The learner states a goal ("I want to be able to build and ship a
  * backend service"), we decompose it into a course sequence (point B), then a
  * diagnostic measures what they already know (point A) and the pathway starts
- * from there — the part Coursera doesn't do.
+ * from there, the part Coursera doesn't do.
  *
  * Courses are planned up front but BUILT on demand, because building all of them
  * eagerly would mean dozens of LLM calls for content the learner may never reach.
@@ -49,7 +49,7 @@ const PLAN_SYSTEM = `You are the Curriculum agent for LearnOS planning a SPECIAL
 Requirements:
 - 3-6 courses in strict dependency order. Each must be a substantial course in its own right, not a module.
 - The first course must be reachable from the learner's stated starting point; the last must actually deliver the goal.
-- "topic" is what we will hand to the course builder — make it specific and self-contained (it is used without the surrounding context).
+- "topic" is what we will hand to the course builder, make it specific and self-contained (it is used without the surrounding context).
 - "why" states, in one sentence, why this course is needed at this position in the path.
 - "skills": 3-6 named skills this course contributes to the goal. These are what a diagnostic will test, so make them concrete and testable.
 - "level" reflects where the learner will be by the time they reach that course, not where they start.
@@ -123,7 +123,7 @@ export async function planSpecialization({ userId, goal, level, onProgress = () 
     if (i > 0) db.prepare('INSERT OR IGNORE INTO roadmap_edges (roadmap_id, from_node, to_node) VALUES (?, ?, ?)').run(rmId, `${rmId}-c${i - 1}`, nid);
   });
 
-  // Placement diagnostic — this is what makes the pathway start at A, not at 0.
+  // Placement diagnostic, this is what makes the pathway start at A, not at 0.
   onProgress(0.75, 'Writing your placement diagnostic…');
   let diagnostic = null;
   try {
@@ -132,7 +132,7 @@ export async function planSpecialization({ userId, goal, level, onProgress = () 
       schema: diagnosticSchema,
       maxTokens: 4000,
       system: DIAGNOSTIC_SYSTEM,
-      messages: `Goal: ${goal}\nPathway:\n${plan.courses.map((c, i) => `${i}. ${c.title} — skills: ${(c.skills || []).join(', ')}`).join('\n')}\n\nWrite the placement diagnostic.`,
+      messages: `Goal: ${goal}\nPathway:\n${plan.courses.map((c, i) => `${i}. ${c.title}, skills: ${(c.skills || []).join(', ')}`).join('\n')}\n\nWrite the placement diagnostic.`,
     })).json;
     if (diagnostic?.questions?.length) {
       db.prepare('UPDATE roadmaps SET placement_json = ? WHERE id = ?').run(JSON.stringify(diagnostic.questions), rmId);
@@ -190,7 +190,7 @@ export function applyPlacement(userId, roadmapId, answers, { skipThreshold = 0.7
     if (!demonstrated && !decided) { startIndex = i; decided = true; }
     perCourse.push({ index: i, title: n.title, correct: rec.correct, total: rec.total, ratio, demonstrated, gaps: [...rec.skills] });
   });
-  if (!decided) startIndex = nodes.length - 1; // demonstrated everything — start at the last course
+  if (!decided) startIndex = nodes.length - 1; // demonstrated everything, start at the last course
 
   nodes.forEach((n, i) => {
     const status = i < startIndex ? 'done' : i === startIndex ? 'active' : i === startIndex + 1 ? 'next' : 'locked';
@@ -203,7 +203,7 @@ export function applyPlacement(userId, roadmapId, answers, { skipThreshold = 0.7
     .run(startNode?.title || '', startIndex, Math.max(0, nodes.length - startIndex), roadmapId);
 
   try {
-    logActivity(userId, { kind: 'session', text: `Placement complete — starting at "${startNode?.title}"`,
+    logActivity(userId, { kind: 'session', text: `Placement complete, starting at "${startNode?.title}"`,
       sub: startIndex > 0 ? `${startIndex} course(s) skipped as already demonstrated` : 'Starting from the beginning', agent: 'AS' });
   } catch {}
 
@@ -219,7 +219,7 @@ registerJobHandler('build-pathway-course', async ({ userId, input, jobId }) => {
   if (!node) throw new Error('Node not found');
   if (node.course_slug) return { slug: node.course_slug, alreadyBuilt: true };
 
-  // The course must know the pathway it serves — an "OOP" course in a C++
+  // The course must know the pathway it serves, an "OOP" course in a C++
   // specialization is a C++ OOP course, not a generic tour of Java and Python.
   const rm = db.prepare('SELECT title, goal FROM roadmaps WHERE id = ?').get(node.roadmap_id);
   const siblings = db.prepare("SELECT title FROM roadmap_nodes WHERE roadmap_id = ? AND node_kind = 'course' ORDER BY id").all(node.roadmap_id).map(n => n.title);
@@ -227,7 +227,7 @@ registerJobHandler('build-pathway-course', async ({ userId, input, jobId }) => {
   const pathwayContext = rm ? [
     `This course is part of the specialization "${rm.title}"${rm.goal ? ` toward the learner's goal: "${rm.goal}"` : ''}.`,
     siblings.length > 1 ? `Course sequence: ${siblings.map((t, i) => `${i + 1}. ${t}${i === position ? ' (THIS COURSE)' : ''}`).join(' → ')}.` : null,
-    'Anchor every example, code sample and idiom to that goal — never drift to a different language, tool or domain.',
+    'Anchor every example, code sample and idiom to that goal, never drift to a different language, tool or domain.',
   ].filter(Boolean).join(' ') : undefined;
 
   db.prepare("UPDATE roadmap_nodes SET build_status = 'building' WHERE id = ?").run(node.id);

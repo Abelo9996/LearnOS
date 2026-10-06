@@ -1,4 +1,4 @@
-// LearnOS is single-user and self-hosted — there is no login, so requests carry
+// LearnOS is single-user and self-hosted, there is no login, so requests carry
 // no auth token. The server resolves the one local user on every request.
 const API = {
   async request(method, path, body) {
@@ -30,7 +30,7 @@ const API = {
   patch: (path, body) => API.request('PATCH',  path, body),
   del:   (path)       => API.request('DELETE', path),
 
-  // ── Current user (single local user — no login) ────────────────────────────
+  // ── Current user (single local user, no login) ────────────────────────────
   getMe: () => API.get('/me'),
 
   // ── Stats / Dashboard ──────────────────────────────────────────────────────
@@ -63,7 +63,7 @@ const API = {
   getActivity:  () => API.get('/activity'),
   postActivity: (data) => API.post('/activity', data),
   getUnreadNotifs: () => API.get('/activity/unread-count'),
-  // Real notifications — milestones, unlocks, work needing attention — as
+  // Real notifications, milestones, unlocks, work needing attention, as
   // opposed to the activity log, which is the full history of everything.
   getNotifications:    () => API.get('/activity/notifications'),
   dismissNotification: (id) => API.post(`/activity/notifications/${id}/dismiss`, {}),
@@ -99,8 +99,8 @@ const API = {
 
   // ── Schedule ──────────────────────────────────────────────────────────────
   getSchedule:         () => API.get('/schedule'),
-  // The real commitments — assignment deadlines, reviews coming due, the next
-  // unfinished lesson in each course — merged and sorted by when they are due.
+  // The real commitments, assignment deadlines, reviews coming due, the next
+  // unfinished lesson in each course, merged and sorted by when they are due.
   getAgenda:           (days) => API.get('/schedule/agenda' + (days ? `?days=${days}` : '')),
   createScheduleEvent: (data) => API.post('/schedule', data),
   deleteScheduleEvent: (id) => API.del(`/schedule/${id}`),
@@ -130,13 +130,13 @@ const API = {
   setAgentRoutingBulk: (model, codes) => API.patch('/users/agent-routing', codes ? { model, codes } : { model }),
   getAgents:        () => API.get('/users/agents'),
 
-  // Course sharing (M12) — a course is a portable file, which is how a
+  // Course sharing (M12), a course is a portable file, which is how a
   // single-user self-hosted tool can genuinely take part in a commons.
   getExportableCourses: () => API.get('/share/exportable'),
   exportCourse:        (slug) => API.get(`/share/course/${slug}`),
   importCourse:        (bundle) => API.post('/share/import', { bundle }),
 
-  // Community registry (C3) — a convenience layered on top of file sharing.
+  // Community registry (C3), a convenience layered on top of file sharing.
   // Every one of these can fail without affecting anything else in the app.
   getRegistryConfig:   () => API.get('/registry/config'),
   setRegistryConfig:   (data) => API.patch('/registry/config', data),
@@ -150,11 +150,11 @@ const API = {
   getEnrollments:     () => API.get('/users/enrollments'),
   createCourse:       (data) => API.post('/courses', data),
   generateCourseAI:   (data) => API.post('/courses/generate', data),
-  // Staged build (M2): returns a jobId to poll — one LLM call per module, so it
+  // Staged build (M2): returns a jobId to poll, one LLM call per module, so it
   // takes minutes but produces a course with real depth.
   buildCourseAI:      (data) => API.post('/courses/build', data),
 
-  // Assessments (M3) — practice is unlimited and explained; graded costs an
+  // Assessments (M3), practice is unlimited and explained; graded costs an
   // attempt, has a pass bar, and moves mastery.
   getModuleQuiz:      (moduleId, mode, count) => API.get(`/assessments/module/${moduleId}/quiz?mode=${mode || 'practice'}${count ? `&count=${count}` : ''}`),
   submitModuleQuiz:   (moduleId, data) => API.post(`/assessments/module/${moduleId}/submit`, data),
@@ -171,7 +171,7 @@ const API = {
   runLab:             (lessonId, data) => API.post(`/assessments/lab/${lessonId}/run`, data),
   getRuntimes:        () => API.get('/assessments/runtimes'),
 
-  // Content accuracy (M7) — generated content can be confidently wrong, so the
+  // Content accuracy (M7), generated content can be confidently wrong, so the
   // learner needs a one-click way to pull a bad question out of grading.
   reportContent:      (data) => API.post('/content/report', data),
   getContentReports:  (status) => API.get(`/content/reports${status ? `?status=${status}` : ''}`),
@@ -179,7 +179,7 @@ const API = {
   getReader:          (lessonId) => API.get(`/content/reader/${lessonId}`),
   getFramable:        (lessonId) => API.get(`/content/framable/${lessonId}`),
 
-  // Specializations (M4) — a pathway of whole courses from A to B.
+  // Specializations (M4), a pathway of whole courses from A to B.
   planSpecialization: (data) => API.post('/roadmaps/specialization', data),
   getPlacement:       (rmId) => API.get(`/roadmaps/${rmId}/placement`),
   submitPlacement:    (rmId, answers) => API.post(`/roadmaps/${rmId}/placement/submit`, { answers }),

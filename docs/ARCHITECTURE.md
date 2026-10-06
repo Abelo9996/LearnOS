@@ -1,4 +1,4 @@
-# LearnOS — Technical Architecture (Target State)
+# LearnOS, Technical Architecture (Target State)
 
 > How the [SPEC.md](SPEC.md) gets built. Engineering-facing. Tracks the AI layer, data model,
 > retrieval pipeline, async jobs, and API surface that don't exist yet.
@@ -7,15 +7,15 @@
 
 ## 1. Current stack (keep)
 - **Frontend:** React 18 + Vite SPA, no router lib (`switch` in `App.jsx`), inline styles + `theme.css`.
-- **Backend:** Express 5, `routes/*.js` mounted in `server.js`, single local user resolved in `middleware/auth.js` (no login — self-hosted).
+- **Backend:** Express 5, `routes/*.js` mounted in `server.js`, single local user resolved in `middleware/auth.js` (no login, self-hosted).
 - **DB:** SQLite via better-sqlite3 (synchronous), WAL, schema in `db/schema.sql`, helpers in `db/database.js`.
-- **Gamification engine:** `awardXP` / `updateStreak` + session-completion cascade (`routes/sessions.js`). **Keep — it's real.**
+- **Gamification engine:** `awardXP` / `updateStreak` + session-completion cascade (`routes/sessions.js`). **Keep, it's real.**
 
 ## 2. What's missing structurally (the big adds)
-1. An **AI orchestration layer** (`/ai` or `/agents` module) — does not exist.
-2. A **model-provider abstraction** (managed key + BYOK, multi-provider) — does not exist.
-3. A **retrieval + verification pipeline** for trusted resources — does not exist.
-4. An **async job system** for long agent runs — does not exist (everything is synchronous today).
+1. An **AI orchestration layer** (`/ai` or `/agents` module), does not exist.
+2. A **model-provider abstraction** (managed key + BYOK, multi-provider), does not exist.
+3. A **retrieval + verification pipeline** for trusted resources, does not exist.
+4. An **async job system** for long agent runs, does not exist (everything is synchronous today).
 5. **~12 new tables** for profiles, content, assessments, submissions, agent runs, attachments.
 6. **Frontend↔Community wiring** (backend + api.js exist; UI doesn't call them).
 
@@ -63,7 +63,7 @@ Resolution order for the key/model:
 2. Else use the **managed platform key** (env `LEARNOS_<PROVIDER>_KEY`) → **meter usage** against the user's tier.
 3. `model` chosen by `agent_routing[userId][agentCode]` or the managed default.
 
-- **Providers:** OpenRouter (OpenAI-compatible) — one key, any model by slug (Claude, GPT, Gemini, Llama, …).
+- **Providers:** OpenRouter (OpenAI-compatible), one key, any model by slug (Claude, GPT, Gemini, Llama, …).
 - **Prompt caching:** mark agent system prompts as cacheable (they're stable, large). See the `claude-api` skill.
 - **Metering:** every managed call writes tokens+cost to `agent_runs`; a daily/monthly cap per user is enforced
   pre-call. Over cap → 402-style "add your own key or wait" response the UI handles gracefully.
@@ -88,19 +88,19 @@ RE.assemble(node):
 - **book** → Google Books API: confirm ISBN/title.
 - **article/generic** → HTTP GET 200 + content-type + (optional) title/keyword match; block known-bad/login-walled.
 Store `verified`, `checked_at`, `http_status`, `source`. Re-verify on a schedule (links rot).
-Note: **"verified" = reachable + correct type + on-topic — NOT "high quality."** Quality signal comes later from community ratings, not the verifier.
+Note: **"verified" = reachable + correct type + on-topic, NOT "high quality."** Quality signal comes later from community ratings, not the verifier.
 
-**Content extraction (required for tutor grounding):** verifying a link is reachable is not enough — the
+**Content extraction (required for tutor grounding):** verifying a link is reachable is not enough, the
 Tutor can't RAG over a raw YouTube URL. After verification, **extract the resource's text** (`retrieval/extract.js`):
 YouTube → transcript/captions; arXiv → PDF→text; article → readable-text scrape. Summarize into
 `module_content` (outline + key points); TU grounds on *this*, generated **lazily per node** when the learner
-arrives — not for the whole course up front (cost control).
+arrives, not for the whole course up front (cost control).
 
-**API/cost notes:** prefer keyless/free checks — **YouTube oEmbed** (keyless) over the quota-limited Data API;
+**API/cost notes:** prefer keyless/free checks, **YouTube oEmbed** (keyless) over the quota-limited Data API;
 **arXiv** + **Crossref** are free/open; **Google Books** needs a key.
 
 > Decision note: this is "LLM-proposed + auto-verified." If higher freshness is needed later, swap `propose.js`
-> to call live web search (Firecrawl/Exa) — the verify stage stays identical.
+> to call live web search (Firecrawl/Exa), the verify stage stays identical.
 
 ---
 
@@ -164,16 +164,16 @@ Follow the existing pattern in `db/database.js` (idempotent `ALTER TABLE … ADD
 | GET  | `/api/jobs/:id` | async job status |
 | GET  | `/api/usage` | managed-tier usage/limits |
 | POST | `/api/courses` / PATCH/`fork`/`publish` | authoring/forking/versioning |
-| *(exists)* | `/api/community/*` | already built — just call it from the UI |
+| *(exists)* | `/api/community/*` | already built, just call it from the UI |
 
 ---
 
 ## 9. Frontend changes
 - **Onboarding flow** (new screen) before Dashboard for users without a profile.
-- **Node Content view** (new) — the missing "where's the content" screen.
-- **Session.jsx** — replace canned `submit()` with a call to the grounded TU endpoint; drive topic from active node; render citations; stream if possible.
-- **Roadmap.jsx** — "Generate roadmap" entry; show job progress; reflect re-plans.
-- **Community (Extras.jsx)** — replace `DISCUSSIONS`/`LEADERBOARD`/local state with `API.getCommunityThreads/...` (already in `api.js`).
+- **Node Content view** (new), the missing "where's the content" screen.
+- **Session.jsx**, replace canned `submit()` with a call to the grounded TU endpoint; drive topic from active node; render citations; stream if possible.
+- **Roadmap.jsx**, "Generate roadmap" entry; show job progress; reflect re-plans.
+- **Community (Extras.jsx)**, replace `DISCUSSIONS`/`LEADERBOARD`/local state with `API.getCommunityThreads/...` (already in `api.js`).
 - **Course authoring** UI (Phase 2).
 - **Job/progress + usage** UI primitives (toasts already exist).
 - **Fix latent bugs** (see STATUS §Bugs): `AgentsPage` `setScreen`, Courses `TopContributorsCard` `openModal`/`ProfileModal`, Session `ChatMessage` `session`, `ForkBanner` `navigate` no-op.

@@ -109,7 +109,7 @@ export function Btn({ children, variant = 'ghost', size = 'sm', icon, iconRight,
    In-app replacement for the browser's native confirm() popup. Render it via
    useModal().open(<ConfirmModal … />): spring entrance comes from the modal
    shell, the icon pops in, and both buttons carry hover lift. `onConfirm` may
-   be async — the confirm button shows a busy state until it settles. */
+   be async, the confirm button shows a busy state until it settles. */
 export function ConfirmModal({ title, message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', danger = false, onConfirm, onCancel }) {
   const [busy, setBusy] = React.useState(false);
   const color = danger ? 'oklch(0.62 0.19 25)' : 'var(--brand)';
@@ -293,7 +293,7 @@ export function PageHeader({ eyebrow, title, subtitle, actions }) {
   return (
     // The actions row must not be allowed to squeeze the title. Without
     // flexShrink:0 on the actions (and a flex basis on the title), a screen with
-    // several buttons — one of which can contain a whole module name — collapsed
+    // several buttons, one of which can contain a whole module name, collapsed
     // the heading to one word per line. Actions wrap onto their own line instead.
     <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, marginBottom: 24, flexWrap: 'wrap' }}>
       <div style={{ minWidth: 260, flex: '1 1 320px' }}>
@@ -328,7 +328,7 @@ export function PageScroll({ children, wide = false }) {
   // Most screens read best at a fixed measure; browse-heavy ones (the course
   // catalog) should spread across the whole page instead of leaving big empty
   // gutters on a wide monitor. `wide` fills the available width and lets the
-  // card grid flow more items per row as the window grows — the container's own
+  // card grid flow more items per row as the window grows, the container's own
   // 32px padding is the only gutter, so no dead whitespace is reserved.
   return (
     <div className="scroll" style={{ height: '100%', padding: '28px 32px 60px' }}>
@@ -338,7 +338,7 @@ export function PageScroll({ children, wide = false }) {
 }
 
 /**
- * The LearnOS mark — the artwork on its own, over whatever is behind it.
+ * The LearnOS mark, the artwork on its own, over whatever is behind it.
  *
  * The PNG is transparent (three quarters of it is empty pixels), so nothing
  * here should introduce a plate or a fill behind it.

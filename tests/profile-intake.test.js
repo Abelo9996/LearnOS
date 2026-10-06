@@ -9,7 +9,7 @@ import { persistProfile, getProfile } from '../ai/agents/profiling.js';
  * The UI sends `learning_style` as an ARRAY of selected chips, but
  * profileSchema declares it a string, so only the LLM path produced the
  * expected shape. Without an API key the heuristic path passed the raw array to
- * better-sqlite3 — which treats an array argument as a LIST of bind parameters
+ * better-sqlite3, which treats an array argument as a LIST of bind parameters
  * rather than one value. The parameter count silently changed and intake died
  * with "Too many parameter values were provided", a message that points at
  * nothing. Onboarding was unreachable for anyone without a key.

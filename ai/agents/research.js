@@ -1,9 +1,9 @@
 /**
- * RE — Research agent (G2). Proposes external learning resources for a given
+ * RE, Research agent (G2). Proposes external learning resources for a given
  * node, persists them as status='proposed', and enqueues a verifier job that
  * fetches each URL to confirm reachability before flipping to status='verified'.
  *
- * The LLM is instructed NEVER to invent URLs — it returns *candidate* canonical
+ * The LLM is instructed NEVER to invent URLs, it returns *candidate* canonical
  * resources from its training; the verifier proves they exist. Any unreachable
  * URL is moved to status='rejected'.
  */
@@ -38,7 +38,7 @@ export async function resolvesToPublicIp(hostname) {
   try {
     // With { all: true }, dns.lookup resolves to an ARRAY of {address, family}.
     // This was destructured as `{ address }` (→ undefined), so the loop threw
-    // and every URL failed closed — silently rejecting ALL real resources.
+    // and every URL failed closed, silently rejecting ALL real resources.
     const records = await dnsLookup(hostname, { all: true });
     const list = Array.isArray(records) ? records : [records];
     for (const rec of list) {
@@ -65,7 +65,7 @@ const RESOURCE_KINDS = ['video', 'paper', 'book', 'blog', 'article', 'website', 
 
 // YouTube/Vimeo return HTTP 200 with a "video unavailable" page for nonexistent
 // video IDs, so a plain reachability check happily verifies hallucinated links.
-// Their oEmbed endpoints return a real 404 for missing videos — use those.
+// Their oEmbed endpoints return a real 404 for missing videos, use those.
 async function videoActuallyExists(url) {
   let oembed = null;
   if (/youtube\.com\/(watch|embed|shorts)|youtu\.be\//i.test(url)) {
@@ -111,7 +111,7 @@ export async function checkUrlReachable(url, kind = 'article') {
 /**
  * Reachable is not the same as correct.
  *
- * checkUrlReachable answers "does this URL load?" — and every citation passed,
+ * checkUrlReachable answers "does this URL load?", and every citation passed,
  * because the model does not invent hostnames, it invents *identifiers*. A
  * lesson on policy and value functions cited arXiv 1712.00567, which loads
  * perfectly and is a paper called "Biorthogonal rational functions of R_II
@@ -154,7 +154,7 @@ async function htmlTitle(url) {
     if (!r.ok) return null;
     if (!(r.headers.get('content-type') || '').toLowerCase().includes('html')) return null;
     const html = await r.text();
-    // Sites append their own name — "Markov chain - Wikipedia" — and that name
+    // Sites append their own name, "Markov chain - Wikipedia", and that name
     // would otherwise count as a content word in every comparison.
     //
     // Strip it ONLY when the trailing segment actually names the site. A blanket
@@ -164,7 +164,7 @@ async function htmlTitle(url) {
     const hostWords = new Set((new URL(url).hostname.toLowerCase().match(/[a-z]{3,}/g) || []));
     const clean = (s) => {
       let t = s.replace(/\s+/g, ' ').trim();
-      const tail = t.match(/^(.*\S)\s*[|\-–—]\s*([^|\-–—]{1,30})$/);
+      const tail = t.match(/^(.*\S)\s*[|\-–-]\s*([^|\-–-]{1,30})$/);
       if (tail) {
         const words = tail[2].toLowerCase().match(/[a-z]{3,}/g) || [];
         if (words.length && words.every(w => hostWords.has(w))) t = tail[1];
@@ -182,7 +182,7 @@ async function htmlTitle(url) {
  * Does this URL hold the document the course says it does?
  *
  * Returns `{ ok, realTitle, reason }`. `ok` is true when we could confirm a
- * match AND when we could not determine a title at all — an unverifiable source
+ * match AND when we could not determine a title at all, an unverifiable source
  * is not evidence of a wrong one, and failing closed here would strip every
  * legitimate link behind a login wall or a JS-rendered page.
  */
@@ -198,7 +198,7 @@ export async function checkUrlMatchesClaim(url, claimedTitle, { context = '' } =
   // at literally anything, and that is exactly how a fabricated citation ends
   // up resolving to a real but unrelated paper.
   //
-  // A descriptive path cannot fail that way — you do not accidentally land on
+  // A descriptive path cannot fail that way, you do not accidentally land on
   // "pandas.pydata.org/docs/user_guide/groupby.html" while meaning something
   // else. Checking those by title comparison only produced false alarms, since
   // a page legitimately titled "Group by: split-apply-combine" was cited as
@@ -207,7 +207,7 @@ export async function checkUrlMatchesClaim(url, claimedTitle, { context = '' } =
   // they are known to resolve.
   const arxivId = (host === 'arxiv.org' || host === 'export.arxiv.org') && u.pathname.match(/^\/(?:abs|pdf)\/(.+?)(?:v\d+)?$/);
   const isVideo = /^(youtube\.com|youtu\.be|m\.youtube\.com)$/.test(host);
-  if (!arxivId && !isVideo) return { ok: true, realTitle: null, reason: 'descriptive url — reachability is enough' };
+  if (!arxivId && !isVideo) return { ok: true, realTitle: null, reason: 'descriptive url, reachability is enough' };
 
   const realTitle = arxivId ? await arxivTitle(arxivId[1]) : await htmlTitle(url);
   if (!realTitle) return { ok: true, realTitle: null, reason: 'no title available' };
@@ -223,7 +223,7 @@ export async function checkUrlMatchesClaim(url, claimedTitle, { context = '' } =
   const ratio = shared / Math.min(real.size, claim.size);
 
   // Academic titles describe their contents, so a real overlap is expected and
-  // its absence is meaningful. Video titles do not play by that rule — "Python
+  // its absence is meaningful. Video titles do not play by that rule, "Python
   // OOP Tutorial 1: Classes and Instances" is exactly the right video for a
   // lesson called "Object-Oriented Programming in Python" while sharing one
   // word. So for video, only a total absence of overlap counts as wrong; that
@@ -259,7 +259,7 @@ const resourceListSchema = {
 const SYSTEM = `You are the Research agent for LearnOS. Given a learning module (the learner's "topic of the day") and its objectives, propose a diverse set of high-quality external resources a motivated learner would actually use.
 
 Cover a MIX of these "kind" values wherever they exist for the topic:
-- video: recorded lectures & talks — prefer YouTube (MIT OpenCourseWare, Stanford, 3Blue1Brown, conference talks)
+- video: recorded lectures & talks, prefer YouTube (MIT OpenCourseWare, Stanford, 3Blue1Brown, conference talks)
 - paper: scientific papers (arXiv, ACL Anthology, OpenReview, NeurIPS, Nature, journal DOIs)
 - book: canonical textbooks or free online books (author companion sites, well-known publishers, OpenLibrary)
 - blog: high-signal posts (distill.pub, respected research/engineering blogs)
@@ -269,7 +269,7 @@ Cover a MIX of these "kind" values wherever they exist for the topic:
 - repo: canonical open-source implementations (GitHub)
 
 Strict rules:
-- Only return resources you are HIGHLY confident exist at a canonical, long-stable URL. Do NOT invent URLs — omit anything you are unsure of. A verifier fetches every URL and drops dead links, so precision matters.
+- Only return resources you are HIGHLY confident exist at a canonical, long-stable URL. Do NOT invent URLs, omit anything you are unsure of. A verifier fetches every URL and drops dead links, so precision matters.
 - Lead with sources that actively TEACH: lecture videos and interactive or visual explainers first. Use Wikipedia only when a concept genuinely has no better teaching source, never as the default.
 - Prefer authoritative, evergreen sources over ephemeral ones.
 - Aim for 6-8 resources spanning at least 3 different kinds (always include at least one lecture video and one paper or book when the topic allows).
@@ -339,7 +339,7 @@ export async function verifyResource({ resourceId }) {
     if (!await resolvesToPublicIp(hostname)) return reject('private_target');
   } catch { return reject('private_target'); }
 
-  // Video hosts serve HTTP 200 for missing videos — the oEmbed endpoint is the
+  // Video hosts serve HTTP 200 for missing videos, the oEmbed endpoint is the
   // only honest signal, so it decides alone for those URLs.
   const videoCheck = await videoActuallyExists(r.url);
   if (videoCheck === false) return reject('video_not_found');

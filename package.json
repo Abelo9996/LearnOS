@@ -1,7 +1,7 @@
 {
   "name": "learnos",
   "version": "1.0.0",
-  "description": "LearnOS — AI-Powered Learning Platform",
+  "description": "LearnOS, AI-Powered Learning Platform",
   "type": "module",
   "scripts": {
     "dev": "vite",

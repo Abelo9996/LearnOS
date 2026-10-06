@@ -11,7 +11,7 @@
 import { runLab, runLabWithTests, availableLanguages } from '../ai/assessment/labRunner.js';
 
 const results = [];
-const check = (id, name, pass, detail = '') => { results.push({ id, pass }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? ` — ${detail}` : ''}`); };
+const check = (id, name, pass, detail = '') => { results.push({ id, pass }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? `, ${detail}` : ''}`); };
 
 const runtimes = await availableLanguages();
 console.log(`Runtimes: ${Object.entries(runtimes).map(([k, v]) => `${k}=${v.available ? 'yes' : 'no'}`).join(', ')}\n`);

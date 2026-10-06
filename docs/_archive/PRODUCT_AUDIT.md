@@ -1,4 +1,4 @@
-# ⚠️ ARCHIVED — superseded by docs/SPEC.md
+# ⚠️ ARCHIVED, superseded by docs/SPEC.md
 
 This audit was the source of truth prior to 2026-06-05. It is kept for historical
 reference only. For current product intent, see ../SPEC.md. For build status, see
@@ -6,7 +6,7 @@ reference only. For current product intent, see ../SPEC.md. For build status, se
 
 ---
 
-# LearnOS — Complete Product Audit
+# LearnOS, Complete Product Audit
 
 ## What Is LearnOS?
 
@@ -19,35 +19,35 @@ The product has a React frontend (Vite) + Express/SQLite backend with JWT auth. 
 ## Database Schema (16 tables)
 
 ### Core Identity
-- **users** — id, name, email, password_hash, role, avatar_hue, level, xp, xp_to_next, streak, best_streak, plan
-- **revoked_tokens** — jti, expires_at (for JWT logout)
-- **user_settings** — user_id, theme, density, font_size, local_only
+- **users**, id, name, email, password_hash, role, avatar_hue, level, xp, xp_to_next, streak, best_streak, plan
+- **revoked_tokens**, jti, expires_at (for JWT logout)
+- **user_settings**, user_id, theme, density, font_size, local_only
 
 ### Learning Content
-- **roadmaps** — id, user_id, title, subtitle, authored_by, mastery, total_modules, completed_modules, status, color, icon, next_module, modules_left
-- **roadmap_nodes** — id, roadmap_id, title, col, row_idx, mastery, status (done/active/next/locked)
-- **roadmap_edges** — roadmap_id, from_node, to_node (DAG edges between nodes)
-- **courses** — slug, title, blurb, author, verified, rating, stars, forks, hours, version, tags
-- **enrollments** — user_id, course_slug, progress, status
+- **roadmaps**, id, user_id, title, subtitle, authored_by, mastery, total_modules, completed_modules, status, color, icon, next_module, modules_left
+- **roadmap_nodes**, id, roadmap_id, title, col, row_idx, mastery, status (done/active/next/locked)
+- **roadmap_edges**, roadmap_id, from_node, to_node (DAG edges between nodes)
+- **courses**, slug, title, blurb, author, verified, rating, stars, forks, hours, version, tags
+- **enrollments**, user_id, course_slug, progress, status
 
 ### Learning Activity
-- **sessions** — id, user_id, roadmap_id, roadmap_node_id, title, subtitle, agent, course, level, session_index, total_sessions, duration_seconds, status, mastery_score
-- **session_messages** — id, session_id, role, agent_code, body, kind, user_rating
-- **assignments** — id, user_id, title, course, status, progress, grade, priority, estimated_minutes, due_date
-- **flashcards** — id, user_id, deck, front, back, interval_days, ease_factor, reps, next_review
-- **flashcard_reviews** — id, card_id, grade, ease_factor, interval_days
+- **sessions**, id, user_id, roadmap_id, roadmap_node_id, title, subtitle, agent, course, level, session_index, total_sessions, duration_seconds, status, mastery_score
+- **session_messages**, id, session_id, role, agent_code, body, kind, user_rating
+- **assignments**, id, user_id, title, course, status, progress, grade, priority, estimated_minutes, due_date
+- **flashcards**, id, user_id, deck, front, back, interval_days, ease_factor, reps, next_review
+- **flashcard_reviews**, id, card_id, grade, ease_factor, interval_days
 
 ### Social & Gamification
-- **certificates** — id, user_id, title, mastery, color, id_short, issued_at
-- **badges** — id, user_id, label, glyph, earned_at
-- **activity_log** — id, user_id, kind, text, sub, xp, agent
-- **starred_items** — user_id, item_type, item_id
+- **certificates**, id, user_id, title, mastery, color, id_short, issued_at
+- **badges**, id, user_id, label, glyph, earned_at
+- **activity_log**, id, user_id, kind, text, sub, xp, agent
+- **starred_items**, user_id, item_type, item_id
 
 ### Scheduling & Agents
-- **schedule_events** — id, user_id, title, event_type, agent, day_of_week, start_hour, duration_hours
-- **agent_status** — agent_code, display_name, short_desc, color, icon, status_text, is_active
-- **agent_routing** — user_id, agent_code, model
-- **api_keys** — id, user_id, provider, encrypted_key, model, is_active
+- **schedule_events**, id, user_id, title, event_type, agent, day_of_week, start_hour, duration_hours
+- **agent_status**, agent_code, display_name, short_desc, color, icon, status_text, is_active
+- **agent_routing**, user_id, agent_code, model
+- **api_keys**, id, user_id, provider, encrypted_key, model, is_active
 
 ### Relationships
 - users → roadmaps (1:N), sessions (1:N), assignments (1:N), flashcards (1:N), certificates (1:N), badges (1:N), activity_log (1:N), schedule_events (1:N), starred_items (1:N), enrollments (1:N)
@@ -137,7 +137,7 @@ The product has a React frontend (Vite) + Express/SQLite backend with JWT auth. 
 **Status:** ✅ Display from DB. Export downloads cert data as text. Share copies link. Verify opens modal with cert details and validity status. Badge grid renders.
 
 ### 10. COMMUNITY
-**Files:** Extras.jsx (Community) — static data for discussions
+**Files:** Extras.jsx (Community), static data for discussions
 **DB:** None (DISCUSSIONS, LEADERBOARD, FEED are hardcoded in data.js)
 **Flow:** Load static discussions → filter by tab (Recent/Top/Unanswered/Following) → search → click opens thread modal → upvote increments local state → reply form adds to local state → new thread form adds to list
 **Status:** ✅ Thread creation works (local state). Reply works (local state). Upvote works (local state). Filters work. Search works. Thread detail modal with reply form. Leaderboard shows static data.
@@ -251,25 +251,25 @@ The product has a React frontend (Vite) + Express/SQLite backend with JWT auth. 
 
 ## Known Issues / Rough Edges
 
-1. **Community is all local state** — discussions, threads, replies, votes are all in frontend data.js or local React state. Nothing persists to DB. No backend routes for community features.
+1. **Community is all local state**, discussions, threads, replies, votes are all in frontend data.js or local React state. Nothing persists to DB. No backend routes for community features.
 
-2. **Learning Progress chart** — Dashboard's weekly progress chart uses hardcoded data (STREAK_BARS from data.js), not real activity data.
+2. **Learning Progress chart**, Dashboard's weekly progress chart uses hardcoded data (STREAK_BARS from data.js), not real activity data.
 
-3. **Flashcard algorithm** — Reviews are saved but the next_review scheduling logic is basic. The flashcards/due endpoint filters by `next_review <= today` so it depends on the review updating this field correctly.
+3. **Flashcard algorithm**, Reviews are saved but the next_review scheduling logic is basic. The flashcards/due endpoint filters by `next_review <= today` so it depends on the review updating this field correctly.
 
-4. **Session agent responses** — Not connected to a real LLM. Uses keyword matching to generate contextual text responses. The agent routing and API keys infrastructure exists but isn't wired to actual LLM calls.
+4. **Session agent responses**, Not connected to a real LLM. Uses keyword matching to generate contextual text responses. The agent routing and API keys infrastructure exists but isn't wired to actual LLM calls.
 
-5. **Mastery tracking** — Roadmap node mastery values exist in DB but there's no automated mechanism to update them based on session completion/quiz scores. Would need manual updates or a scoring algorithm.
+5. **Mastery tracking**, Roadmap node mastery values exist in DB but there's no automated mechanism to update them based on session completion/quiz scores. Would need manual updates or a scoring algorithm.
 
-6. **XP/Level system** — XP values exist in the DB schema and user model, but no backend logic awards XP for completing assignments, sessions, or quizzes.
+6. **XP/Level system**, XP values exist in the DB schema and user model, but no backend logic awards XP for completing assignments, sessions, or quizzes.
 
-7. **Certificate issuance** — No automated certificate generation when completing a roadmap. Would need a trigger when all nodes are marked done.
+7. **Certificate issuance**, No automated certificate generation when completing a roadmap. Would need a trigger when all nodes are marked done.
 
-8. **Streak tracking** — Streak count exists but no backend logic to increment/decrement based on daily activity.
+8. **Streak tracking**, Streak count exists but no backend logic to increment/decrement based on daily activity.
 
-9. **Course content** — No actual lesson content or video hosting. Syllabus items are placeholder text.
+9. **Course content**, No actual lesson content or video hosting. Syllabus items are placeholder text.
 
-10. **Whiteboard persistence** — Canvas drawings are in-memory only, not saved to any backend.
+10. **Whiteboard persistence**, Canvas drawings are in-memory only, not saved to any backend.
 
 ---
 

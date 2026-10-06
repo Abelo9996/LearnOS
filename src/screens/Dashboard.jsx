@@ -177,7 +177,7 @@ function RoadmapsRow({ setScreen, onOpenRoadmap, roadmaps }) {
           <div>
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>Let's build your first roadmap</div>
             <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 4, maxWidth: 360 }}>
-              Tell us what you want to learn — the Curriculum agent will generate a personalized path of modules, lessons, and assessments.
+              Tell us what you want to learn, the Curriculum agent will generate a personalized path of modules, lessons, and assessments.
             </div>
           </div>
           <Btn variant="primary" size="md" icon={I.spark} onClick={() => onOpenRoadmap()}>Generate my roadmap</Btn>

@@ -9,7 +9,7 @@ import { useUser } from '../UserContext.jsx';
 import MarkdownText from '../components/Markdown';
 import QuizModal from '../components/QuizModal.jsx';
 
-// Excalidraw is large — only pulled in when the Whiteboard tab is opened.
+// Excalidraw is large, only pulled in when the Whiteboard tab is opened.
 const Whiteboard = React.lazy(() => import('../components/Whiteboard.jsx'));
 
 export default function Session({ setScreen }) {
@@ -58,9 +58,9 @@ export default function Session({ setScreen }) {
           const sessData = await API.getSession(s.id);
           normalize(sessData);
         }
-        // If no sessions, session stays null — parent shows empty state
+        // If no sessions, session stays null, parent shows empty state
       } catch {
-        // API failure — stay at null (empty state)
+        // API failure, stay at null (empty state)
       }
     };
     initSession();
@@ -119,7 +119,7 @@ export default function Session({ setScreen }) {
       const level  = (session && session.level)  || 'intermediate';
       if (lower.includes('quiz') || lower.includes('test') || lower.includes('assess')) {
         replyAgent = 'AS';
-        replyBody = `Ready to test yourself on **${topic}**? Hit **Generate quiz** in the actions above — you'll get a real, scored multiple-choice quiz that tracks your result and updates your mastery.`;
+        replyBody = `Ready to test yourself on **${topic}**? Hit **Generate quiz** in the actions above, you'll get a real, scored multiple-choice quiz that tracks your result and updates your mastery.`;
       } else if (lower.includes('cite') || lower.includes('source') || lower.includes('paper') || lower.includes('read')) {
         replyAgent = 'RE';
         let resources = [];
@@ -129,17 +129,17 @@ export default function Session({ setScreen }) {
           }
         } catch {}
         if (resources && resources.length) {
-          const lines = resources.slice(0, 5).map(r => `• [${r.title}](${r.url}) — *${r.source || r.kind}*`).join('\n');
+          const lines = resources.slice(0, 5).map(r => `• [${r.title}](${r.url}), *${r.source || r.kind}*`).join('\n');
           replyBody = `Verified resources for **${topic}**:\n\n${lines}`;
         } else {
           replyBody = `I don't have verified sources for **${topic}** yet. Add an OpenRouter key in Settings to let the Research agent propose and verify resources for this module.`;
         }
       } else if (lower.includes('example') || lower.includes('real') || lower.includes('show')) {
-        replyBody = `For a real example of **${topic}**, I'd normally walk you through a concrete case. To generate one tailored to *${course}* at the *${level}* level, add an OpenRouter key in Settings — I'll then produce a worked example, not a canned one.`;
+        replyBody = `For a real example of **${topic}**, I'd normally walk you through a concrete case. To generate one tailored to *${course}* at the *${level}* level, add an OpenRouter key in Settings, I'll then produce a worked example, not a canned one.`;
       } else if (lower.includes('summary') || lower.includes('recap')) {
         replyBody = `Here's a recap framework for **${topic}**:\n\n1. The core idea this module covers\n2. Why it matters in *${course}*\n3. The pitfalls people commonly run into\n4. How it connects to what comes next\n\nFor a personalized recap drawn from our conversation, configure your OpenRouter key in Settings.`;
       } else {
-        replyBody = `I can help you explore **${topic}** at the *${level}* level. Try asking for an example, a quiz, a recap, or sources — or configure your OpenRouter key in Settings for full conversational tutoring.`;
+        replyBody = `I can help you explore **${topic}** at the *${level}* level. Try asking for an example, a quiz, a recap, or sources, or configure your OpenRouter key in Settings for full conversational tutoring.`;
       }
       // Show the no-key banner once per session.
       if (!localStorage.getItem('learnos_nokey_banner_dismissed')) {
@@ -163,7 +163,7 @@ export default function Session({ setScreen }) {
     if (session && session.id && session.id !== 'local') {
       try {
         await API.patchSession(session.id, { status: 'completed' });
-        const placeholder = { role: 'agent', agent: 'AN', kind: 'text', body: `**Session Summary — ${session.title || 'Module'}**\n\n_The Analytics agent is reviewing your session…_` };
+        const placeholder = { role: 'agent', agent: 'AN', kind: 'text', body: `**Session Summary, ${session.title || 'Module'}**\n\n_The Analytics agent is reviewing your session…_` };
         setMessages(m => [...m, placeholder]);
         toast('Session completed · mastery updated · +25 XP', 'success');
 
@@ -179,7 +179,7 @@ export default function Session({ setScreen }) {
           const lines = [r.summary];
           if (r.objectives?.length) {
             lines.push('\n**Per-objective mastery:**');
-            r.objectives.forEach(o => lines.push(`- ${o.objective} — **${Math.round((o.mastery || 0) * 100)}%**`));
+            r.objectives.forEach(o => lines.push(`- ${o.objective}, **${Math.round((o.mastery || 0) * 100)}%**`));
           }
           if (r.weak_areas?.length) {
             lines.push(`\n**Revisit:** ${r.weak_areas.slice(0,3).join(' · ')}`);
@@ -190,10 +190,10 @@ export default function Session({ setScreen }) {
             lines.push(`\n🔄 The Curriculum agent inserted ${r.inserted_node_ids.length} remediation node(s) into your roadmap.`);
             try { localStorage.setItem('learnos_replanned', '1'); } catch {}
           }
-          summaryBody = `**Session Summary — ${session.title || 'Module'}**\n\n${lines.join('\n')}`;
+          summaryBody = `**Session Summary, ${session.title || 'Module'}**\n\n${lines.join('\n')}`;
         } else {
           const userQs = messages.filter(m => m.role === 'user' && m.kind === 'text');
-          summaryBody = `**Session Summary — ${session.title || 'Module'}**\n\n- Exchanged ${userQs.length} question${userQs.length === 1 ? '' : 's'} with the Tutor.\n- Module marked complete — mastery updated and next module unlocked.\n- Try a spaced-review session in a few days to lock it in.`;
+          summaryBody = `**Session Summary, ${session.title || 'Module'}**\n\n- Exchanged ${userQs.length} question${userQs.length === 1 ? '' : 's'} with the Tutor.\n- Module marked complete, mastery updated and next module unlocked.\n- Try a spaced-review session in a few days to lock it in.`;
         }
         setMessages(m => m.map(x => x === placeholder ? { ...x, body: summaryBody } : x));
         // Persist the summary so it survives a reload (it was local-state only).
@@ -213,7 +213,7 @@ export default function Session({ setScreen }) {
         subtitle: '',
         agent: 'TU',
       });
-      // The route replies { ok, session } — using the envelope directly left
+      // The route replies { ok, session }, using the envelope directly left
       // session.id undefined, so every later message/patch was misrouted to
       // /api/sessions/undefined and the chat never persisted.
       const newSess = res?.session || res;
@@ -368,7 +368,7 @@ function ChatColumn({ scrollerRef, messages, thinking, input, setInput, submit, 
     <Card pad={false} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
       {noKeyBanner && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: 'oklch(0.74 0.18 80 / 0.12)', borderBottom: '1px solid oklch(0.74 0.18 80 / 0.3)', color: 'var(--ink-2)', fontSize: 12.5 }}>
-          <span style={{ flex: 1 }}>Offline mode — replies are generic. Add an OpenRouter key in Settings for real conversational tutoring.</span>
+          <span style={{ flex: 1 }}>Offline mode, replies are generic. Add an OpenRouter key in Settings for real conversational tutoring.</span>
           <button onClick={() => setScreen && (localStorage.setItem('settings_tab', 'keys'), setScreen('settings'))} style={{ padding: '4px 10px', fontSize: 11.5, fontWeight: 600, background: 'var(--brand)', color: 'var(--on-brand)', border: 0, borderRadius: 6, cursor: 'pointer' }}>Add key</button>
           <button onClick={dismissBanner} title="Dismiss" style={{ padding: '4px 8px', background: 'transparent', color: 'var(--muted)', border: 0, cursor: 'pointer', fontSize: 14 }}>×</button>
         </div>
@@ -425,7 +425,7 @@ function ChatMessage({ m, session, user }) {
             catch { toast('Could not save feedback', 'error'); }
           }} />
           <IconBtn icon="👎" title="Dislike" onClick={async () => {
-            try { await API.patchMessage(session.id, m.id, { user_rating: -1 }); toast('Feedback recorded — we\'ll improve.', 'info'); }
+            try { await API.patchMessage(session.id, m.id, { user_rating: -1 }); toast('Feedback recorded, we\'ll improve.', 'info'); }
             catch { toast('Could not save feedback', 'error'); }
           }} />
           </>)}
@@ -664,7 +664,7 @@ function CodeView({ session }) {
   React.useEffect(() => { try { setCode(localStorage.getItem(key) || ''); } catch {} }, [key]);
   return (
     <div style={{ padding: 14 }}>
-      <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 8 }}>Scratchpad — paste or write code while you learn. Saved per-session.</div>
+      <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 8 }}>Scratchpad, paste or write code while you learn. Saved per-session.</div>
       <textarea
         value={code}
         onChange={(e) => setCode(e.target.value)}
@@ -711,7 +711,7 @@ function RightRail({ onExport, setScreen, session }) {
   }, [session?.id, session?.roadmap_node_id, session?.course, session?.roadmap_id]);
 
   const concepts = React.useMemo(() => {
-    const t = (session?.title || '').replace(/[–—]/g, '-');
+    const t = (session?.title || '').replace(/[–-]/g, '-');
     return t ? Array.from(new Set(t.split(/[\s\-]+/).filter(w => w.length > 3))).slice(0, 6) : [];
   }, [session?.title]);
 

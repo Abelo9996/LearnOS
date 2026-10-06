@@ -1,15 +1,15 @@
 /**
- * Executable lab runner — M8 of docs/MASTERY_SPEC_V2.md.
+ * Executable lab runner, M8 of docs/MASTERY_SPEC_V2.md.
  *
  * Hands-on practice is the single most-valued part of a Coursera program, and it
  * is the thing we most obviously faked: our labs were instructions to go and do
  * something elsewhere. This makes a lab something you actually run.
  *
- * TRUST MODEL — read before extending this.
+ * TRUST MODEL, read before extending this.
  * LearnOS is self-hosted and single-user. The code executed here is the local
  * user's own, typed by them, on their own machine: running it is equivalent to
  * them saving the file and running it in a terminal, which is what they'd
- * otherwise do. Nothing model-authored is ever executed — generated test cases
+ * otherwise do. Nothing model-authored is ever executed, generated test cases
  * are DATA ({fn, args, expected}), and generated starter code is only ever run
  * after the user has it in front of them and presses Run.
  *
@@ -65,7 +65,7 @@ export const LANGUAGES = {
   java: {
     label: 'Java', file: 'Main.java',
     // macOS ships a stub javac that errors with "Unable to locate a Java
-    // Runtime" when no JDK is installed — that is a missing toolchain, not a
+    // Runtime" when no JDK is installed, that is a missing toolchain, not a
     // failure of the learner's code.
     notInstalledPattern: /Unable to locate a Java Runtime/i,
     compile: (dir) => ({ cmd: 'javac', args: [join(dir, 'Main.java')] }),
@@ -75,7 +75,7 @@ export const LANGUAGES = {
   },
   go: {
     label: 'Go', file: 'main.go',
-    // `go run` compiles and runs in one step — no separate artifact to manage.
+    // `go run` compiles and runs in one step, no separate artifact to manage.
     run: (dir) => ({ cmd: 'go', args: ['run', join(dir, 'main.go')] }),
     runTimeoutMs: 20000, // includes compilation on every invocation
     hello: 'package main\n\nimport "fmt"\n\nfunc main() { fmt.Print("ok") }',
@@ -138,7 +138,7 @@ function spawnStep({ cmd, args, cwd, timeoutMs, stdin = '', label }) {
         exitCode: code,
         timedOut,
         durationMs: Date.now() - started,
-        error: timedOut ? `Ran longer than ${Math.round(timeoutMs / 1000)}s and was stopped — check for an infinite loop.` : null,
+        error: timedOut ? `Ran longer than ${Math.round(timeoutMs / 1000)}s and was stopped, check for an infinite loop.` : null,
       });
     });
 
@@ -149,7 +149,7 @@ function spawnStep({ cmd, args, cwd, timeoutMs, stdin = '', label }) {
 
 /**
  * Write the source into `dir` and compile it when the language needs it.
- * Returns { ok, error?, stderr? } — on success the dir is ready to run.
+ * Returns { ok, error?, stderr? }, on success the dir is ready to run.
  */
 async function prepareDir(dir, source, language) {
   const lang = LANGUAGES[language];
@@ -180,7 +180,7 @@ async function prepareDir(dir, source, language) {
 export async function runLab({ source, language = 'javascript', timeoutMs = DEFAULT_TIMEOUT, stdin = '' }) {
   const lang = LANGUAGES[language];
   if (!lang) return { ok: false, error: `Unsupported language: ${language}`, language, stdout: '', stderr: '', exitCode: null, timedOut: false, durationMs: 0 };
-  if (!source || !String(source).trim()) return { ok: false, error: 'Nothing to run — write some code first.', language, stdout: '', stderr: '', exitCode: null, timedOut: false, durationMs: 0 };
+  if (!source || !String(source).trim()) return { ok: false, error: 'Nothing to run, write some code first.', language, stdout: '', stderr: '', exitCode: null, timedOut: false, durationMs: 0 };
 
   let dir;
   const started = Date.now();
@@ -192,7 +192,7 @@ export async function runLab({ source, language = 'javascript', timeoutMs = DEFA
       return {
         ok: false, language, stdout: '', stderr: truncate(prep.stderr || ''), exitCode: null, timedOut: false,
         durationMs: Date.now() - started,
-        error: prep.compileFailed ? 'Compilation failed — see the compiler output below.' : prep.error,
+        error: prep.compileFailed ? 'Compilation failed, see the compiler output below.' : prep.error,
       };
     }
 
@@ -213,7 +213,7 @@ export async function runLab({ source, language = 'javascript', timeoutMs = DEFA
  */
 export async function runLabWithTests({ source, language = 'javascript', tests, timeoutMs = DEFAULT_TIMEOUT }) {
   // I/O-tested languages grade by feeding each case's stdin to the compiled
-  // program — the plain run happens as case zero, so skip the separate warm-up.
+  // program, the plain run happens as case zero, so skip the separate warm-up.
   if (IO_TEST_LANGUAGES.has(language)) {
     return runIoTests({ source, language, tests, timeoutMs });
   }
@@ -229,7 +229,7 @@ export async function runLabWithTests({ source, language = 'javascript', tests, 
 
   if (language === 'python') {
     const graded = await runPythonTests(source, list, timeoutMs);
-    // The learner's print() calls happen while their function runs — i.e. inside
+    // The learner's print() calls happen while their function runs, i.e. inside
     // the harness, not the bare run. Show that output, or they'd print for
     // debugging and see nothing.
     const stdout = graded.stdout != null && graded.stdout !== '' ? graded.stdout : run.stdout;
@@ -243,7 +243,7 @@ export async function runLabWithTests({ source, language = 'javascript', tests, 
 /**
  * Judge-style grading for compiled/system languages: compile once, then run the
  * program once per case with the case's stdin, comparing trimmed stdout to the
- * expected text. Case format reuses the standard test shape — args[0] is the
+ * expected text. Case format reuses the standard test shape, args[0] is the
  * exact stdin, expected is the exact expected stdout.
  */
 async function runIoTests({ source, language, tests, timeoutMs = DEFAULT_TIMEOUT }) {
@@ -259,7 +259,7 @@ async function runIoTests({ source, language, tests, timeoutMs = DEFAULT_TIMEOUT
     if (!prep.ok) {
       return {
         ...base, ok: false, stderr: truncate(prep.stderr || ''), durationMs: Date.now() - started,
-        error: prep.compileFailed ? 'Compilation failed — see the compiler output below.' : prep.error,
+        error: prep.compileFailed ? 'Compilation failed, see the compiler output below.' : prep.error,
         tests: list.length ? { ok: false, error: 'Did not compile', total: list.length, passedCount: 0, score: 0, ratio: 0, passed: false, cases: [] } : null,
       };
     }
@@ -288,7 +288,7 @@ async function runIoTests({ source, language, tests, timeoutMs = DEFAULT_TIMEOUT
       const entry = { name: t.name || `case ${i + 1}`, hidden: !!t.hidden, passed };
       if (!passed) {
         if (out.error) entry.error = out.error;
-        else if (!out.ok) entry.error = `exited with code ${out.exitCode}${out.stderr ? ` — ${out.stderr.slice(0, 200)}` : ''}`;
+        else if (!out.ok) entry.error = `exited with code ${out.exitCode}${out.stderr ? `, ${out.stderr.slice(0, 200)}` : ''}`;
       }
       if (!t.hidden) { entry.expected = expected; entry.actual = actual; }
       cases.push(entry);
@@ -308,7 +308,7 @@ async function runIoTests({ source, language, tests, timeoutMs = DEFAULT_TIMEOUT
 }
 
 // Python grading: the learner's module is imported and each case called with
-// JSON-encoded args. The harness is fixed code we wrote — the only thing that
+// JSON-encoded args. The harness is fixed code we wrote, the only thing that
 // varies is the JSON payload, so no generated string is ever executed.
 async function runPythonTests(source, tests, timeoutMs) {
   const payload = JSON.stringify(tests.map(t => ({ name: t.name || t.fn, fn: t.fn, args: t.args ?? [], expected: t.expected, hidden: !!t.hidden })));
@@ -362,7 +362,7 @@ _sys.stderr.write("__LEARNOS_TESTS__" + _json.dumps({"passedCount": _passed, "ca
 /**
  * Which runtimes actually work on this machine. Each language is probed with a
  * real hello-world through the full compile+run path, so "available" means it
- * genuinely works — not just that a binary exists on PATH. Probes run once and
+ * genuinely works, not just that a binary exists on PATH. Probes run once and
  * are cached for the process lifetime (toolchains don't appear mid-session,
  * and compiling five hello-worlds per Settings visit would be silly).
  */

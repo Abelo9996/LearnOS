@@ -8,16 +8,16 @@ import { CommunityBrowse, PublishPanel } from '../components/CommunityPanel.jsx'
 const GITHUB = 'https://github.com/Abelo9996/LearnOS';
 
 /**
- * Share — M12.
+ * Share, M12.
  *
  * This screen used to be "Community": a feed of threads written by four invented
  * people, with a leaderboard of fabricated contributions. LearnOS is single-user
- * and self-hosted, so there was no community — it was set dressing, and it sat
+ * and self-hosted, so there was no community, it was set dressing, and it sat
  * oddly next to a codebase that refuses to fabricate anything else.
  *
  * What a local open-source tool can genuinely do is treat a course as a file:
  * export yours, send it to someone, import theirs. No accounts, no server, works
- * offline. Real discussion lives where the project actually is — GitHub.
+ * offline. Real discussion lives where the project actually is, GitHub.
  */
 export default function Share() {
   const { add: toast } = useToast();
@@ -80,7 +80,7 @@ export default function Share() {
       <PageHeader
         eyebrow="Open-source content commons"
         title="Share"
-        subtitle="Browse what others have published, or publish your own. Everything also works as plain files — export a course to send it to someone directly, no server involved."
+        subtitle="Browse what others have published, or publish your own. Everything also works as plain files, export a course to send it to someone directly, no server involved."
       />
 
       <CommunityBrowse onImported={load} />
@@ -121,7 +121,7 @@ export default function Share() {
           }}>
             {result.error ? result.message : (
               <>
-                <strong style={{ color: 'var(--good)' }}>Imported “{result.title}”</strong> — {result.modules} modules,
+                <strong style={{ color: 'var(--good)' }}>Imported “{result.title}”</strong>, {result.modules} modules,
                 {' '}{result.lessons} lessons, {result.quizItems} questions.
                 {result.droppedUrls > 0 && <> {result.droppedUrls} unsafe link{result.droppedUrls === 1 ? '' : 's'} were dropped.</>}
                 <div style={{ marginTop: 6, color: 'var(--muted)', fontSize: 12.5 }}>{result.note}</div>
@@ -134,12 +134,12 @@ export default function Share() {
       {/* Export */}
       <Card pad={false} style={{ marginBottom: 20 }}>
         <div style={{ padding: 'var(--pad)' }}>
-          <SectionHead title="Export a course" subtitle="Everything travels with it — lessons, verified resources, labs and the question bank" />
+          <SectionHead title="Export a course" subtitle="Everything travels with it, lessons, verified resources, labs and the question bank" />
         </div>
         {loading ? (
           <div style={{ padding: '0 var(--pad) var(--pad)' }}><SkeletonRows rows={4} height={46} /></div>
         ) : courses.length === 0 ? (
-          <div style={{ padding: '0 var(--pad) var(--pad)', color: 'var(--muted)', fontSize: 13 }}>No courses yet — generate one first.</div>
+          <div style={{ padding: '0 var(--pad) var(--pad)', color: 'var(--muted)', fontSize: 13 }}>No courses yet, generate one first.</div>
         ) : (
           <div className="stagger">
             {courses.map(c => (
@@ -163,10 +163,10 @@ export default function Share() {
 
       {/* Where the actual community is */}
       <Card>
-        <SectionHead title="Discussion & contribution" subtitle="LearnOS runs entirely on your machine — there is no server holding a forum" />
+        <SectionHead title="Discussion & contribution" subtitle="LearnOS runs entirely on your machine, there is no server holding a forum" />
         <div style={{ fontSize: 13.5, color: 'var(--ink-2)', lineHeight: 1.7, marginTop: 10 }}>
           This app is yours alone: your data never leaves this computer, and there is no account,
-          no telemetry and no feed of other people. That is the point of it being self-hosted —
+          no telemetry and no feed of other people. That is the point of it being self-hosted -
           but it does mean the community lives where the project does, not inside the app.
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>

@@ -1,5 +1,5 @@
 /**
- * Reader mode — fetches an external article/docs page and extracts its readable
+ * Reader mode, fetches an external article/docs page and extracts its readable
  * text as Markdown so references can be studied inside LearnOS instead of only
  * as outbound links. No headless browser, no heavy parser: a bounded fetch plus
  * a conservative HTML → Markdown reduction. Sites that resist extraction fall
@@ -16,7 +16,7 @@ const CACHE_DAYS = 7;
 const MIN_USEFUL_CHARS = 400; // less than this and the extraction failed in practice
 
 function decodeEntities(s) {
-  const named = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', mdash: '—', ndash: '–', hellip: '…', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“', times: '×', middot: '·', copy: '©' };
+  const named = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', mdash: '-', ndash: '–', hellip: '…', rsquo: '’', lsquo: '‘', rdquo: '”', ldquo: '“', times: '×', middot: '·', copy: '©' };
   return s
     .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
     .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
@@ -39,7 +39,7 @@ function inlineText(html) {
  *
  * A course embeds its source directly, but a site can forbid that with
  * `X-Frame-Options: DENY|SAMEORIGIN` or a CSP `frame-ancestors` that excludes
- * us — the browser then paints a blank "refused to connect" box, which is worse
+ * us, the browser then paints a blank "refused to connect" box, which is worse
  * than an honest link. So we ask the site first (one bounded, SSRF-guarded
  * request) and let the UI embed only when it will actually render.
  *
@@ -81,7 +81,7 @@ export async function canBeFramed(url) {
     const fa = csp.match(/frame-ancestors([^;]*)/i);
     if (fa) {
       const v = fa[1].toLowerCase();
-      // Framable only if the directive is open (*) — anything else names hosts
+      // Framable only if the directive is open (*), anything else names hosts
       // that won't include a localhost instance.
       if (!/\*|https?:(?!\/\/)/.test(v) && !v.includes('*')) return decide(false);
     }

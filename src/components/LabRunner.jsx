@@ -8,7 +8,7 @@ import API from '../api.js';
  *
  * Hands-on practice is what learners say they value most, and it is the part we
  * previously only described. This gives a lab a real editor, a Run button, the
- * actual program output, and pass/fail against declared cases — so "doing" means
+ * actual program output, and pass/fail against declared cases, so "doing" means
  * doing, not reading about doing.
  *
  * Work is autosaved locally: losing an hour of lab work to a refresh would be
@@ -74,7 +74,7 @@ export default function LabRunner({ lessonId }) {
   if (error) return <Panel><div style={{ color: 'var(--bad)', fontSize: 13 }}>{error}</div></Panel>;
   if (!lab) return <Panel><div style={{ color: 'var(--muted)', fontSize: 13 }}>Loading lab…</div></Panel>;
 
-  // A lab without a runtime is still a legitimate exercise — it just isn't code.
+  // A lab without a runtime is still a legitimate exercise, it just isn't code.
   const meta = LANG_META[lab.language];
   if (!meta) return null;
 
@@ -87,7 +87,7 @@ export default function LabRunner({ lessonId }) {
           {meta.label}
         </span>
         <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>
-          Write it, run it, see what happens{lab.tests?.length ? ` — ${lab.tests.length + (lab.hiddenTestCount || 0)} checks` : ''}
+          Write it, run it, see what happens{lab.tests?.length ? `, ${lab.tests.length + (lab.hiddenTestCount || 0)} checks` : ''}
         </span>
         <span style={{ flex: 1 }} />
         <Btn variant="ghost" size="sm" onClick={reset}>Reset</Btn>
@@ -152,9 +152,9 @@ export default function LabRunner({ lessonId }) {
                     <span style={{ color: c.passed ? 'var(--good)' : 'var(--bad)', flexShrink: 0 }}>{c.passed ? '✓' : '✕'}</span>
                     <span style={{ color: 'var(--ink-2)', flex: 1 }}>
                       {c.name}{c.hidden ? ' (hidden)' : ''}
-                      {!c.passed && c.error && <span style={{ color: 'var(--bad)' }}> — {c.error}</span>}
+                      {!c.passed && c.error && <span style={{ color: 'var(--bad)' }}>, {c.error}</span>}
                       {!c.passed && !c.error && !c.hidden && 'actual' in c && (
-                        <span style={{ color: 'var(--muted)' }}> — expected {JSON.stringify(c.expected)}, got {JSON.stringify(c.actual)}</span>
+                        <span style={{ color: 'var(--muted)' }}>, expected {JSON.stringify(c.expected)}, got {JSON.stringify(c.actual)}</span>
                       )}
                     </span>
                   </div>

@@ -82,7 +82,7 @@ router.patch('/settings', (req, res) => {
   if (density !== undefined)  { fields.push('density = ?');   vals.push(density); }
   if (font_size !== undefined){ fields.push('font_size = ?'); vals.push(font_size); }
   if (local_only !== undefined){ fields.push('local_only = ?'); vals.push(local_only ? 1 : 0); }
-  // Onboarding completion — the client writes this at the end of the wizard.
+  // Onboarding completion, the client writes this at the end of the wizard.
   // It was missing from the whitelist, so the PATCH 400'd and the flag never
   // persisted, re-showing onboarding whenever the user had no roadmaps.
   if (onboarded_at !== undefined) { fields.push('onboarded_at = ?'); vals.push(onboarded_at); }
@@ -98,7 +98,7 @@ router.patch('/settings', (req, res) => {
 
 router.get('/apikeys', (req, res) => {
   const keys = db.prepare('SELECT id, provider, encrypted_key, model, is_active FROM api_keys WHERE user_id = ?').all(req.userId);
-  // Never return the real key — decrypt then mask for display only.
+  // Never return the real key, decrypt then mask for display only.
   res.json(keys.map(k => ({ ...k, encrypted_key: maskSecret(decryptSecret(k.encrypted_key)) })));
 });
 
@@ -147,7 +147,7 @@ router.patch('/agent-routing/:code', (req, res) => {
 });
 
 /**
- * PATCH /agent-routing — point several agents at one model in a single write.
+ * PATCH /agent-routing, point several agents at one model in a single write.
  *
  * Most people run every agent on the same model and only split them up later,
  * if at all. Doing that one row at a time meant seven separate requests and
@@ -170,7 +170,7 @@ router.patch('/agent-routing', (req, res) => {
     if (!Array.isArray(codes) || codes.length === 0) {
       return res.status(400).json({ error: true, message: 'codes must be a non-empty array, or omitted to mean every agent' });
     }
-    // Only touch agents that actually exist — an unknown code is a caller bug,
+    // Only touch agents that actually exist, an unknown code is a caller bug,
     // not a licence to invent a routing row.
     targets = codes.filter(c => known.includes(c));
     if (!targets.length) return res.status(400).json({ error: true, message: 'no such agents' });

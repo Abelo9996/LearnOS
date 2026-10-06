@@ -1,10 +1,10 @@
-# LearnOS — Build Status (Living Tracker)
+# LearnOS, Build Status (Living Tracker)
 
 > Snapshot of **what's built vs missing**, kept current by dev agents as work lands.
 > Update the Status column + date when you change something. Supersedes `../PRODUCT_AUDIT.md`.
 > Legend: ✅ done & wired · 🟡 partial / cosmetic surface · 🔌 backend exists, UI not wired · ❌ missing · 🐞 has bug
 >
-> Last updated: 2026-06-05 (Round 4 — product completeness pass)
+> Last updated: 2026-06-05 (Round 4, product completeness pass)
 
 ---
 
@@ -28,24 +28,24 @@
 | Settings (account/keys/routing/appearance/data) | ✅ | persists; keys NOT encrypted at rest |
 | Marketing Landing | ✅ | static showcase by design |
 
-## B. The AI agent system (the core — mostly missing)
+## B. The AI agent system (the core, mostly missing)
 
 | Agent / capability | Status | Notes |
 |---|---|---|
-| Model-provider abstraction (managed + BYOK, Anthropic v1) | ✅ | `ai/llm.js` `complete()` — key resolution + `agent_routing` model + run logging |
+| Model-provider abstraction (managed + BYOK, Anthropic v1) | ✅ | `ai/llm.js` `complete()`, key resolution + `agent_routing` model + run logging |
 | Prompt caching | ✅ | agent system prompts cached in `complete()` |
 | Usage metering / caps | 🟡 | `usage_counters` + `/api/ai/usage` live; caps (AI-6) not enforced yet |
 | `agent_runs` observability | ✅ | logged per call; `GET /api/ai/runs` |
 | Async job system (`agent_jobs`, `/api/jobs/:id`) | ✅ | `ai/jobs.js` in-process worker; resumes on boot |
 | **PR** Profiling / onboarding intake | ❌ | no `user_profiles` |
-| **CR** Curriculum — roadmap generation | ❌ | roadmaps are seeded, not generated |
-| **CR** Curriculum — dynamic re-plan | ❌ | mastery never re-routes the path |
-| **RE** Research — resource proposal | ✅ | `ai/agents/research.js` `proposeResources()` with structured-output schema (G2.B, 2026-06-05) |
-| **RE** Research — verification pipeline | ✅ | `verifyResource()` background job: HEAD/GET reachability + content-type sanity (G2.C, 2026-06-05) |
-| **TU** Tutor — grounded real LLM | ✅ | calls `complete()` via `/api/ai/chat`; offline fallback is now topic-aware (G1, 2026-06-05) |
-| **AS** Assessment — generate quizzes/assignments | ✅ | `ai/agents/assessment.js`; node-aware structured-output; `/api/ai/assignments/generate` (G3, 2026-06-05) |
-| **AS** Assessment — grade submissions | ❌ | grades are fake |
-| **AN** Analytics — mastery + weak-spot detection | ❌ | — |
+| **CR** Curriculum, roadmap generation | ❌ | roadmaps are seeded, not generated |
+| **CR** Curriculum, dynamic re-plan | ❌ | mastery never re-routes the path |
+| **RE** Research, resource proposal | ✅ | `ai/agents/research.js` `proposeResources()` with structured-output schema (G2.B, 2026-06-05) |
+| **RE** Research, verification pipeline | ✅ | `verifyResource()` background job: HEAD/GET reachability + content-type sanity (G2.C, 2026-06-05) |
+| **TU** Tutor, grounded real LLM | ✅ | calls `complete()` via `/api/ai/chat`; offline fallback is now topic-aware (G1, 2026-06-05) |
+| **AS** Assessment, generate quizzes/assignments | ✅ | `ai/agents/assessment.js`; node-aware structured-output; `/api/ai/assignments/generate` (G3, 2026-06-05) |
+| **AS** Assessment, grade submissions | ❌ | grades are fake |
+| **AN** Analytics, mastery + weak-spot detection | ❌ |, |
 | **CE** Certification | ✅ | auto-issue via cascade (keep) |
 
 ## C. Content & courses (mostly missing)
@@ -54,9 +54,9 @@
 |---|---|---|
 | Node Content view (verified resources + outline) | ✅ | `node_resources` table + seeded verified resources + Resources panel in ModuleDetail (G2.A, 2026-06-05) |
 | Real course modules/content (`course_modules`,`module_content`) | ❌ | syllabus = 5 fixed strings |
-| Course authoring (create/edit) | ❌ | — |
+| Course authoring (create/edit) | ❌ |, |
 | Fork → edit → publish-back + versioning | 🟡 | roadmap fork copies nodes; no course authoring/publish |
-| Resource verification storage (`node_resources`) | ❌ | — |
+| Resource verification storage (`node_resources`) | ❌ |, |
 
 ## D. Community (backend built, UI orphaned)
 
@@ -69,7 +69,7 @@
 | Seed content authored by demo members (not the user) | ✅ | `DEMO_MEMBERS` + one-time re-attribution so leaderboard is honest (2026-06-03) |
 | Feed integrated with real app activity | ✅ | `logActivity()` on session/assignment/cert/enroll/publish (2026-06-03) |
 | Certificates gated to LearnOS-verified courses | ✅ | only `courses.verified=1` issues a credential; else completion record (2026-06-03) |
-| "solved" marker | ❌ | — |
+| "solved" marker | ❌ |, |
 
 ## E. Known bugs (latent runtime errors / no-ops) 🐞
 
@@ -84,7 +84,7 @@
 | ~~`navigate` CustomEvent has no listener~~ **FIXED** | `Session.jsx` RightRail | "View Assignment" now uses `setScreen` (2026-06-03) |
 | ~~API keys stored unencrypted~~ **FIXED** | `ai/crypto.js` | AES-256-GCM at rest + masked on read (PLAT-04) |
 
-## F. Round 2 — product-quality pass (2026-06-03) ✅
+## F. Round 2, product-quality pass (2026-06-03) ✅
 
 | # | Issue | Fix |
 |---|---|---|
@@ -101,18 +101,18 @@
 | 18 | Schedule disconnected | event modal "Start now →" launches the linked screen |
 | 19 | Only Tutor visible | Agents page shows all 7 with real per-agent activity + roles |
 
-## H. Round 3 — closing the agent loop (2026-06-05) ✅
+## H. Round 3, closing the agent loop (2026-06-05) ✅
 
 | # | Gap | Fix |
 |---|---|---|
 | G1 | Tutor offline fallback hardcoded to bias-variance | Rewrote `Session.jsx` fallback to use `session.title/course/level` + `roadmap_node_id` for resources; added one-time no-key banner with deep-link to Settings → Keys |
 | G2.A | No verified external content storage/UI | New `node_resources` table; seeded ~20 verified resources across Prompt Engineering, LLM fundamentals, RAG, Hypothesis testing, etc.; `GET /api/nodes/:id/resources`; live panel in ModuleDetail with kind chips + verified badges |
-| G2.B | RE agent unimplemented | `ai/agents/research.js` `proposeResources()` — structured JSON output, URL safety guard (http(s) only), dedupe against existing |
-| G2.C | No verification | `verifyResource()` background job (registered in `ai/jobs.js`) — HEAD with GET fallback, 8s timeout, content-type sanity, video-host check; flips status proposed → verified or rejected |
+| G2.B | RE agent unimplemented | `ai/agents/research.js` `proposeResources()`, structured JSON output, URL safety guard (http(s) only), dedupe against existing |
+| G2.C | No verification | `verifyResource()` background job (registered in `ai/jobs.js`), HEAD with GET fallback, 8s timeout, content-type sanity, video-host check; flips status proposed → verified or rejected |
 | G2.D | No in-session citation rendering | Session.jsx fallback now reads `node_resources` when user asks for sources and renders inline links |
-| G3 | "Generate practice" picked from a static bank | `ai/agents/assessment.js` `generateAssignment()` with structured-output; `POST /api/ai/assignments/generate`; Extras.jsx tries AS first using the user's active node, falls back to the curated bank with a clear "From practice bank — add a key for AI-generated" toast |
+| G3 | "Generate practice" picked from a static bank | `ai/agents/assessment.js` `generateAssignment()` with structured-output; `POST /api/ai/assignments/generate`; Extras.jsx tries AS first using the user's active node, falls back to the curated bank with a clear "From practice bank, add a key for AI-generated" toast |
 
-## I. Round 4 — product completeness backend (2026-06-05) ✅
+## I. Round 4, product completeness backend (2026-06-05) ✅
 
 | # | Area | Status | Notes |
 |---|---|---|---|
@@ -137,7 +137,7 @@
 - Dashboard: Learning-Progress chart (14.2h/26/89% + curve), streak mini-bars, Agent Activity strip statuses.
 - Session right rail: outline, concepts, mastery signals (static `SESSION`), the visualizer (hardwired topic).
 - Topbar "28.4k" GitHub chip.
-- External trusted content (YouTube/articles/papers) — RE agent surfacing needs the extraction pipeline + an API key (Phase 4).
+- External trusted content (YouTube/articles/papers), RE agent surfacing needs the extraction pipeline + an API key (Phase 4).
 - Courses: syllabus (5 fixed modules), version history, featured, top contributors.
 - Topbar "28.4k" GitHub chip.
 
@@ -145,5 +145,5 @@
 
 ### How to update this file
 When you finish a unit of work, flip its Status, add a one-line note + date, and (if it closes a
-[BACKLOG.md](BACKLOG.md) item) tick the corresponding task. Keep the legend honest — 🟡 means "looks
+[BACKLOG.md](BACKLOG.md) item) tick the corresponding task. Keep the legend honest, 🟡 means "looks
 done but isn't fully real," which is the trap this product needs to climb out of.

@@ -1,5 +1,5 @@
 /**
- * Assessment routes — M3 of docs/MASTERY_SPEC_V2.md.
+ * Assessment routes, M3 of docs/MASTERY_SPEC_V2.md.
  *
  * Practice is safe and unlimited; graded costs an attempt, has a pass bar, and
  * is what actually moves mastery and unlocks the next module. Questions are
@@ -21,8 +21,8 @@ const parse = (s, fb) => { try { return s ? JSON.parse(s) : fb; } catch { return
 // Items whose independent check disagreed with the stored answer, or that a
 // learner has reported, are never used to grade anyone. They stay in the bank
 // (so they can be reviewed and repaired) but are excluded from papers. An item
-// that could not be verified is still usable — unverified means "unchecked",
-// not "suspect" — but disputed means we have positive reason to distrust it.
+// that could not be verified is still usable, unverified means "unchecked",
+// not "suspect", but disputed means we have positive reason to distrust it.
 const EXCLUDED = "('disputed','flagged')";
 
 function bankItems(moduleId, { includeUntrusted = false } = {}) {
@@ -126,11 +126,11 @@ router.post('/module/:moduleId/submit', (req, res) => {
     if (mode === 'practice') {
       // Practice earns a little XP but must never move a grade or mastery.
       awardXP(req.userId, Math.round(g.correct * 2));
-      logActivity(req.userId, { kind: 'quiz', text: `Practice: ${mod?.title || 'Module'} — ${g.score}%`, sub: `${g.correct}/${g.total} correct · not graded`, xp: Math.round(g.correct * 2), agent: 'AS' });
+      logActivity(req.userId, { kind: 'quiz', text: `Practice: ${mod?.title || 'Module'}, ${g.score}%`, sub: `${g.correct}/${g.total} correct · not graded`, xp: Math.round(g.correct * 2), agent: 'AS' });
     } else {
       const xp = g.passed ? g.correct * 5 + 20 : g.correct * 2;
       awardXP(req.userId, xp);
-      logActivity(req.userId, { kind: 'quiz', text: `Graded: ${mod?.title || 'Module'} — ${g.score}%`, sub: `${g.passed ? 'PASSED' : 'not passed'} · attempt ${attemptNo}/${maxAttempts}`, xp, agent: 'AS' });
+      logActivity(req.userId, { kind: 'quiz', text: `Graded: ${mod?.title || 'Module'}, ${g.score}%`, sub: `${g.passed ? 'PASSED' : 'not passed'} · attempt ${attemptNo}/${maxAttempts}`, xp, agent: 'AS' });
       if (g.passed) {
         unlocked = applyMasteryForModule(req.userId, moduleId, g.ratio);
         if (unlocked?.nextModules?.length) {
@@ -212,7 +212,7 @@ router.post('/assignment/:id/run', async (req, res) => {
   if (!a) return res.status(404).json({ error: true, message: 'Assignment not found' });
   const tests = parse(a.tests_json, []);
   if (!Array.isArray(tests) || !tests.length) {
-    return res.status(400).json({ error: true, code: 'NO_TESTS', message: 'This assignment has no automated tests — submit it for rubric review instead.' });
+    return res.status(400).json({ error: true, code: 'NO_TESTS', message: 'This assignment has no automated tests, submit it for rubric review instead.' });
   }
 
   const out = await runCodeTests(req.body?.source, tests, { passThreshold: a.pass_threshold ?? DEFAULT_PASS_THRESHOLD });
@@ -220,7 +220,7 @@ router.post('/assignment/:id/run', async (req, res) => {
     try {
       db.prepare('UPDATE assignments SET grade = ?, progress = ?, status = ? WHERE id = ?')
         .run(out.score, out.passed ? 100 : Math.round(out.ratio * 100), out.passed ? 'done' : 'doing', a.id);
-      logActivity(req.userId, { kind: 'assignment', text: `Autograded: ${a.title} — ${out.score}%`, sub: `${out.passedCount}/${out.total} tests passed`, xp: out.passed ? 30 : 5, agent: 'AS' });
+      logActivity(req.userId, { kind: 'assignment', text: `Autograded: ${a.title}, ${out.score}%`, sub: `${out.passedCount}/${out.total} tests passed`, xp: out.passed ? 30 : 5, agent: 'AS' });
       awardXP(req.userId, out.passed ? 30 : 5);
     } catch { /* best effort */ }
   }
@@ -230,7 +230,7 @@ router.post('/assignment/:id/run', async (req, res) => {
 /**
  * POST /api/assessments/assignment/:id/step/:stepId/run  { source }
  * Live "Run" for a coding step in an interactive assignment. Runs the learner's
- * code against that step's VISIBLE test cases only — hidden cases are held back
+ * code against that step's VISIBLE test cases only, hidden cases are held back
  * for grading, never returned here. This does not record a grade; submitting the
  * whole assignment is what grades it (against visible + hidden cases).
  */
@@ -262,7 +262,7 @@ router.get('/module/:moduleId/remediation', (req, res) => {
 
   const attempts = db.prepare('SELECT questions_json, answers_json FROM quiz_attempts WHERE user_id = ? AND module_id = ? ORDER BY created_at DESC LIMIT 5')
     .all(req.userId, moduleId);
-  if (!attempts.length) return res.status(404).json({ error: true, code: 'NO_ATTEMPTS', message: 'Take an assessment first — there is nothing to diagnose yet.' });
+  if (!attempts.length) return res.status(404).json({ error: true, code: 'NO_ATTEMPTS', message: 'Take an assessment first, there is nothing to diagnose yet.' });
 
   const all = bankItems(moduleId);
   const byId = new Map(all.map(i => [i.id, i]));
@@ -332,8 +332,8 @@ router.get('/module/:moduleId/remediation', (req, res) => {
  * GET /api/assessments/retention
  *
  * What the learner can probably still do today, as opposed to what they once
- * proved. Demonstrated mastery is never lowered — it is the evidence a
- * certificate rests on — but retention decays with time since last practice, and
+ * proved. Demonstrated mastery is never lowered, it is the evidence a
+ * certificate rests on, but retention decays with time since last practice, and
  * that is the number worth acting on.
  */
 router.get('/retention', (req, res) => {
@@ -357,7 +357,7 @@ router.get('/retention', (req, res) => {
   });
 });
 
-/** GET /api/assessments/runtimes — which lab languages this machine can run. */
+/** GET /api/assessments/runtimes, which lab languages this machine can run. */
 router.get('/runtimes', async (_req, res) => {
   res.json({ ok: true, runtimes: await availableLanguages() });
 });
@@ -375,7 +375,7 @@ router.post('/lab/:lessonId/run', async (req, res) => {
   const out = await runLabWithTests({ source: req.body?.source, language, tests });
 
   // Passing a lab's tests is real practice and worth logging, but a lab is
-  // formative — it never counts toward a grade the way a graded assessment does.
+  // formative, it never counts toward a grade the way a graded assessment does.
   if (out.tests?.passed) {
     try {
       awardXP(req.userId, 15);
@@ -385,7 +385,7 @@ router.post('/lab/:lessonId/run', async (req, res) => {
   res.json({ ok: true, ...out });
 });
 
-/** GET /api/assessments/lab/:lessonId — starter code + visible cases. */
+/** GET /api/assessments/lab/:lessonId, starter code + visible cases. */
 router.get('/lab/:lessonId', (req, res) => {
   const lesson = db.prepare("SELECT id, title, body_md, lab_language, starter_code, lab_tests_json, estimated_minutes FROM module_lessons WHERE id = ?").get(req.params.lessonId);
   if (!lesson) return res.status(404).json({ error: true, message: 'Lab not found' });
@@ -404,7 +404,7 @@ router.get('/lab/:lessonId', (req, res) => {
   });
 });
 
-/** GET /api/assessments/module/:moduleId/attempts — history + remaining attempts. */
+/** GET /api/assessments/module/:moduleId/attempts, history + remaining attempts. */
 router.get('/module/:moduleId/attempts', (req, res) => {
   const rows = db.prepare('SELECT id, mode, attempt_no, score, correct, total, passed, created_at FROM quiz_attempts WHERE user_id = ? AND module_id = ? ORDER BY created_at DESC')
     .all(req.userId, req.params.moduleId);
@@ -416,7 +416,7 @@ router.get('/module/:moduleId/attempts', (req, res) => {
   });
 });
 
-// Passing a graded assessment is what moves mastery and opens the next module —
+// Passing a graded assessment is what moves mastery and opens the next module -
 // progression is earned, not clicked.
 function applyMasteryForModule(userId, moduleId, ratio) {
   const mod = db.prepare('SELECT title, course_slug FROM course_modules WHERE id = ?').get(moduleId);

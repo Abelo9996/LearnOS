@@ -22,7 +22,7 @@ export const profileSchema = {
  * learner from where they are to their goal.
  *
  * It is deliberately NOT a concept graph. There are no parallel lanes, no DAG
- * and no "explore in any order" — each stage depends on the one before it, so
+ * and no "explore in any order", each stage depends on the one before it, so
  * there is always exactly one next thing to do.
  */
 export const roadmapSchema = {

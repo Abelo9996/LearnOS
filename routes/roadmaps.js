@@ -18,7 +18,7 @@ router.post('/specialization', (req, res) => {
   res.json({ ok: true, jobId });
 });
 
-// The placement diagnostic — answer keys are never sent to the client.
+// The placement diagnostic, answer keys are never sent to the client.
 router.get('/:id/placement', (req, res) => {
   const rm = db.prepare('SELECT id, title, goal, placement_json FROM roadmaps WHERE id = ? AND user_id = ?').get(req.params.id, req.userId);
   if (!rm) return res.status(404).json({ error: true, message: 'Roadmap not found' });
@@ -58,11 +58,11 @@ router.post('/generate', (req, res) => {
 });
 
 /**
- * GET / — the learner's roadmaps.
+ * GET /, the learner's roadmaps.
  *
  * Building a course also writes a private companion roadmap (`rm-<slug>`) whose
  * nodes are that course's modules. It exists because module mastery is tracked
- * on roadmap_nodes — see applyMasteryForModule in routes/assessments.js — not
+ * on roadmap_nodes, see applyMasteryForModule in routes/assessments.js, not
  * because a course is a roadmap. A course is a course, and listing it beside
  * real pathways made "your roadmaps" a mix of two different things and counted
  * every course twice.
@@ -88,7 +88,7 @@ router.get('/:id', (req, res) => {
     (objsByNode[o.node_id] ||= []).push(o.text);
   }
   // Attach the size of each stage's course where one has been built, so the map
-  // can say what a stage actually is — "11 modules · 150 lessons · 114h" — and
+  // can say what a stage actually is, "11 modules · 150 lessons · 114h", and
   // not just show a title and a percentage.
   const sizeOf = db.prepare(`SELECT c.hours,
       (SELECT COUNT(*) FROM course_modules m WHERE m.course_slug = c.slug) modules,

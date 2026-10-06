@@ -1,16 +1,16 @@
 /**
- * On-demand translation — M9 of docs/MASTERY_SPEC_V2.md §3.9.
+ * On-demand translation, M9 of docs/MASTERY_SPEC_V2.md §3.9.
  *
  * Coursera localises a subset of its catalogue into a subset of languages,
  * because human translation costs money per course per language. We generate
- * content, so we can translate ANY course into ANY language on demand — this is
+ * content, so we can translate ANY course into ANY language on demand, this is
  * one of the few places where being AI-native is a straightforward structural
  * advantage rather than a trade-off.
  *
  * Rules that keep a translation trustworthy:
  *   · The original is never overwritten. Translations are stored alongside, so a
  *     bad translation can't destroy the source of truth.
- *   · Code blocks, identifiers, URLs and numbers are preserved verbatim — a
+ *   · Code blocks, identifiers, URLs and numbers are preserved verbatim, a
  *     translated variable name is a broken lesson.
  *   · Nothing is translated twice; existing translations are reused.
  */
@@ -20,7 +20,7 @@ import { complete } from '../llm.js';
 export const SYSTEM = `You are translating educational material for a learning platform.
 
 Rules:
-- Translate the prose accurately and naturally into the requested language, as a subject-matter teacher would write it — not word-for-word.
+- Translate the prose accurately and naturally into the requested language, as a subject-matter teacher would write it, not word-for-word.
 - Preserve Markdown structure exactly: headings, lists, emphasis, tables, links.
 - NEVER translate: code inside fenced blocks or backticks, identifiers, function/variable names, URLs, file paths, mathematical notation, or numbers.
 - Keep technical terms that are conventionally used untranslated in the target language (e.g. widely-used English terms in programming) rather than inventing local coinages.
@@ -46,7 +46,7 @@ export async function translateText({ userId = 'user-1', text, language }) {
   return out?.json?.text || null;
 }
 
-/** Cached lookup — a lesson is never translated into the same language twice. */
+/** Cached lookup, a lesson is never translated into the same language twice. */
 export function getTranslation(targetType, targetId, language) {
   return db.prepare('SELECT * FROM translations WHERE target_type = ? AND target_id = ? AND language = ?')
     .get(targetType, targetId, language) || null;

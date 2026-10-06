@@ -21,20 +21,20 @@ router.get('/status', (req, res) => {
  * The OpenRouter model catalog (cached ~1h). The list endpoint is public, so no
  * key is needed to browse it.
  *
- * There are ~400 entries and LearnOS should offer all of them — including the
+ * There are ~400 entries and LearnOS should offer all of them, including the
  * free ones, which are the whole reason somebody self-hosts this and brings
  * their own key. A learner asking for `inclusionai/ling-3.0-tiny:free` should
  * find it.
  *
  * Two kinds of noise are worth removing:
  *
- *   `:batch`  — the same model behind OpenRouter's asynchronous batch endpoint.
+ *   `:batch` , the same model behind OpenRouter's asynchronous batch endpoint.
  *               60 of the 401 entries. Every one is a second copy of a model
  *               already in the list, and batch semantics do not work for
  *               interactive tutoring, so offering them is offering a broken
  *               duplicate. A custom slug still reaches them if anyone insists.
  *
- *   duplicate ids — defensive; the upstream list has none today.
+ *   duplicate ids, defensive; the upstream list has none today.
  *
  * `:free` and `:thinking` are NOT duplicates. They are genuinely different
  * offerings of the model and both stay.
@@ -65,7 +65,7 @@ router.get('/models', async (_req, res) => {
         const prompt = m.pricing?.prompt != null ? Number(m.pricing.prompt) : null;
         const completion = m.pricing?.completion != null ? Number(m.pricing.completion) : null;
         const rawProvider = m.id.split('/')[0];
-        // A leading `~` marks a floating alias — `~anthropic/claude-sonnet-latest`
+        // A leading `~` marks a floating alias, `~anthropic/claude-sonnet-latest`
         // always resolves to the newest Sonnet. Grouped under the real vendor,
         // or the picker would show a phantom "~anthropic" next to "anthropic".
         const alias = rawProvider.startsWith('~');
@@ -73,7 +73,7 @@ router.get('/models', async (_req, res) => {
           id: m.id,
           name: m.name || m.id,
           provider: alias ? rawProvider.slice(1) : rawProvider,
-          // The part after the slash — what the model is actually called within
+          // The part after the slash, what the model is actually called within
           // its vendor, and all the second dropdown needs to show.
           slug: m.id.slice(m.id.indexOf('/') + 1),
           alias,
@@ -84,8 +84,8 @@ router.get('/models', async (_req, res) => {
           free: prompt === 0 && completion === 0,
         };
       })
-      // Free models first — they are the hardest to find and the most asked
-      // for — then everything else alphabetically.
+      // Free models first, they are the hardest to find and the most asked
+      // for, then everything else alphabetically.
       .sort((a, b) => (a.free === b.free ? a.id.localeCompare(b.id) : a.free ? -1 : 1));
 
     _modelCache = { at: now, data: models };
@@ -111,7 +111,7 @@ router.post('/ping', async (req, res) => {
   }
 });
 
-// Learning Coach — the adaptive advisor. Derives a proficiency + pace read from
+// Learning Coach, the adaptive advisor. Derives a proficiency + pace read from
 // REAL signals (recent quiz scores, assignment grades, node mastery, activity)
 // and returns concrete, actionable recommendations that guide and adjust the
 // learner's path. Heuristic (works without a key); the numbers are all real.
@@ -137,15 +137,15 @@ router.get('/coach', (req, res) => {
 
   const recs = [];
   if (activeNode) recs.push({ icon: 'play', tone: 'brand', title: `Continue: ${activeNode.title}`, detail: `Pick up your ${activeNode.roadmap} path where you left off.`, action: { screen: 'roadmaps', roadmap_id: activeNode.roadmap_id } });
-  if (proficiency != null && proficiency >= 82) recs.push({ icon: 'spark', tone: 'good', title: "You're ahead — take a stretch", detail: 'Your recent scores are strong. Try a harder assignment or jump to the next module.', action: { screen: 'assignments' } });
-  else if (proficiency != null && proficiency < 55) recs.push({ icon: 'chart', tone: 'warn', title: "Let's slow down and reinforce", detail: 'Recent results suggest reviewing fundamentals before moving on — a quiz will pinpoint gaps.', action: { screen: 'roadmaps', roadmap_id: activeNode?.roadmap_id } });
-  for (const w of weak) recs.push({ icon: 'chart', tone: 'warn', title: `Revisit: ${w.title}`, detail: `Mastery is ${Math.round((w.mastery || 0) * 100)}% — a quick review or quiz will lift it.`, action: { screen: 'roadmaps', roadmap_id: w.roadmap_id } });
+  if (proficiency != null && proficiency >= 82) recs.push({ icon: 'spark', tone: 'good', title: "You're ahead, take a stretch", detail: 'Your recent scores are strong. Try a harder assignment or jump to the next module.', action: { screen: 'assignments' } });
+  else if (proficiency != null && proficiency < 55) recs.push({ icon: 'chart', tone: 'warn', title: "Let's slow down and reinforce", detail: 'Recent results suggest reviewing fundamentals before moving on, a quiz will pinpoint gaps.', action: { screen: 'roadmaps', roadmap_id: activeNode?.roadmap_id } });
+  for (const w of weak) recs.push({ icon: 'chart', tone: 'warn', title: `Revisit: ${w.title}`, detail: `Mastery is ${Math.round((w.mastery || 0) * 100)}%, a quick review or quiz will lift it.`, action: { screen: 'roadmaps', roadmap_id: w.roadmap_id } });
   if (pending > 0) recs.push({ icon: 'check', tone: 'brand', title: `${pending} assignment${pending === 1 ? '' : 's'} to complete`, detail: 'Submitting graded work is what moves your mastery the most.', action: { screen: 'assignments' } });
   if (avgQuiz == null) recs.push({ icon: 'check', tone: 'accent', title: 'Take a quiz to calibrate', detail: 'A short quiz lets the coach gauge your level and tailor the difficulty of what comes next.', action: { screen: 'roadmaps', roadmap_id: activeNode?.roadmap_id } });
 
-  const paceMsg = pace === 'ahead' ? "You're moving fast — keep the momentum."
-    : pace === 'steady' ? 'A steady, consistent pace — nicely done.'
-    : 'You\'ve slowed down — even one short session today keeps your streak and momentum.';
+  const paceMsg = pace === 'ahead' ? "You're moving fast, keep the momentum."
+    : pace === 'steady' ? 'A steady, consistent pace, nicely done.'
+    : 'You\'ve slowed down, even one short session today keeps your streak and momentum.';
 
   res.json({
     proficiency, pace, paceMsg,
@@ -156,7 +156,7 @@ router.get('/coach', (req, res) => {
   });
 });
 
-// Recent agent runs — observability (PLAT-05).
+// Recent agent runs, observability (PLAT-05).
 router.get('/runs', (req, res) => {
   const runs = db.prepare(
     `SELECT id, agent_code, model, managed, input_tokens, output_tokens,
@@ -166,7 +166,7 @@ router.get('/runs', (req, res) => {
   res.json(runs);
 });
 
-// Managed-tier usage for the current month (feeds caps later — AI-6).
+// Managed-tier usage for the current month (feeds caps later, AI-6).
 router.get('/usage', (req, res) => {
   const period = new Date().toISOString().slice(0, 7); // YYYY-MM
   const row = db.prepare('SELECT * FROM usage_counters WHERE user_id = ? AND period = ?').get(req.userId, period)
@@ -175,7 +175,7 @@ router.get('/usage', (req, res) => {
 });
 
 
-// Chat endpoint for the Session frontend (TU agent — with citations §3.7)
+// Chat endpoint for the Session frontend (TU agent, with citations §3.7)
 router.post('/chat', async (req, res) => {
   const { messages, sessionContext } = req.body;
   if (!messages) return res.status(400).json({ error: true, message: 'messages required' });
@@ -187,7 +187,7 @@ router.post('/chat', async (req, res) => {
     if (nodeId) {
       const resources = db.prepare("SELECT id, title, url, source FROM node_resources WHERE node_id = ? AND status = 'verified' LIMIT 8").all(nodeId);
       if (resources.length > 0) {
-        const resBlock = resources.map((r, i) => `[${i + 1}] "${r.title}" — ${r.source} (${r.url})`).join('\n');
+        const resBlock = resources.map((r, i) => `[${i + 1}] "${r.title}", ${r.source} (${r.url})`).join('\n');
         system += `\n\nAvailable verified sources for this module:\n${resBlock}\nWhen you reference a claim, cite by [N] using these source numbers. Prefer citing the provided sources over making claims from memory. If the sources don't cover something, say so explicitly.`;
       }
     }
@@ -203,7 +203,7 @@ router.post('/chat', async (req, res) => {
     res.status(e.code === 'NO_KEY' ? 400 : 502).json({ error: true, code: e.code || null, message: e.message });
   }
 });
-// AS agent — quiz generation (P8).
+// AS agent, quiz generation (P8).
 router.post('/quiz/generate', async (req, res) => {
   const { node_id } = req.body || {};
   try {
@@ -243,7 +243,7 @@ router.post('/quiz/submit', (req, res) => {
 
   try {
     awardXP(req.userId, xp);
-    logActivity(req.userId, { kind: 'quiz', text: `Quiz: ${title || 'Module quiz'} — ${score}%`, sub: `${correct}/${total} correct`, xp, agent: 'AS' });
+    logActivity(req.userId, { kind: 'quiz', text: `Quiz: ${title || 'Module quiz'}, ${score}%`, sub: `${correct}/${total} correct`, xp, agent: 'AS' });
     // Real badge for a perfect score (was seeded-only, never earned).
     if (correct === total && total >= 3 && awardBadge(req.userId, 'First quiz 100%', 'check')) {
       logActivity(req.userId, { kind: 'cert', text: 'Earned badge: First quiz 100%', sub: 'Perfect quiz', xp: 0, agent: 'CE' });
@@ -261,7 +261,7 @@ router.post('/quiz/submit', (req, res) => {
   res.json({ ok: true, score, correct, total, xp, results });
 });
 
-// AS agent — real, node-aware assignment generation (G3).
+// AS agent, real, node-aware assignment generation (G3).
 router.post('/assignments/generate', async (req, res) => {
   const { node_id, kind, difficulty } = req.body || {};
   try {

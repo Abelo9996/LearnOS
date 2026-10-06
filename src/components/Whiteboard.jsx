@@ -7,14 +7,14 @@ import API from '../api';
 /**
  * The Tutor whiteboard, on Excalidraw.
  *
- * The old board was freehand strokes on a raw canvas — fine for scribbling,
+ * The old board was freehand strokes on a raw canvas, fine for scribbling,
  * useless for teaching. Excalidraw gives real shapes, arrows, text and sticky
- * notes, and — the reason it's here — a **Mermaid → diagram** path: paste (or
+ * notes, and, the reason it's here, a **Mermaid → diagram** path: paste (or
  * have the tutor emit) Mermaid and it drops onto the board as editable,
  * hand-drawn-style elements you can then rearrange and annotate.
  *
  * Loaded lazily by Session.jsx (Excalidraw is large). The whole scene persists
- * per session as one JSON blob. MIT-licensed — no watermark, no license key.
+ * per session as one JSON blob. MIT-licensed, no watermark, no license key.
  * Its fonts come from the Excalidraw CDN; LearnOS is self-hosted, not offline,
  * so that's fine, and the CSP in server.js allows it.
  */
@@ -37,7 +37,7 @@ export default function Whiteboard({ session }) {
     return () => { alive = false; };
   }, [sid, isOnline]);
 
-  // Debounced autosave — Excalidraw fires onChange on every pointer move.
+  // Debounced autosave, Excalidraw fires onChange on every pointer move.
   const persist = React.useCallback((elements) => {
     if (!isOnline) return;
     clearTimeout(saveTimer.current);
@@ -66,7 +66,7 @@ export default function Whiteboard({ session }) {
       }
       setMermaidText(''); setOpen(false);
     } catch {
-      setMermaidErr('That Mermaid didn’t parse — check the syntax.');
+      setMermaidErr('That Mermaid didn’t parse, check the syntax.');
     }
   };
 
@@ -89,7 +89,7 @@ export default function Whiteboard({ session }) {
       {open && (
         <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-window)' }}>
           <div style={{ fontSize: 11.5, color: 'var(--muted)', marginBottom: 6, lineHeight: 1.5 }}>
-            Paste Mermaid (or ask the Tutor for a Mermaid diagram) — it drops onto the board as editable shapes.
+            Paste Mermaid (or ask the Tutor for a Mermaid diagram), it drops onto the board as editable shapes.
           </div>
           <textarea
             value={mermaidText} onChange={e => setMermaidText(e.target.value)}

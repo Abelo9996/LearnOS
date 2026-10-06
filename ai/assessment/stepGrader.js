@@ -2,7 +2,7 @@
  * Step grading for interactive, multi-step assignments (Phase 1).
  *
  * An assignment is an ordered list of auto-gradeable steps rather than one
- * essay box. This module owns the parts that need no LLM — normalising the
+ * essay box. This module owns the parts that need no LLM, normalising the
  * step list, and grading MCQ and coding steps deterministically. Coding steps
  * reuse the exact same runner the in-lesson labs use (`runLabWithTests`), so a
  * coding step is judged against real compiled/interpreted test cases, not a
@@ -23,7 +23,7 @@ const clamp01 = (n) => Math.max(0, Math.min(1, n));
 /**
  * Validate + normalise a raw steps array (from the LLM or a manual create).
  * Drops anything unusable, assigns stable ids, and guarantees the shape the
- * grader and the UI both rely on. Returns [] when nothing survives — the caller
+ * grader and the UI both rely on. Returns [] when nothing survives, the caller
  * treats an empty result as "fall back to the legacy essay assignment".
  */
 export function normalizeSteps(raw) {

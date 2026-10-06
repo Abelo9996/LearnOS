@@ -1,8 +1,8 @@
-# 🌍 VISION.md — LearnOS: The Open-Source AI University
+# 🌍 VISION.md, LearnOS: The Open-Source AI University
 
 ## The Big Idea
 
-LearnOS is the **world's first agentic AI university** — an open-source platform where AI agents replace pre-recorded lectures, static quizzes, and one-size-fits-all curricula.
+LearnOS is the **world's first agentic AI university**, an open-source platform where AI agents replace pre-recorded lectures, static quizzes, and one-size-fits-all curricula.
 
 Not "Coursera + ChatGPT." A fundamentally new paradigm where **AI agents ARE the university.**
 
@@ -10,31 +10,31 @@ Not "Coursera + ChatGPT." A fundamentally new paradigm where **AI agents ARE the
 
 ### Online education is broken
 
-- 💸 **Expensive** — per-course fees, five-figure degrees, certificates behind paywalls
-- 📹 **Static** — Pre-recorded in 2019, taught in 2026
-- 🧱 **One-size-fits-all** — Same lecture for a beginner and an expert
-- 🏝️ **Isolated** — 5-15% completion rates. You learn alone, drop out alone
-- 📜 **Credentials are hollow** — A certificate that says you watched videos
+- 💸 **Expensive**, per-course fees, five-figure degrees, certificates behind paywalls
+- 📹 **Static**, Pre-recorded in 2019, taught in 2026
+- 🧱 **One-size-fits-all**, Same lecture for a beginner and an expert
+- 🏝️ **Isolated**, 5-15% completion rates. You learn alone, drop out alone
+- 📜 **Credentials are hollow**, A certificate that says you watched videos
 
 ### The world needs a new model
 
 | What Exists | What LearnOS Builds |
 |---|---|
 | Watch videos, take quizzes | AI agents that teach via Socratic dialogue |
-| Pay a platform per course | Self-hosted and free — bring one OpenRouter key, pay only for tokens |
+| Pay a platform per course | Self-hosted and free, bring one OpenRouter key, pay only for tokens |
 | Content ages | Living courses powered by real-time web knowledge |
 | Learn alone | Cohorts, communities, study groups |
 | Certificates = completion | Certificates = verified mastery |
-| Only institutions create courses | **GitHub of Courses** — anyone creates, forks, stars |
+| Only institutions create courses | **GitHub of Courses**, anyone creates, forks, stars |
 
 ## The "GitHub of Courses"
 
 This is the core social model:
 
-- 📚 Anyone can **create** a course — AI-assisted or fully AI-generated
-- ⭐ Courses get **starred** by learners — the best rise organically
-- 🔀 Courses can be **forked** and improved — open-source education
-- 🤝 Communities form around **subjects** — like GitHub organizations
+- 📚 Anyone can **create** a course, AI-assisted or fully AI-generated
+- ⭐ Courses get **starred** by learners, the best rise organically
+- 🔀 Courses can be **forked** and improved, open-source education
+- 🤝 Communities form around **subjects**, like GitHub organizations
 - 📊 Quality is measured by **learning outcomes**, not marketing spend
 
 ## Agentic Architecture
@@ -60,7 +60,7 @@ Agents share memory. They collaborate. Together they deliver a university experi
 Personal AI learning with roadmaps, tutoring, assignments, analytics, profiling
 
 ### Layer 2: University 🔨 (Building)
-Course library, cohort learning, certificates, and communities — all self-hosted, no accounts required
+Course library, cohort learning, certificates, and communities, all self-hosted, no accounts required
 
 ### Layer 3: Platform 📋 (Planned)
 Multi-language, mobile, offline mode, enterprise instances, API ecosystem
@@ -70,12 +70,12 @@ AI research mentorship, portfolio generation, job placement, accreditation pathw
 
 ## How It Grows
 
-1. **STEM first** — CS, Math, Data Science, Engineering
-2. **GitHub as home** — clone it, run it, contribute back
-3. **Community-driven** — contributors become maintainers
-4. **Open-source by default** — trust, customization, longevity
-5. **Expand outward** — humanities, business, creative arts, professional development
-6. **Run your own** — anyone can self-host their own instance for a class, team, or community
+1. **STEM first**, CS, Math, Data Science, Engineering
+2. **GitHub as home**, clone it, run it, contribute back
+3. **Community-driven**, contributors become maintainers
+4. **Open-source by default**, trust, customization, longevity
+5. **Expand outward**, humanities, business, creative arts, professional development
+6. **Run your own**, anyone can self-host their own instance for a class, team, or community
 
 ## The North Star
 

@@ -1,7 +1,7 @@
 import db from '../db/database.js';
 
 /**
- * LearnOS is a single-user, self-hosted tool — there is no login or registration.
+ * LearnOS is a single-user, self-hosted tool, there is no login or registration.
  * Every request runs as one implicit local user. `requireAuth` used to enforce a
  * JWT; it now simply resolves that local user and attaches it to the request, so
  * every existing `WHERE user_id = ?` query keeps working unchanged.
@@ -9,7 +9,7 @@ import db from '../db/database.js';
 const LOCAL_USER_ID = process.env.LEARNOS_LOCAL_USER || 'user-1';
 
 // Ensure the local user (and its settings row) exists once at boot. There is
-// no seed data — every install starts from scratch with a fresh level-1 user.
+// no seed data, every install starts from scratch with a fresh level-1 user.
 function ensureLocalUser() {
   const exists = db.prepare('SELECT id FROM users WHERE id = ?').get(LOCAL_USER_ID);
   if (!exists) {

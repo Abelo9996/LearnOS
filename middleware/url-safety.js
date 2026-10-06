@@ -4,7 +4,7 @@
  * every endpoint that accepts a user-supplied URL can guard with one import.
  */
 
-// Synchronous host/protocol check — call before persisting any user URL.
+// Synchronous host/protocol check, call before persisting any user URL.
 export function isPublicUrl(u) {
   try {
     const parsed = new URL(u);

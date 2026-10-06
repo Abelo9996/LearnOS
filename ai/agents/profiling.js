@@ -1,5 +1,5 @@
 /**
- * PR — Profiling agent (PR-1/2). Turns a goal + short intake into a learner
+ * PR, Profiling agent (PR-1/2). Turns a goal + short intake into a learner
  * profile used by every downstream agent. Falls back to the raw answers as a
  * heuristic profile when no LLM key is configured.
  */
@@ -36,7 +36,7 @@ function heuristicProfile(a) {
     // Onboarding sends learning_style as an ARRAY of chips, while profileSchema
     // (and therefore the LLM path) declares it a string. This heuristic branch
     // passed the array straight through to SQLite, which flattens arrays into
-    // extra bind parameters — so intake died with "Too many parameter values
+    // extra bind parameters, so intake died with "Too many parameter values
     // were provided" for every learner without an API key, i.e. every genuine
     // first run. Normalise to the string form the schema promises.
     learning_style: styleToText(a.learning_style),
@@ -55,7 +55,7 @@ export function persistProfile(userId, goal, p) {
   // better-sqlite3 treats an array argument as a LIST of bind parameters rather
   // than a single value, so an array reaching .run() silently changes the
   // parameter count and throws "Too many/Too few parameter values were
-  // provided" — an error that names nothing useful. Coercing here means no
+  // provided", an error that names nothing useful. Coercing here means no
   // caller can reproduce that, whatever shape the model or the UI sends.
   const text = (v, fb = '') => {
     if (v == null) return fb;

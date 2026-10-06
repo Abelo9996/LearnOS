@@ -1,5 +1,5 @@
 /**
- * Registry client — LearnOS's side of the community.
+ * Registry client, LearnOS's side of the community.
  *
  * The registry is a CONVENIENCE, never a dependency. Every route here fails
  * softly and says so: if the service is unreachable, misconfigured, or switched
@@ -36,7 +36,7 @@ function getConfig(userId) {
 
 /**
  * The registry is a remote host the user can point anywhere, so it goes through
- * the same SSRF policy as any other user-supplied URL — with an explicit
+ * the same SSRF policy as any other user-supplied URL, with an explicit
  * carve-out for loopback, because the expected default IS a local service.
  */
 function assertUsableUrl(url) {
@@ -61,7 +61,7 @@ async function call(url, path, { method = 'GET', body } = {}) {
     const text = await res.text();
     let data = null;
     try { data = text ? JSON.parse(text) : null; } catch {
-      throw new Error('The registry returned something unexpected — is that URL really a LearnOS registry?');
+      throw new Error('The registry returned something unexpected, is that URL really a LearnOS registry?');
     }
     if (!res.ok) {
       const err = new Error(data?.message || `Registry error (${res.status})`);
@@ -81,7 +81,7 @@ async function call(url, path, { method = 'GET', body } = {}) {
   }
 }
 
-/** GET /api/registry/config — what this instance is pointed at. */
+/** GET /api/registry/config, what this instance is pointed at. */
 router.get('/config', (req, res) => {
   const c = getConfig(req.userId);
   res.json({
@@ -95,7 +95,7 @@ router.get('/config', (req, res) => {
   });
 });
 
-/** PATCH /api/registry/config — point elsewhere, or switch it off entirely. */
+/** PATCH /api/registry/config, point elsewhere, or switch it off entirely. */
 router.patch('/config', (req, res) => {
   const { url, handle, enabled } = req.body || {};
   const fields = [];
@@ -123,7 +123,7 @@ router.patch('/config', (req, res) => {
   res.json({ ok: true, ...getConfig(req.userId), token: undefined });
 });
 
-/** GET /api/registry/browse — proxied search, so the UI has one origin. */
+/** GET /api/registry/browse, proxied search, so the UI has one origin. */
 router.get('/browse', async (req, res) => {
   const c = getConfig(req.userId);
   if (!c.enabled) return res.status(409).json({ error: true, code: 'DISABLED', message: 'Community sharing is switched off for this instance.' });
@@ -138,7 +138,7 @@ router.get('/browse', async (req, res) => {
   }
 });
 
-/** GET /api/registry/browse/:id — detail before importing. */
+/** GET /api/registry/browse/:id, detail before importing. */
 router.get('/browse/:id', async (req, res) => {
   const c = getConfig(req.userId);
   if (!c.enabled) return res.status(409).json({ error: true, code: 'DISABLED', message: 'Community sharing is switched off for this instance.' });
@@ -150,7 +150,7 @@ router.get('/browse/:id', async (req, res) => {
 });
 
 /**
- * POST /api/registry/import/:id — fetch a published bundle and hand it back.
+ * POST /api/registry/import/:id, fetch a published bundle and hand it back.
  *
  * The bundle is NOT written here: it is returned so the existing import path in
  * routes/share.js does the writing, which means community imports go through
@@ -176,7 +176,7 @@ router.post('/import/:id', async (req, res) => {
 });
 
 /**
- * POST /api/registry/publish/:slug — publish one of this user's courses.
+ * POST /api/registry/publish/:slug, publish one of this user's courses.
  *
  * Exports through the same bundle builder the file export uses, so what gets
  * published is exactly what a file download would contain.
@@ -219,7 +219,7 @@ router.post('/publish/:slug', async (req, res) => {
       });
       notify(req.userId, {
         kind: 'milestone',
-        title: `${out.updated ? 'Updated' : 'Published'} — ${course.title}`,
+        title: `${out.updated ? 'Updated' : 'Published'}, ${course.title}`,
         body: `Live on the community registry as @${handle}. ${out.course.lessons} lessons, ${out.course.quizItems} questions.`,
         actionScreen: 'share',
       });

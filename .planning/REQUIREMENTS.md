@@ -5,7 +5,7 @@
 
 > Derived from `docs/SPEC.md` + `docs/BACKLOG.md`. v1 = the MVP vertical mastery loop. v2 = full shippable vision.
 
-## v1 Requirements (MVP — the vertical mastery loop)
+## v1 Requirements (MVP, the vertical mastery loop)
 
 ### Platform / AI layer
 - [ ] **PLAT-01**: Any agent can call an LLM through a single provider abstraction (managed key or user BYOK)
@@ -92,8 +92,8 @@
 | QUAL-01, QUAL-03 | Phase 8 | Pending |
 
 **Coverage:**
-- v1 requirements: 21 total — mapped to phases 1–5, unmapped: 0 ✓
-- v2 requirements: 11 total — mapped to phases 6–8, unmapped: 0 ✓
+- v1 requirements: 21 total, mapped to phases 1–5, unmapped: 0 ✓
+- v2 requirements: 11 total, mapped to phases 6–8, unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-06-02*

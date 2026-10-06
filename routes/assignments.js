@@ -53,7 +53,7 @@ router.patch('/:id', (req, res) => {
   const a = db.prepare('SELECT title, course FROM assignments WHERE id = ?').get(req.params.id);
   if (a) {
     if (status === 'graded' && grade !== undefined && grade !== null) {
-      logActivity(req.userId, { kind: 'assignment', text: `Submitted & graded: "${a.title}" — ${grade}%`, sub: a.course, xp: 50, agent: 'AS' });
+      logActivity(req.userId, { kind: 'assignment', text: `Submitted & graded: "${a.title}", ${grade}%`, sub: a.course, xp: 50, agent: 'AS' });
       awardXP(req.userId, 50, { silent: true });
     } else if (status === 'submitted' || status === 'done') {
       logActivity(req.userId, { kind: 'assignment', text: `Submitted assignment: "${a.title}"`, sub: a.course, xp: 50, agent: 'AS' });

@@ -1,4 +1,4 @@
-# LearnOS → Coursera-parity (and beyond) — Working Spec
+# LearnOS → Coursera-parity (and beyond), Working Spec
 
 **Goal:** make LearnOS a genuinely better learning product than Coursera by leaning
 into what we can do that they can't: **AI that generates and adapts** a rigorous,
@@ -11,7 +11,7 @@ This is the north star; the tasks below are the road to it. Updated as we go.
 1. **Embedded, media-rich lessons.** Coursera embeds lecture *video* inline, with
    readings and downloadable resources woven together. We only *link* out.
    → We must **embed** public resources: YouTube lectures inline, article/blog/paper
-   cards with previews, visualizations — a real multimedia lesson, not a link list.
+   cards with previews, visualizations, a real multimedia lesson, not a link list.
 
 2. **Assessments are real.** Coursera has substantial graded assignments, peer
    projects, and proper quizzes/exams. Ours are thin popup modals with almost no
@@ -25,7 +25,7 @@ This is the north star; the tasks below are the road to it. Updated as we go.
    → Roadmaps must compose **courses/modules into a pathway from the learner's
    current mastery (A) to a target (B)**, gated by demonstrated mastery.
 
-4. **Adaptation.** Neither of us truly adapts — this is our edge to seize.
+4. **Adaptation.** Neither of us truly adapts, this is our edge to seize.
    → The AI agents must **track proficiency, speed, and assignment/quiz results**
    and actively **adjust** difficulty, pacing, next-step recommendations, and the
    roadmap. A visible "learning coach" that guides the learner through.
@@ -38,29 +38,29 @@ This is the north star; the tasks below are the road to it. Updated as we go.
 - Open an assignment/exam → a **full page**: context, reference resources, a work
   surface (editor), submit → **detailed rubric feedback** and a grade that flows
   into mastery, XP, and the path.
-- A **coach** panel/feed: "you're ahead — here's a stretch project", "revisit X",
+- A **coach** panel/feed: "you're ahead, here's a stretch project", "revisit X",
   "next up: module Y", driven by real performance signals.
 - A roadmap that is a **course pathway A→B**, unlocking by demonstrated mastery,
   re-planned when the learner struggles or races ahead.
 
-## Workstreams (tracked as tasks) — all shipped ✅
+## Workstreams (tracked as tasks), all shipped ✅
 
-1. ✅ **Rich embedded lesson viewer** — embeds YouTube inline (youtube-nocookie
+1. ✅ **Rich embedded lesson viewer**, embeds YouTube inline (youtube-nocookie
    16:9), resource cards by kind, MarkdownText readings, prev/next navigation,
    completion→advance. `src/screens/Courses.jsx`.
-2. ✅ **Full-page examination/assignment experience** — `AssignmentExam` replaces
+2. ✅ **Full-page examination/assignment experience**, `AssignmentExam` replaces
    the modal: instructions, requirements checklist, autosaving work surface (code
    editor for coding kinds), submit → rubric feedback with score bars, grading
    sidebar. `src/screens/Extras.jsx`. Quiz exam flow via `QuizModal`.
-3. ✅ **Adaptive learning engine + coach** — `GET /api/ai/coach` proficiency/pace
+3. ✅ **Adaptive learning engine + coach**, `GET /api/ai/coach` proficiency/pace
    from quiz_attempts + graded assignments + node mastery + activity; mastery-
    derived assignment difficulty; `LearningCoach` panel on Dashboard with
    clickable recommendations. `routes/ai.js`, `ai/agents/assessment.js`.
-4. ✅ **Roadmap = course pathway (A→B)** — every AI course spins up a companion
+4. ✅ **Roadmap = course pathway (A→B)**, every AI course spins up a companion
    roadmap: one node per module (capstone included), linear prereq edges as
    mastery gates, `course_slug` on each node, "Study content" opens the course.
    `ai/agents/course.js`, `src/screens/Roadmap.jsx`.
-5. ✅ **Resource enrichment everywhere** — module resources are reachability-
+5. ✅ **Resource enrichment everywhere**, module resources are reachability-
    verified before shipping and copied onto roadmap nodes (node_resources);
    the roadmap embeds lecture video inline. RE agent `propose-resources` job
    enriches any node on demand. `ai/agents/research.js`, `routes/nodes.js`.

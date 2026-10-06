@@ -15,7 +15,7 @@ import { runCodeTests, scoreRubric } from '../ai/assessment/grader.js';
 
 const BASE = process.argv[2] || 'http://localhost:3001';
 const results = [];
-const check = (id, name, pass, detail = '') => { results.push({ id, name, pass, detail }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? ` — ${detail}` : ''}`); };
+const check = (id, name, pass, detail = '') => { results.push({ id, name, pass, detail }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? `, ${detail}` : ''}`); };
 
 const api = async (path, opts = {}) => {
   const r = await fetch(`${BASE}${path}`, { headers: { 'Content-Type': 'application/json' }, ...opts });
@@ -27,7 +27,7 @@ const mod = db.prepare(`SELECT m.id, m.title, m.course_slug, COUNT(q.id) n
                         FROM course_modules m JOIN quiz_items q ON q.module_id = m.id
                         GROUP BY m.id HAVING n >= 8 ORDER BY n DESC LIMIT 1`).get();
 if (!mod) {
-  console.log('SKIP — no module with a question bank. Build a course first (POST /api/courses/build).');
+  console.log('SKIP, no module with a question bank. Build a course first (POST /api/courses/build).');
   process.exit(0);
 }
 console.log(`Using module: ${mod.title} (${mod.n} bank items)\n`);
@@ -88,7 +88,7 @@ check('V4a', 'graded tracks attempt numbers', gradedStatus[0]?.attemptNo === 1 &
 check('V4b', 'graded reports attempts remaining', gradedStatus[1]?.attemptsLeft === 1, `left=${gradedStatus[1]?.attemptsLeft}`);
 check('V5b', 'failed graded withholds nothing once attempts near exhaustion', typeof gradedStatus[1]?.explanationsRevealed === 'boolean');
 
-// third attempt — pass it
+// third attempt, pass it
 const g3 = await api(`/api/assessments/module/${mod.id}/quiz?mode=graded&count=10`);
 const ids3 = (g3.body.questions || []).map(q => q.id);
 const sub3 = await api(`/api/assessments/module/${mod.id}/submit`, { method: 'POST', body: JSON.stringify({ mode: 'graded', item_ids: ids3, answers: answerKey(ids3) }) });
@@ -124,7 +124,7 @@ check('V6g', 'async hangs are hard-killed, not just timed out', asyncHang.score 
 const escape = await runCodeTests('function add(a,b){ return typeof process === "undefined" && typeof require === "undefined" ? a+b : -1 }', tests, { timeoutMs: 1000 });
 check('V6h', 'the sandbox exposes no process/require to submitted code', escape.score === 100, `score=${escape.score}`);
 
-// ── V13: remediation — a failure must come with a diagnosis ─────────────────
+// ── V13: remediation, a failure must come with a diagnosis ─────────────────
 check('V13a', 'a failed graded attempt names the weak skills',
   Array.isArray(gradedStatus[0]?.weakSkills) && gradedStatus[0].weakSkills.length > 0,
   `${gradedStatus[0]?.weakSkills?.length || 0} skills`);

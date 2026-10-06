@@ -1,5 +1,5 @@
 /**
- * Course sharing — M12 of docs/MASTERY_SPEC_V2.md.
+ * Course sharing, M12 of docs/MASTERY_SPEC_V2.md.
  *
  * LearnOS is single-user and self-hosted, so it cannot host a social network,
  * and pretending otherwise (seeded "members", invented threads, a leaderboard of
@@ -8,7 +8,7 @@
  *
  * What an open-source local tool CAN genuinely participate in is a content
  * commons: a course is a file. Export it, send it to someone, they import it and
- * have the whole thing — readings, resources, labs, question bank and all. No
+ * have the whole thing, readings, resources, labs, question bank and all. No
  * server, no accounts, no network required.
  */
 import { Router } from 'express';
@@ -52,7 +52,7 @@ export function buildBundle(slug) {
           pass_threshold: l.pass_threshold, max_attempts: l.max_attempts,
           lab_language: l.lab_language, starter_code: l.starter_code, lab_tests: parse(l.lab_tests_json, null),
         })),
-      // The question bank travels too — a course without its assessment is half a course.
+      // The question bank travels too, a course without its assessment is half a course.
       quiz_items: db.prepare('SELECT question, choices_json, answer_idx, explanation, difficulty, skill, verification_status FROM quiz_items WHERE module_id = ?').all(m.id)
         .map(q => ({
           question: q.question, choices: parse(q.choices_json, []), answer_idx: q.answer_idx,
@@ -65,7 +65,7 @@ export function buildBundle(slug) {
   };
 }
 
-/** GET /api/share/course/:slug — the whole course as one portable JSON bundle. */
+/** GET /api/share/course/:slug, the whole course as one portable JSON bundle. */
 router.get('/course/:slug', (req, res) => {
   const bundle = buildBundle(req.params.slug);
   if (!bundle) return res.status(404).json({ error: true, message: 'Course not found' });
@@ -86,7 +86,7 @@ function validateBundle(b) {
 }
 
 /**
- * POST /api/share/import — import a bundle someone shared.
+ * POST /api/share/import, import a bundle someone shared.
  *
  * Imported content is untrusted: URLs are checked against the same SSRF policy
  * as anything else, and every question arrives as 'unverified' regardless of
@@ -155,11 +155,11 @@ router.post('/import', (req, res) => {
   res.json({
     ok: true, slug, title: c.title,
     modules: bundle.modules.length, lessons: lessonCount, quizItems: itemCount, droppedUrls,
-    note: 'Imported questions start unverified — run the fact-checker before relying on them to grade you.',
+    note: 'Imported questions start unverified, run the fact-checker before relying on them to grade you.',
   });
 });
 
-/** GET /api/share/exportable — courses available to export, with size hints. */
+/** GET /api/share/exportable, courses available to export, with size hints. */
 router.get('/exportable', (req, res) => {
   const rows = db.prepare(`SELECT c.slug, c.title, c.hours,
                              (SELECT COUNT(*) FROM course_modules m WHERE m.course_slug = c.slug) modules,

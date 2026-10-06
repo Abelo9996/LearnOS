@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Verifies M4 specialization pathways (docs/MASTERY_SPEC_V2.md §5):
- *   V9  placement — the diagnostic sets a defensible starting node
- *   V8  gating    — a pathway of courses progresses only on demonstrated mastery
+ *   V9  placement, the diagnostic sets a defensible starting node
+ *   V8  gating   , a pathway of courses progresses only on demonstrated mastery
  *
  * Placement is pure logic, so it is tested exhaustively with a synthetic pathway
  * (no LLM needed): a learner who knows the first two courses must start at the
@@ -15,7 +15,7 @@ import db from '../db/database.js';
 import { applyPlacement } from '../ai/agents/specialization.js';
 
 const results = [];
-const check = (id, name, pass, detail = '') => { results.push({ id, pass }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? ` — ${detail}` : ''}`); };
+const check = (id, name, pass, detail = '') => { results.push({ id, pass }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? `, ${detail}` : ''}`); };
 
 const RM = 'sp-verify-test';
 const COURSES = ['Foundations', 'Core Skills', 'Applied Practice', 'Advanced Topics'];
@@ -85,7 +85,7 @@ r = applyPlacement('user-1', RM, partial);
 check('V9h', 'scoring below the skip threshold does not skip the course', r.startIndex === 0, `course0 ratio=${r.perCourse[0].ratio.toFixed(2)}`);
 check('V9i', 'placement reports the specific skill gaps', Array.isArray(r.perCourse[0].gaps) && r.perCourse[0].gaps.length > 0, `gaps=${r.perCourse[0].gaps.length}`);
 
-// ── V8: pathway gating — locked until the predecessor is done ───────────────
+// ── V8: pathway gating, locked until the predecessor is done ───────────────
 seed();
 applyPlacement('user-1', RM, answersFor([false, false, false, false]));
 st = statuses();

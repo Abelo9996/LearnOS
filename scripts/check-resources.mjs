@@ -4,7 +4,7 @@
  * the course says it is.
  *
  * The build only ever checked that a URL loads. That catches nothing useful,
- * because the model does not invent hostnames — it invents identifiers, and a
+ * because the model does not invent hostnames, it invents identifiers, and a
  * fabricated arXiv id resolves perfectly to somebody else's paper. A lesson on
  * policy and value functions cited "Biorthogonal rational functions of R_II
  * type" and was marked verified, because the link worked.

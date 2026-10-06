@@ -13,7 +13,7 @@ function getCourse(slug) {
   return db.prepare('SELECT * FROM courses WHERE slug = ?').get(slug);
 }
 
-// AI course generation — the Curriculum agent designs a full Coursera-grade
+// AI course generation, the Curriculum agent designs a full Coursera-grade
 // course (readings, verified resources, assignments, capstone). Declared before
 // the /:slug routes so "generate" is never captured as a slug.
 router.post('/generate', requireAuth, async (req, res) => {
@@ -27,7 +27,7 @@ router.post('/generate', requireAuth, async (req, res) => {
   }
 });
 
-// Staged build (M2) — one LLM call per module produces a course with real depth.
+// Staged build (M2), one LLM call per module produces a course with real depth.
 // Too slow for a request/response cycle, so it returns a jobId to poll; the job
 // reports progress per module and validates the result against the depth floors.
 router.post('/build', requireAuth, (req, res) => {
@@ -46,7 +46,7 @@ router.post('/:slug/enrich', requireAuth, (req, res) => {
   res.json({ ok: true, jobId });
 });
 
-// Depth report for one course — powers the "this course is thin" UI affordance.
+// Depth report for one course, powers the "this course is thin" UI affordance.
 router.get('/:slug/depth', requireAuth, async (req, res) => {
   const { validateCourseDepth } = await import('../ai/quality/depthFloors.js');
   const course = db.prepare('SELECT slug FROM courses WHERE slug = ?').get(req.params.slug);
@@ -107,7 +107,7 @@ router.post('/', requireAuth, (req, res) => {
   const { slug, title, blurb, author, hours, tags, syllabus, rating, stars, forks, thumbnail_url } = req.body;
   if (!slug || !title) return res.status(400).json({ error: true, message: 'slug and title required' });
   // S-07: SSRF guard on user-supplied thumbnail URL. Same-origin /uploads/*
-  // paths are allowed (matching the avatar_url rule in routes/users.js) —
+  // paths are allowed (matching the avatar_url rule in routes/users.js) -
   // otherwise an uploaded thumbnail was always rejected as "unsafe".
   if (thumbnail_url && !thumbnail_url.startsWith('/uploads/') && !isPublicUrl(thumbnail_url)) {
     return res.status(400).json({ error: true, code: 'UNSAFE_URL', message: 'thumbnail_url must be an uploaded path or a public http(s) URL' });
@@ -116,7 +116,7 @@ router.post('/', requireAuth, (req, res) => {
   // so every course creation threw a SQLite arity error and 500'd.
   db.prepare('INSERT OR REPLACE INTO courses (slug, title, blurb, author, verified, rating, stars, forks, hours, version, tags, thumbnail_url) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?)')
     // `tags` arrives as an array from the UI. Binding an array is not a type
-    // error in better-sqlite3 — it expands into extra parameters and fails with
+    // error in better-sqlite3, it expands into extra parameters and fails with
     // "Too many parameter values were provided", so it must be serialised here.
     .run(slug, title, blurb || '', author || 'You', rating || 0, stars || 0, forks || 0, hours || 0, 'v1.0',
       Array.isArray(tags) ? JSON.stringify(tags) : (tags || '[]'), thumbnail_url || null);
@@ -277,7 +277,7 @@ router.get('/:slug/progress', requireAuth, (req, res) => {
 // ── Course verification (§3.9) ───────────────────────────────────────────────
 
 router.post('/:slug/verify', requireAuth, (req, res) => {
-  // Self-hosted single-user instance — you curate your own catalog.
+  // Self-hosted single-user instance, you curate your own catalog.
   const c = getCourse(req.params.slug);
   if (!c) return res.status(404).json({ error: true, message: 'Course not found' });
   db.prepare("UPDATE courses SET verified = 1, verified_by = ?, verified_at = datetime('now') WHERE slug = ?").run(req.userId, req.params.slug);
@@ -286,7 +286,7 @@ router.post('/:slug/verify', requireAuth, (req, res) => {
 });
 
 router.post('/:slug/unverify', requireAuth, (req, res) => {
-  // Self-hosted single-user instance — you curate your own catalog.
+  // Self-hosted single-user instance, you curate your own catalog.
   const c = getCourse(req.params.slug);
   if (!c) return res.status(404).json({ error: true, message: 'Course not found' });
   db.prepare("UPDATE courses SET verified = 0, verified_by = NULL, verified_at = NULL WHERE slug = ?").run(req.params.slug);

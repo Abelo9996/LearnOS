@@ -4,7 +4,7 @@ import React from 'react';
  * Choose any model OpenRouter offers, as a vendor and then a model.
  *
  * Onboarding used to hardcode four options, so somebody who wanted a free model
- * — the reason to bring your own key in the first place — simply could not pick
+ *, the reason to bring your own key in the first place, simply could not pick
  * one. Replacing that with one flat list of 341 `vendor/model` slugs fixed the
  * availability but not the browsing: every entry repeated its vendor prefix,
  * and finding Anthropic's models meant scrolling past OpenAI's 59 and Qwen's
@@ -37,7 +37,7 @@ export default function ModelPicker({
   const [q, setQ] = React.useState('');
   const [freeOnly, setFreeOnly] = React.useState(false);
   // Which vendor's list is on screen. Starts at whatever is selected, but the
-  // stored value only changes when a model is actually chosen — browsing around
+  // stored value only changes when a model is actually chosen, browsing around
   // must not silently repoint an agent.
   const [browse, setBrowse] = React.useState(() => providerOf(value));
   const ref = React.useRef(null);
@@ -62,15 +62,15 @@ export default function ModelPicker({
     return [...by.values()].sort((a, b) => b.count - a.count || a.id.localeCompare(b.id));
   }, [models, freeOnly]);
 
-  // Turning on "Free only" can empty the provider you were looking at —
-  // Anthropic has no free models — which left the panel showing "0 · No models
+  // Turning on "Free only" can empty the provider you were looking at -
+  // Anthropic has no free models, which left the panel showing "0 · No models
   // here" and no obvious way forward. Move to the first provider that does.
   React.useEffect(() => {
     if (!providers.length) return;
     if (!browse || !providers.some(p => p.id === browse)) setBrowse(providers[0].id);
   }, [providers, browse]);
 
-  // A search is answered across every vendor — you should not have to know who
+  // A search is answered across every vendor, you should not have to know who
   // makes a model to find it by name.
   const searching = q.trim().length > 0;
   const list = React.useMemo(() => {

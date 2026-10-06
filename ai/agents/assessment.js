@@ -1,5 +1,5 @@
 /**
- * AS — Assessment agent (G3). Generates real, node-aware assignments tailored
+ * AS, Assessment agent (G3). Generates real, node-aware assignments tailored
  * to a learner's current module and difficulty. Falls back to the static
  * ASSIGNMENT_LIBRARY on the frontend if the agent fails (no key, etc.).
  */
@@ -32,7 +32,7 @@ const SYSTEM = `You are the Assessment agent for LearnOS. Given a module title, 
 the course it belongs to, and a difficulty, generate a single real assignment.
 
 Strict rules:
-- The assignment MUST test the module's actual objectives — not a generic placeholder.
+- The assignment MUST test the module's actual objectives, not a generic placeholder.
 - 'kind' must match what was requested.
 - 'tasks' is a concrete, ordered checklist of 4-7 specific actions the learner should perform.
   Each task is one sentence. No filler like "complete the assignment" or "submit your work".
@@ -91,7 +91,7 @@ const stepsAssignmentSchema = {
 };
 
 const STEPS_SYSTEM = `You are the Assessment agent for LearnOS. Build a single HANDS-ON, auto-graded assignment
-that makes the learner DO things and get immediate, real feedback — never a wall-of-text essay.
+that makes the learner DO things and get immediate, real feedback, never a wall-of-text essay.
 
 Output an ordered list of 4–7 "steps". Each step is one of:
 - "mcq": a concept check. 3–4 "choices", exactly one correct via "answer_idx" (0-based), and a one-sentence "explanation".
@@ -99,7 +99,7 @@ Output an ordered list of 4–7 "steps". Each step is one of:
 - "short": a focused free-response answer of AT MOST 2–4 sentences. Put what a correct answer must contain in "guidance". Use AT MOST ONE short step, and NEVER ask for essays, reports, or word counts above ~120.
 
 Design rules:
-- Prefer interactive, auto-graded steps (mcq + code). Every step must be checkable — no "reflect on…" or "write about…" busywork.
+- Prefer interactive, auto-graded steps (mcq + code). Every step must be checkable, no "reflect on…" or "write about…" busywork.
 - Scaffold: start easier, build up. Give code steps clear, minimal "starter_code" (function signature / a TODO), not a blank box.
 - Ground every step in the module's actual objectives and the provided resources.
 - Give each step a "weight" of 1 (minor), 2 (normal), or 3 (core).
@@ -108,7 +108,7 @@ CODE step rules (pick ONE language appropriate to the course):
 - For python or javascript: write FUNCTION tests. The learner implements a named function. Each test = { "name", "fn": "<function name>", "args": [ ... ], "expected": <value> }. "starter_code" must define that function's signature with a TODO body.
 - For cpp, c, java, or go: write I/O tests. The program reads from stdin and prints the answer to stdout. Each test = { "name", "args": ["<exact stdin>"], "expected": "<exact expected stdout>" }. "starter_code" must be a compilable skeleton that reads input.
 - Provide 2–4 visible "tests" AND 1–3 "hidden_tests" (same format) so the learner can't hard-code outputs.
-- Keep tests deterministic and exact — no randomness, no floating-point equality traps (use integers or exact strings).
+- Keep tests deterministic and exact, no randomness, no floating-point equality traps (use integers or exact strings).
 - Only use code steps when the topic is genuinely programmatic. For non-programmatic topics, use mcq + one short step.
 
 Also return a short "description" (2–3 sentences on what the learner will build/practice), a realistic "estimated_minutes", a "priority", and a "kind".
@@ -184,12 +184,12 @@ export async function generateAssignment({ userId, nodeId, kind, difficulty }) {
   let d = DIFFICULTIES.includes(difficulty) ? difficulty : null;
   if (!d) d = mastery == null ? 'medium' : mastery < 0.4 ? 'easy' : mastery < 0.75 ? 'medium' : 'hard';
   const masteryNote = mastery == null ? '' :
-    `\nLearner's current mastery of this module: ${Math.round(mastery * 100)}%. Calibrate the challenge accordingly — ${mastery < 0.4 ? 'scaffold heavily, focus on fundamentals and confidence' : mastery < 0.75 ? 'reinforce and apply the core skills' : 'push toward synthesis, edge cases and independent design'}.`;
+    `\nLearner's current mastery of this module: ${Math.round(mastery * 100)}%. Calibrate the challenge accordingly, ${mastery < 0.4 ? 'scaffold heavily, focus on fundamentals and confidence' : mastery < 0.75 ? 'reinforce and apply the core skills' : 'push toward synthesis, edge cases and independent design'}.`;
   const resourceNote = resources.length
-    ? `\n\nGround the assignment in these vetted resources for the module — reference them where useful and have the learner apply what they cover:\n${resources.map(r => `- [${r.kind}] ${r.title} (${r.source || ''}) — ${r.summary || r.url}`).join('\n')}`
+    ? `\n\nGround the assignment in these vetted resources for the module, reference them where useful and have the learner apply what they cover:\n${resources.map(r => `- [${r.kind}] ${r.title} (${r.source || ''}), ${r.summary || r.url}`).join('\n')}`
     : '';
 
-  const objText = objectives.length ? objectives.map(o => `- ${o}`).join('\n') : '(no objectives specified — infer reasonable ones from the title)';
+  const objText = objectives.length ? objectives.map(o => `- ${o}`).join('\n') : '(no objectives specified, infer reasonable ones from the title)';
   const out = await complete({
     userId, agentCode: 'AS',
     schema: stepsAssignmentSchema,
@@ -259,7 +259,7 @@ const gradeSchema = {
 
 const GRADE_SYSTEM = `You are the Assessment agent for LearnOS grading a learner's assignment submission.
 Evaluate the submission against the assignment's objectives and tasks.
-Be fair and constructive — point out what was done well AND what could improve.
+Be fair and constructive, point out what was done well AND what could improve.
 The grade should reflect genuine mastery, not effort alone.`;
 
 export async function gradeSubmission({ submissionId }) {
@@ -285,7 +285,7 @@ export async function gradeSubmission({ submissionId }) {
     try {
       logActivity(sub.user_id, {
         kind: 'assignment_graded',
-        text: `Graded: ${assignment?.title || 'Assignment'} — ${gradeVal}%`,
+        text: `Graded: ${assignment?.title || 'Assignment'}, ${gradeVal}%`,
         sub: assignment?.course || 'Assignment',
         xp: 50, agent: 'AS',
       });
@@ -315,7 +315,7 @@ Grade this submission. Return overall_grade (0-100), per_criterion scores, and f
     });
   } catch (e) {
     // complete() THROWS when no key is configured, so the heuristic fallback
-    // below used to be unreachable — submissions sat ungraded forever with the
+    // below used to be unreachable, submissions sat ungraded forever with the
     // UI stuck on "Grading in progress…". Fall through to the heuristic.
     out = null;
   }
@@ -331,7 +331,7 @@ Grade this submission. Return overall_grade (0-100), per_criterion scores, and f
     applyGrade(
       fallbackGrade,
       `**Auto-graded (no AI key):** ${fallbackGrade}%\n\nYour submission was evaluated heuristically. Add an OpenRouter key in Settings for detailed AI feedback.`,
-      [{ criterion: 'Overall', score: fallbackGrade, why: 'Heuristic grading — add an AI key for detailed feedback' }],
+      [{ criterion: 'Overall', score: fallbackGrade, why: 'Heuristic grading, add an AI key for detailed feedback' }],
     );
     return { ok: true, fallback: true, grade: fallbackGrade };
   }
@@ -380,7 +380,7 @@ function persistAssignmentGrade(sub, assignment, gradeVal, feedbackMd, rubric, s
   try {
     logActivity(sub.user_id, {
       kind: 'assignment_graded',
-      text: `Graded: ${assignment?.title || 'Assignment'} — ${gradeVal}%`,
+      text: `Graded: ${assignment?.title || 'Assignment'}, ${gradeVal}%`,
       sub: assignment?.course || 'Assignment', xp: 50, agent: 'AS',
     });
     awardXP(sub.user_id, 50);
@@ -395,7 +395,7 @@ export async function gradeStepSubmission({ submissionId }) {
   const assignment = db.prepare('SELECT * FROM assignments WHERE id = ?').get(sub.assignment_id);
   const steps = normalizeSteps(parseJson(assignment?.steps_json, []));
   if (!steps.length) {
-    // Not a step assignment — defer to the legacy essay grader.
+    // Not a step assignment, defer to the legacy essay grader.
     return gradeSubmission({ submissionId });
   }
   const answers = parseJson(sub.answers_json, {}) || {};
@@ -415,7 +415,7 @@ export async function gradeStepSubmission({ submissionId }) {
     }
   }
 
-  // 2) Text steps (short/written) — one batched LLM call, heuristic fallback.
+  // 2) Text steps (short/written), one batched LLM call, heuristic fallback.
   const textSteps = steps.filter(s => s.type === 'short' || s.type === 'written');
   if (textSteps.length) {
     let graded = null;
@@ -444,7 +444,7 @@ A blank or off-topic answer scores low. Give one or two sentences of concrete fe
         const words = (answers[s.id]?.text || '').trim().split(/\s+/).filter(Boolean).length;
         const ratio = s.min_words ? Math.min(1, words / s.min_words) : (words > 0 ? 1 : 0);
         const score = Math.round(ratio * (words > 0 ? 70 : 0));
-        results[s.id] = { type: s.type, score, passed: score >= 60, feedback: 'Auto-graded without an AI key — add an OpenRouter key in Settings for real feedback.', autograded: false };
+        results[s.id] = { type: s.type, score, passed: score >= 60, feedback: 'Auto-graded without an AI key, add an OpenRouter key in Settings for real feedback.', autograded: false };
       }
     }
   }
@@ -463,7 +463,7 @@ A blank or off-topic answer scores low. Give one or two sentences of concrete fe
 
 function stepWhy(s, r) {
   if (!r) return 'Not attempted.';
-  if (s.type === 'mcq') return r.passed ? 'Correct.' : `Incorrect${Number.isInteger(r.correctIdx) ? ` — the right choice was #${r.correctIdx + 1}` : ''}.`;
+  if (s.type === 'mcq') return r.passed ? 'Correct.' : `Incorrect${Number.isInteger(r.correctIdx) ? `, the right choice was #${r.correctIdx + 1}` : ''}.`;
   if (s.type === 'code') return r.total ? `${r.passedCount}/${r.total} test cases passed${r.error ? ` · ${r.error}` : ''}.` : (r.passed ? 'Ran cleanly.' : (r.error || 'Did not run.'));
   return r.feedback || (r.passed ? 'Solid answer.' : 'Answer was thin or off-target.');
 }
@@ -473,7 +473,7 @@ function buildStepFeedback(steps, results, overall) {
   steps.forEach((s, i) => {
     const r = results[s.id] || {};
     const mark = r.passed ? '✅' : (r.score >= 60 ? '🟡' : '❌');
-    lines.push(`**${i + 1}. ${mark} ${stepTaskLabel(s)} — ${r.score ?? 0}%**`);
+    lines.push(`**${i + 1}. ${mark} ${stepTaskLabel(s)}, ${r.score ?? 0}%**`);
     lines.push(stepWhy(s, r));
     lines.push('');
   });

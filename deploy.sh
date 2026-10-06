@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# deploy.sh — Build and run LearnOS
+# deploy.sh, Build and run LearnOS
 #
 # Usage:
 #   ./deploy.sh           Build frontend + start backend on :3001
@@ -34,7 +34,7 @@ done
 
 # ── prereqs ───────────────────────────────────────────────────────────────────
 step "Checking prerequisites"
-command -v node >/dev/null 2>&1 || die "Node.js not found — https://nodejs.org"
+command -v node >/dev/null 2>&1 || die "Node.js not found, https://nodejs.org"
 command -v npm  >/dev/null 2>&1 || die "npm not found"
 NODE_MAJOR=$(node -e "process.stdout.write(process.versions.node.split('.')[0])")
 [[ "$NODE_MAJOR" -ge 18 ]] || die "Node.js 18+ required (found $(node -v))"
@@ -52,7 +52,7 @@ fi
 if $RESET; then
   step "Resetting database"
   rm -f db/learnos.db db/learnos.db-shm db/learnos.db-wal
-  ok "Database wiped — will re-seed on start"
+  ok "Database wiped, will re-seed on start"
 fi
 
 # ── dev mode ──────────────────────────────────────────────────────────────────
@@ -72,7 +72,7 @@ ok "Build complete → dist/"
 
 # ── free port ─────────────────────────────────────────────────────────────────
 if lsof -ti :3001 >/dev/null 2>&1; then
-  warn "Port 3001 in use — stopping existing process"
+  warn "Port 3001 in use, stopping existing process"
   lsof -ti :3001 | xargs kill -9 2>/dev/null || true
   sleep 1
 fi

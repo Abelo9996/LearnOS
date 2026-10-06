@@ -18,7 +18,7 @@ function useApi(fetcher, deps = []) {
   const load = React.useCallback(() => {
     setLoading(true);
     setError(null);
-    // Surface the error instead of swallowing it — a failed load used to be
+    // Surface the error instead of swallowing it, a failed load used to be
     // indistinguishable from a genuinely empty list ("No assignments yet.").
     fetcher().then(d => { setData(d); }).catch(e => { setError(e); }).finally(() => setLoading(false));
   }, deps);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -32,7 +32,7 @@ function ErrorBanner({ error, onRetry }) {
   return (
     <div style={{ padding: '10px 14px', marginBottom: 14, borderRadius: 10, background: 'oklch(0.7 0.2 25 / 0.10)', border: '1px solid oklch(0.7 0.2 25 / 0.35)', display: 'flex', alignItems: 'center', gap: 10, fontSize: 12.5, color: 'var(--ink-2)' }}>
       <span style={{ color: 'var(--bad)' }}>⚠</span>
-      <span style={{ flex: 1 }}>Couldn't load this — {error.message || 'the server may be unavailable'}.</span>
+      <span style={{ flex: 1 }}>Couldn't load this, {error.message || 'the server may be unavailable'}.</span>
       {onRetry && <button onClick={onRetry} className="ui-btn" style={{ background: 'none', border: 0, color: 'var(--brand)', cursor: 'pointer', fontWeight: 600, fontSize: 12.5 }}>Retry</button>}
     </div>
   );
@@ -68,7 +68,7 @@ function ScheduleAgenda({ setScreen }) {
 
   if (!data) return <Card style={{ padding: 16, marginBottom: SECT_MARGIN }}><SkeletonRows rows={3} height={44} /></Card>;
 
-  // A lesson is not "due" — it is where you left off. Mixing the two meant the
+  // A lesson is not "due", it is where you left off. Mixing the two meant the
   // undated ones sorted below every deadline and fell off the end of the list,
   // which is the opposite of useful for the thing you do most days.
   const dated = (data.items || []).filter(i => i.due);
@@ -93,7 +93,7 @@ function ScheduleAgenda({ setScreen }) {
         <div>
           <div style={{ fontSize: 14, fontWeight: 650, color: 'var(--ink)' }}>What's due</div>
           <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>
-            Pulled from your assignments, reviews and courses — not typed in here.
+            Pulled from your assignments, reviews and courses, not typed in here.
           </div>
         </div>
         <div className="mono" style={{ fontSize: 11, display: 'flex', gap: 12 }}>
@@ -427,7 +427,7 @@ export function Schedule({ setScreen }) {
 /* ═══════════════════════════════════════════════════════════════════════════
    ASSIGNMENTS
    ═══════════════════════════════════════════════════════════════════════════ */
-// A real, varied catalogue the Assessment agent draws from — coding projects,
+// A real, varied catalogue the Assessment agent draws from, coding projects,
 // larger homeworks, quizzes, and analyses, each with concrete tasks (#11, #16).
 const ASSIGNMENT_LIBRARY = [
   { title: 'Implement k-NN from scratch', course: 'Machine Learning', kind: 'coding', priority: 'high', minutes: 120,
@@ -471,11 +471,11 @@ export function Assignments() {
       kind:     a.kind || 'homework',
       description: a.description || '',
       tasks:    (() => { try { return typeof a.tasks === 'string' ? JSON.parse(a.tasks || '[]') : (a.tasks || []); } catch { return []; } })(),
-      // Interactive steps (Phase 1) — present → the exam renders the stepper;
+      // Interactive steps (Phase 1), present → the exam renders the stepper;
       // absent → the legacy essay renderer.
       steps:    (() => { try { return a.steps_json ? JSON.parse(a.steps_json) : (Array.isArray(a.steps) ? a.steps : []); } catch { return []; } })(),
-      est:      a.estimated_minutes ? `${a.estimated_minutes} min` : '—',
-      due:      a.due_date ? dueLabel(a.due_date) : '—',
+      est:      a.estimated_minutes ? `${a.estimated_minutes} min` : '-',
+      due:      a.due_date ? dueLabel(a.due_date) : '-',
     }));
   }, [rawAssignments]);
 
@@ -512,7 +512,7 @@ export function Assignments() {
       <PageHeader eyebrow={`${pending} pending`} title="Assignments" subtitle="Auto-graded work and longer projects from the Assessment Agent."
         actions={<><Btn variant="outline" size="md" icon={I.plus} onClick={() => openModal(<CreateAssignmentModal onCreated={() => { reload(); toast('Assignment created', 'success'); }} />)}>Create manually</Btn>
         <Btn variant="primary" size="md" icon={I.spark} onClick={async () => {
-          // Try the AS agent first — context-aware generation based on the user's
+          // Try the AS agent first, context-aware generation based on the user's
           // most-recent active node. On any failure (no key, agent down) fall back
           // to a curated bank so the button still does something useful.
           let activeNodeId = null;
@@ -535,7 +535,7 @@ export function Assignments() {
             reload();
             return;
           } catch (err) {
-            // Library fallback — used when no key or AS errors.
+            // Library fallback, used when no key or AS errors.
             const existing = new Set(assignments.map(a => a.title));
             const choices = ASSIGNMENT_LIBRARY.filter(a => !existing.has(a.title));
             const pick = (choices.length ? choices : ASSIGNMENT_LIBRARY)[Math.floor(Math.random() * (choices.length || ASSIGNMENT_LIBRARY.length))];
@@ -545,7 +545,7 @@ export function Assignments() {
                 estimated_minutes: pick.minutes, description: pick.description, tasks: pick.tasks,
                 due_date: new Date(Date.now() + 86400000 * (pick.kind === 'project' ? 14 : 7)).toISOString().split('T')[0],
               });
-              toast(`From practice bank: "${pick.title}" — add an OpenRouter key for AI-generated`, 'info');
+              toast(`From practice bank: "${pick.title}", add an OpenRouter key for AI-generated`, 'info');
               reload();
             } catch { toast('Could not generate assignment', 'error'); }
           }
@@ -553,7 +553,7 @@ export function Assignments() {
       <ErrorBanner error={error} onRetry={reload} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: SECT_MARGIN }}>
         <RoadmapStat2 icon={I.check}    label="In progress" value={assignments.filter(a => a.status === 'in-progress').length.toString()} sub="active"          color="var(--brand)" />
-        <RoadmapStat2 icon={I.clock}    label="Avg grade"   value={avgGrade ? `${avgGrade}%` : '—'}                                       sub="last graded"    color="var(--good)" />
+        <RoadmapStat2 icon={I.clock}    label="Avg grade"   value={avgGrade ? `${avgGrade}%` : '-'}                                       sub="last graded"    color="var(--good)" />
         <RoadmapStat2 icon={I.spark}    label="Pending"     value={pending.toString()}                                                     sub="to complete"    color="var(--brand-3)" />
         <RoadmapStat2 icon={I.calendar} label="Total"       value={assignments.length.toString()}                                          sub="assignments"    color="oklch(0.74 0.18 25)" />
       </div>
@@ -645,7 +645,7 @@ function RoadmapStat2({ icon, label, value, sub, color }) {
 }
 
 // Real work surface: description + task checklist + written submission → LLM grading.
-// Full-page examination — a real, Coursera-grade assignment experience with a
+// Full-page examination, a real, Coursera-grade assignment experience with a
 // two-column layout, requirements checklist, a proper work surface (autosaving,
 // monospace for coding), AI grading and a detailed rubric.
 const EXAM_KIND = {
@@ -695,7 +695,7 @@ function AssignmentExam({ a, onClose }) {
     setGrading(true);
     try {
       await API.submitAssignment(a.id, submission.trim());
-      toast('Submitted — the Assessment agent is grading your work…', 'info');
+      toast('Submitted, the Assessment agent is grading your work…', 'info');
       let graded = null;
       for (let i = 0; i < 30; i++) {
         await new Promise(r => setTimeout(r, 2000));
@@ -707,7 +707,7 @@ function AssignmentExam({ a, onClose }) {
         setFeedback({ grade: graded.grade, feedback_md: graded.feedback_md, rubric });
         toast(`Graded: ${graded.grade}%`, graded.grade >= 70 ? 'success' : 'info');
       } else {
-        setFeedback({ grade: null, feedback_md: '**Grading in progress…** The Assessment agent is still reviewing your work — reopen this assignment shortly to see the result.', rubric: [] });
+        setFeedback({ grade: null, feedback_md: '**Grading in progress…** The Assessment agent is still reviewing your work, reopen this assignment shortly to see the result.', rubric: [] });
       }
     } catch (e) { toast(e.message || 'Could not submit for grading', 'error'); }
     finally { setGrading(false); }
@@ -768,7 +768,7 @@ function AssignmentExam({ a, onClose }) {
           )}
 
           <Card style={{ padding: 20 }}>
-            <SectionHead title={isCoding ? 'Your solution (code)' : 'Your submission'} subtitle={isGraded ? 'Submitted — reviewed below.' : 'Autosaves as you type. The Assessment agent grades it against the requirements.'} />
+            <SectionHead title={isCoding ? 'Your solution (code)' : 'Your submission'} subtitle={isGraded ? 'Submitted, reviewed below.' : 'Autosaves as you type. The Assessment agent grades it against the requirements.'} />
             {grading && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: 'var(--accent-soft)', border: '1px solid var(--accent-line)', borderRadius: 8, marginBottom: 12 }}>
                 <span style={{ display: 'inline-flex', gap: 4 }}>{[0, 1, 2].map(i => <span key={i} style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--brand)', animation: `ldot 1s ease-in-out ${i * 0.15}s infinite` }} />)}</span>
@@ -779,7 +779,7 @@ function AssignmentExam({ a, onClose }) {
               value={submission}
               onChange={e => setSubmission(e.target.value)}
               disabled={isGraded || grading}
-              placeholder={isCoding ? '// Paste or write your code here…' : 'Write your answer, analysis, or solution here — address each requirement above.'}
+              placeholder={isCoding ? '// Paste or write your code here…' : 'Write your answer, analysis, or solution here, address each requirement above.'}
               rows={isCoding ? 16 : 12}
               style={{ width: '100%', padding: '12px 14px', background: isCoding ? 'oklch(0.12 0.02 270)' : 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: isCoding ? 12.5 : 13.5, resize: 'vertical', fontFamily: isCoding ? 'var(--font-mono)' : 'var(--font-body)', lineHeight: 1.6 }}
             />
@@ -831,10 +831,10 @@ function AssignmentExam({ a, onClose }) {
           <Card style={{ padding: 18 }}>
             <div className="cap" style={{ marginBottom: 10 }}>Tips</div>
             <ul style={{ margin: 0, paddingLeft: 16, fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.7 }}>
-              <li>Be concrete — show your reasoning and steps.</li>
+              <li>Be concrete, show your reasoning and steps.</li>
               {isCoding && <li>Include working code and note how to run it.</li>}
               <li>Reference the module's lessons and resources.</li>
-              <li>Your draft autosaves — you can leave and return.</li>
+              <li>Your draft autosaves, you can leave and return.</li>
             </ul>
           </Card>
         </div>
@@ -849,8 +849,8 @@ function AssignmentExam({ a, onClose }) {
    Instead of one essay box + cosmetic checkboxes, an assignment is an ordered
    list of steps the learner actually DOES: multiple-choice concept checks, a
    coding task they write and RUN against real test cases, and at most one short
-   focused answer. Every step is graded — MCQ and code deterministically, short
-   answers by the Assessment agent — and the overall grade is a weighted mix.
+   focused answer. Every step is graded, MCQ and code deterministically, short
+   answers by the Assessment agent, and the overall grade is a weighted mix.
    ───────────────────────────────────────────────────────────────────────────── */
 const STEP_LANG_LABEL = { python: 'Python', javascript: 'JavaScript', cpp: 'C++', c: 'C', java: 'Java', go: 'Go' };
 const STEP_TYPE_META = {
@@ -906,7 +906,7 @@ function StepAssignment({ a, onClose }) {
     setGrading(true);
     try {
       await API.submitAssignmentSteps(a.id, answers);
-      toast('Submitted — grading each step…', 'info');
+      toast('Submitted, grading each step…', 'info');
       let final = null;
       for (let i = 0; i < 40; i++) {
         await stepSleep(2000);
@@ -921,7 +921,7 @@ function StepAssignment({ a, onClose }) {
         toast(`Graded: ${final.grade}%`, final.grade >= 70 ? 'success' : 'info');
         window.scrollTo?.({ top: 0, behavior: 'smooth' });
       } else {
-        toast('Still grading — reopen shortly to see your result.', 'info');
+        toast('Still grading, reopen shortly to see your result.', 'info');
       }
     } catch (e) { toast(e.message || 'Could not submit for grading', 'error'); }
     finally { setGrading(false); }
@@ -1057,7 +1057,7 @@ function ShortStepBody({ step, answer, setAns, disabled, stepResult }) {
       <textarea
         value={text} disabled={disabled}
         onChange={e => setAns({ text: e.target.value })}
-        placeholder={`A focused ${step.min_words ? `~${step.min_words}-word` : 'short'} answer — no essay needed.`}
+        placeholder={`A focused ${step.min_words ? `~${step.min_words}-word` : 'short'} answer, no essay needed.`}
         rows={4}
         style={{ width: '100%', padding: '12px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13.5, resize: 'vertical', fontFamily: 'var(--font-body)', lineHeight: 1.6 }}
       />
@@ -1120,8 +1120,8 @@ function CodeStepBody({ a, step, answer, setAns, disabled, stepResult }) {
                   <div key={i} style={{ display: 'flex', gap: 8, fontSize: 12, alignItems: 'flex-start' }}>
                     <span style={{ color: c.passed ? 'var(--good)' : 'var(--bad)', flexShrink: 0 }}>{c.passed ? '✓' : '✕'}</span>
                     <span style={{ color: 'var(--ink-2)', flex: 1 }}>
-                      {c.name}{!c.passed && !c.hidden && 'actual' in c && <span style={{ color: 'var(--muted)' }}> — expected {JSON.stringify(c.expected)}, got {JSON.stringify(c.actual)}</span>}
-                      {!c.passed && c.error && <span style={{ color: 'var(--bad)' }}> — {c.error}</span>}
+                      {c.name}{!c.passed && !c.hidden && 'actual' in c && <span style={{ color: 'var(--muted)' }}>, expected {JSON.stringify(c.expected)}, got {JSON.stringify(c.actual)}</span>}
+                      {!c.passed && c.error && <span style={{ color: 'var(--bad)' }}>, {c.error}</span>}
                     </span>
                   </div>
                 ))}
@@ -1155,7 +1155,7 @@ export function Flashcards() {
   const { add: toast } = useToast();
   const { open: openModal, close: closeModal } = useModal();
   const { data: rawCards, loading, error, reload } = useApi(() => API.getFlashcardsDue());
-  // Decks (all cards, not just due) — so we can tell "empty deck, go generate"
+  // Decks (all cards, not just due), so we can tell "empty deck, go generate"
   // apart from "caught up for today", and show what's in the deck at all.
   const { data: decks, reload: reloadDecks } = useApi(() => API.getFlashcardDecks());
   const totalCards = (decks || []).reduce((s, d) => s + (d.total || 0), 0);
@@ -1213,15 +1213,15 @@ export function Flashcards() {
 
   return (
     <PageScroll>
-      <PageHeader eyebrow={sessionComplete ? `Review complete! · ${total} cards reviewed` : `Review · ${done} / ${total} due today`} title="Spaced review" subtitle="Built from your courses' questions and the ones you get wrong — resurfaced on a spacing schedule so it sticks before the next assignment."
+      <PageHeader eyebrow={sessionComplete ? `Review complete! · ${total} cards reviewed` : `Review · ${done} / ${total} due today`} title="Spaced review" subtitle="Built from your courses' questions and the ones you get wrong, resurfaced on a spacing schedule so it sticks before the next assignment."
         actions={<>
           <Btn variant="outline" icon={I.spark} onClick={openGenerate}>Generate from a course</Btn>
           <Btn variant="ghost" icon={I.plus} onClick={() => openModal(<CreateCardsModal onCreated={() => { closeModal(); reloadAll(); toast('Cards created!', 'success'); }} />)}>Create cards</Btn>
           <Btn variant="primary" size="md" icon={I.play} onClick={() => {
             if (sessionComplete) return resetSession();
-            if (totalCards === 0) return openGenerate();  // nothing to review yet — fill the deck
-            if (total === 0) return toast("You're caught up — nothing due today", 'info');
-            // Previously this branch did nothing at all — the primary CTA was
+            if (totalCards === 0) return openGenerate();  // nothing to review yet, fill the deck
+            if (total === 0) return toast("You're caught up, nothing due today", 'info');
+            // Previously this branch did nothing at all, the primary CTA was
             // dead whenever cards were actually due. Advance to the next
             // unreviewed card (or flip the current one).
             const nextIdx = cards.findIndex((c, i) => i >= idx && !reviewed[c.id]);
@@ -1322,7 +1322,7 @@ export function Flashcards() {
             <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.65 }}>
               Cards come from your courses' question banks and anything you miss on a graded quiz.
               Grade each recall <span style={{ color: 'var(--ink-2)' }}>Again → Easy</span> and the
-              scheduler spaces the next review — frequent for shaky ones, rare for solid ones — so a
+              scheduler spaces the next review, frequent for shaky ones, rare for solid ones, so a
               few minutes a day keeps a course fresh through its assignments.
             </div>
           </Card>
@@ -1353,12 +1353,12 @@ export function Certificates() {
           a.href = url; a.download = 'learnos-certificates.txt'; a.click(); URL.revokeObjectURL(url);
           toast('Certificates exported', 'success');
         }}>Export</Btn><Btn variant="primary" size="md" icon={I.upload} onClick={async () => {
-          // Copy verifiable credential text — there is no client router, so the
+          // Copy verifiable credential text, there is no client router, so the
           // old `origin + '/certificates'` link just dumped anyone on the
           // Dashboard. Share the credential details + verification IDs instead.
-          if (certs.length === 0) { toast('No certificates to share yet — complete a roadmap first', 'info'); return; }
+          if (certs.length === 0) { toast('No certificates to share yet, complete a roadmap first', 'info'); return; }
           const text = 'My LearnOS credentials:\n\n' + certs.map(c =>
-            `🎓 ${c.title} — ${Math.round((c.mastery || 0) * 100)}% mastery\n   Verification ID: ${c.id_short || c.id}${c.issued_at ? ` · issued ${fmtDate(c.issued_at)}` : ''}`
+            `🎓 ${c.title}, ${Math.round((c.mastery || 0) * 100)}% mastery\n   Verification ID: ${c.id_short || c.id}${c.issued_at ? ` · issued ${fmtDate(c.issued_at)}` : ''}`
           ).join('\n\n');
           try { await navigator.clipboard.writeText(text); toast(`Copied ${certs.length} credential${certs.length === 1 ? '' : 's'} to clipboard`, 'success'); }
           catch { toast('Could not copy to clipboard', 'error'); }
@@ -1369,7 +1369,7 @@ export function Certificates() {
         <div style={{ padding: 32, color: 'var(--muted)' }}>Loading…</div>
       ) : certs.length === 0 ? (
         <Card style={{ padding: 48, textAlign: 'center' }}>
-          <div style={{ fontSize: 16, color: 'var(--muted)' }}>No certificates yet — complete a roadmap to earn one!</div>
+          <div style={{ fontSize: 16, color: 'var(--muted)' }}>No certificates yet, complete a roadmap to earn one!</div>
         </Card>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
@@ -1381,7 +1381,7 @@ export function Certificates() {
         <div style={{ padding: 32, color: 'var(--muted)' }}>Loading…</div>
       ) : badges.length === 0 ? (
         <Card style={{ padding: 32, textAlign: 'center' }}>
-          <div style={{ fontSize: 14, color: 'var(--muted)' }}>No badges yet — keep learning!</div>
+          <div style={{ fontSize: 14, color: 'var(--muted)' }}>No badges yet, keep learning!</div>
         </Card>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 12 }}>
@@ -1429,7 +1429,7 @@ function CertCard({ cert }) {
 
 // NOTE: the old in-app Community screen (threads, replies, votes, a contributor
 // leaderboard) is gone. LearnOS is single-user and self-hosted, so the
-// "community" it displayed was four invented people and five seeded threads —
+// "community" it displayed was four invented people and five seeded threads -
 // fabricated data presented as social proof. The real thing is in
 // src/screens/Share.jsx: courses travel as files, and a registry server anyone
 // can run lets people publish and browse them for real.
@@ -1455,7 +1455,7 @@ export function Feed() {
           {loading ? (
             <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)' }}>Loading…</div>
           ) : activity.length === 0 ? (
-            <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)' }}>No activity yet — start learning to see your feed!</div>
+            <div style={{ padding: 48, textAlign: 'center', color: 'var(--muted)' }}>No activity yet, start learning to see your feed!</div>
           ) : activity.map(a => {
             const m = kindMeta[a.kind] || kindMeta.session;
             return (
@@ -1542,7 +1542,7 @@ export function Starred() {
         <div style={{ padding: 32, color: 'var(--muted)' }}>Loading…</div>
       ) : courses.length === 0 ? (
         <Card style={{ padding: 48, textAlign: 'center' }}>
-          <div style={{ fontSize: 16, color: 'var(--muted)' }}>No starred courses yet — star a course to save it here.</div>
+          <div style={{ fontSize: 16, color: 'var(--muted)' }}>No starred courses yet, star a course to save it here.</div>
         </Card>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
@@ -1608,7 +1608,7 @@ function CoverVizSmall({ kind }) {
 /**
  * Which model runs which agent.
  *
- * Seven agents, and almost everyone wants the same model behind all of them —
+ * Seven agents, and almost everyone wants the same model behind all of them -
  * at least until they have a reason not to. Setting that one row at a time
  * meant seven searches through a 341-model catalog to express a single
  * decision. Select some agents (or none, meaning all), pick a model once,
@@ -1634,7 +1634,7 @@ function AgentRouting({ models, routeModels, setRouteModels, toast }) {
     if (!bulkModel) { toast('Pick a model to apply first', 'error'); return; }
     setApplying(true);
     try {
-      // One transaction rather than seven requests — half-applied routing is
+      // One transaction rather than seven requests, half-applied routing is
       // worse than none.
       const r = await API.setAgentRoutingBulk(bulkModel, picked.size ? [...picked] : undefined);
       setRouteModels(prev => {
@@ -1738,7 +1738,7 @@ function AgentRouting({ models, routeModels, setRouteModels, toast }) {
 export function Settings() {
   const { add: toast } = useToast();
   // Deep-linked tabs may name a tab that no longer exists (or 'keys' from an
-  // older link) — fall back to API keys rather than rendering nothing.
+  // older link), fall back to API keys rather than rendering nothing.
   const VALID_TABS = ['account', 'api', 'agents', 'data'];
   const [activeTab, setActiveTab] = React.useState(() => {
     const t = localStorage.getItem('settings_tab');
@@ -1871,7 +1871,7 @@ export function Settings() {
       case 'api':
         return (
           <Card style={{ padding: 18 }}>
-            <SectionHead title="OpenRouter API key" subtitle="LearnOS uses OpenRouter — one key unlocks every model. Stored encrypted, used only for AI calls." />
+            <SectionHead title="OpenRouter API key" subtitle="LearnOS uses OpenRouter, one key unlocks every model. Stored encrypted, used only for AI calls." />
             {loadingKeys ? (
               <div style={{ padding: 24, color: 'var(--muted)' }}>Loading keys…</div>
             ) : (
@@ -1975,9 +1975,9 @@ export function Settings() {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   AGENTS PAGE — shows live agent statuses from DB
+   AGENTS PAGE, shows live agent statuses from DB
    ═══════════════════════════════════════════════════════════════════════════ */
-// Where each agent actually acts in the product — shown so it's clear all 7
+// Where each agent actually acts in the product, shown so it's clear all 7
 // are wired in, not just the Tutor (#19).
 const AGENT_ROLE = {
   TU: 'Runs your tutoring sessions and answers questions',
@@ -2046,7 +2046,7 @@ export function AgentsPage({ setScreen }) {
                       ))}
                     </div>
                   ) : (
-                    <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>No actions yet — this agent will log work here as you use the related features.</div>
+                    <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>No actions yet, this agent will log work here as you use the related features.</div>
                   )}
                 </div>
               )}
@@ -2093,7 +2093,7 @@ function CreateAssignmentModal({ onCreated }) {
   return (
     <div>
       <h3 className="display" style={{ fontSize: 22, marginBottom: 6 }}>Create assignment</h3>
-      <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18 }}>Build a project, quiz, or homework manually — useful when you want full control over the tasks.</p>
+      <p style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18 }}>Build a project, quiz, or homework manually, useful when you want full control over the tasks.</p>
       <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10, marginBottom: 10 }}>
         <div><div className="cap" style={{ marginBottom: 4 }}>Title</div><input value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Implement softmax from scratch" style={inp} /></div>
         <div><div className="cap" style={{ marginBottom: 4 }}>Course</div><input value={course} onChange={e => setCourse(e.target.value)} placeholder="e.g. Deep Learning" style={inp} /></div>
@@ -2128,7 +2128,7 @@ function CreateAssignmentModal({ onCreated }) {
 
 /**
  * Turn a course (or one of its modules) into a spaced-review deck in one click.
- * This is the intended way to fill review — the manual card editor is the
+ * This is the intended way to fill review, the manual card editor is the
  * fallback for anything the course didn't cover.
  */
 function GenerateDeckModal({ onDone }) {
@@ -2158,7 +2158,7 @@ function GenerateDeckModal({ onDone }) {
     try {
       const r = await API.generateFlashcards(slug, moduleId || undefined);
       if (r.created > 0) toast(`Added ${r.created} review card${r.created === 1 ? '' : 's'} to "${r.deck}"`, 'success');
-      else if (r.totalQuestions === 0) toast('That course has no questions to turn into cards yet — build or enrich it first.', 'info');
+      else if (r.totalQuestions === 0) toast('That course has no questions to turn into cards yet, build or enrich it first.', 'info');
       else toast('Those cards are already in your deck.', 'info');
       onDone && onDone();
     } catch (e) { toast(e.message || 'Could not generate cards', 'error'); }
@@ -2169,7 +2169,7 @@ function GenerateDeckModal({ onDone }) {
     <div style={{ minWidth: 460, maxWidth: 520 }}>
       <h3 className="display" style={{ fontSize: 22, marginBottom: 6 }}>Generate review cards</h3>
       <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 16, lineHeight: 1.6 }}>
-        Every graded question in the course becomes a recall card — the question on the front, the
+        Every graded question in the course becomes a recall card, the question on the front, the
         answer and why it's right on the back. Review a whole course, or just the module whose
         assignment is coming up.
       </div>
@@ -2251,7 +2251,7 @@ function CreateCardsModal({ onCreated }) {
 /* ── Verification modal ────────────────────────────────────────────────────── */
 function VerificationModal({ cert }) {
   // Actually verify against the server (GET /certificates/:id) rather than just
-  // re-displaying the in-memory row — the credential is "valid" only if the
+  // re-displaying the in-memory row, the credential is "valid" only if the
   // record still exists server-side and matches.
   const [check, setCheck] = React.useState({ status: 'checking' });
   React.useEffect(() => {

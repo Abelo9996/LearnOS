@@ -1,14 +1,14 @@
 /**
- * Study plans & honest credentials — M11 of docs/MASTERY_SPEC_V2.md §3.8.
+ * Study plans & honest credentials, M11 of docs/MASTERY_SPEC_V2.md §3.8.
  *
  * Pacing: a 115-hour course with no weekly plan is where most online learners
  * quietly stop. A plan converts a vague intention into a target date and an
- * hours-per-week budget, then keeps score honestly — including telling you the
+ * hours-per-week budget, then keeps score honestly, including telling you the
  * date is no longer reachable at your current rate, rather than letting you
  * drift into it.
  *
  * Credentials: Coursera's real moat is employer recognition. We have none of it
- * and must never imply otherwise. What we can offer instead is EVIDENCE —
+ * and must never imply otherwise. What we can offer instead is EVIDENCE -
  * exactly what was assessed, the scores, the dates, and whether the questions
  * were independently checked.
  */
@@ -81,11 +81,11 @@ function planStatus(userId, plan) {
     requiredWeekly = weeksLeft > 0 ? remainingMinutes / weeksLeft : Infinity;
 
     if (remainingMinutes === 0) { verdict = 'complete'; message = 'You have finished this.'; }
-    else if (!Number.isFinite(requiredWeekly)) { verdict = 'missed'; message = 'The target date has passed — pick a new one.'; }
+    else if (!Number.isFinite(requiredWeekly)) { verdict = 'missed'; message = 'The target date has passed, pick a new one.'; }
     else if (requiredWeekly <= plannedWeekly * 1.05) {
       verdict = actualWeekly >= requiredWeekly ? 'on_track' : 'behind';
       message = verdict === 'on_track'
-        ? `On track — about ${Math.round(requiredWeekly / 60)}h/week gets you there.`
+        ? `On track, about ${Math.round(requiredWeekly / 60)}h/week gets you there.`
         : `You're studying ~${Math.round(actualWeekly / 60)}h/week but need ~${Math.round(requiredWeekly / 60)}h/week to hit ${plan.target_date}.`;
     } else {
       // Honesty over encouragement: say the date is unreachable at the agreed budget.
@@ -111,7 +111,7 @@ function planStatus(userId, plan) {
   };
 }
 
-/** POST /api/plans — commit to a target date and a weekly budget. */
+/** POST /api/plans, commit to a target date and a weekly budget. */
 router.post('/', (req, res) => {
   const { scope_type, scope_id, target_date, weekly_hours } = req.body || {};
   if (!['course', 'roadmap'].includes(scope_type)) return res.status(400).json({ error: true, message: "scope_type must be 'course' or 'roadmap'" });
@@ -132,7 +132,7 @@ router.post('/', (req, res) => {
   res.json({ ok: true, plan: planStatus(req.userId, plan) });
 });
 
-/** GET /api/plans — active plans with an honest verdict on each. */
+/** GET /api/plans, active plans with an honest verdict on each. */
 router.get('/', (req, res) => {
   const plans = db.prepare("SELECT * FROM learning_plans WHERE user_id = ? AND status = 'active' ORDER BY created_at DESC").all(req.userId);
   res.json({ ok: true, plans: plans.map(p => planStatus(req.userId, p)).filter(Boolean) });

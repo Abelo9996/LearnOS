@@ -13,7 +13,7 @@ import { checkUrlReachable } from '../ai/agents/research.js';
 
 const BASE = process.argv[2] || 'http://localhost:3001';
 const results = [];
-const check = (id, name, pass, detail = '') => { results.push({ id, pass }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? ` — ${detail}` : ''}`); };
+const check = (id, name, pass, detail = '') => { results.push({ id, pass }); console.log(`${pass ? 'PASS' : 'FAIL'}  ${id}  ${name}${detail ? `, ${detail}` : ''}`); };
 
 // ── V12: no fabricated or placeholder content ───────────────────────────────
 // Real generated prose can legitimately discuss these words, so we only flag
@@ -27,7 +27,7 @@ const PLACEHOLDER = [
   /\bYOUR_[A-Z_]+\b/,
 ];
 // "coming soon" is different: in a stub it means unfinished, but in real
-// teaching prose it means "later in this course" — a lesson genuinely wrote
+// teaching prose it means "later in this course", a lesson genuinely wrote
 // "off-policy methods (coming soon) learn optimal values…". Only treat it as
 // scaffolding when there is barely a lesson around it.
 const STUB_ONLY = /\bcoming soon\b/i;
@@ -64,7 +64,7 @@ const urls = [
 ];
 const unique = [...new Set(urls)];
 console.log(`\nChecking ${unique.length} shipped URLs…`);
-// A single failed request is not proof a link is dead — with ~90 URLs checked at
+// A single failed request is not proof a link is dead, with ~90 URLs checked at
 // once, one transient network blip would fail the whole suite. Retry before
 // declaring anything broken.
 const reachableWithRetry = async (u, attempts = 3) => {
@@ -110,7 +110,7 @@ if (health.status !== 200) {
     const run = await api(`/api/assessments/assignment/${noTests.id}/run`, { method: 'POST', body: JSON.stringify({ source: 'x' }) });
     check('V11e', 'autograde on an assignment with no tests explains itself', run.status === 400 && run.body.code === 'NO_TESTS', `status=${run.status}`);
   } else {
-    check('V11e', 'autograde on an assignment with no tests explains itself', true, 'skipped — none present');
+    check('V11e', 'autograde on an assignment with no tests explains itself', true, 'skipped, none present');
   }
 }
 

@@ -134,7 +134,7 @@ function useModal() { return React.useContext(ModalContext); }
 // onboarding instead.
 function AppRoot() {
   // The app is the entry point. LearnOS runs on your own machine, so there is
-  // nobody to market to here — the landing page now lives in the LearnOSWeb
+  // nobody to market to here, the landing page now lives in the LearnOSWeb
   // repo, which is where a public site belongs. Opening LearnOS opens LearnOS.
   //
   // 'checking' exists so a returning learner never flashes the onboarding
@@ -145,7 +145,7 @@ function AppRoot() {
   // Does this user still need onboarding? (no roadmaps + never onboarded)
   // NOTE: the API calls intentionally do NOT swallow errors into a "no data"
   // conclusion. An unreachable or throttled API must never be mistaken for
-  // "this user is new" — that would drop an existing learner back into the
+  // "this user is new", that would drop an existing learner back into the
   // onboarding wizard and, worse, let them overwrite their own setup.
   React.useEffect(() => {
     let alive = true;
@@ -168,7 +168,7 @@ function AppRoot() {
   }, []);
 
   // The generator falls back to a canned template when no key is configured, and
-  // that used to be dropped on the floor here — the learner arrived at a generic
+  // that used to be dropped on the floor here, the learner arrived at a generic
   // roadmap believing it was built for them. Carry the source through so the app
   // can say which one they got.
   function handleOnboardingComplete(roadmapId, meta) {
@@ -213,7 +213,7 @@ export default AppRoot;
 // ── Main authenticated app ────────────────────────────────────────────────────
 // Outer `App` only mounts providers. The shell that *consumes* the contexts
 // must live below the providers in the tree (you cannot read a context in the
-// same component that renders its Provider — useContext returns the default
+// same component that renders its Provider, useContext returns the default
 // null and destructuring `{ add }` throws).
 function App() {
   const [me, setMe] = React.useState(null);
@@ -254,7 +254,7 @@ function AppShell() {
 
   const { add: toast } = useToast();
 
-  // Live sidebar counts (pending assignments, due review cards) — refreshed on
+  // Live sidebar counts (pending assignments, due review cards), refreshed on
   // navigation so they reflect real state instead of hardcoded numbers.
   React.useEffect(() => {
     let alive = true;
@@ -271,7 +271,7 @@ function AppShell() {
     return () => { alive = false; };
   }, [screen]);
 
-  // §3.8 — Schedule reminders: poll every 60s for events starting within 15 min
+  // §3.8, Schedule reminders: poll every 60s for events starting within 15 min
   const remindedRef = React.useRef(new Set()); // track already-reminded event ids
   React.useEffect(() => {
     let alive = true;
@@ -315,7 +315,7 @@ function AppShell() {
   const go = (s) => setScreen(s);
   const toggleSidebar = () => setSidebarCollapsed((c) => !c);
 
-  // Must react to resize/rotation — computing this once at first render meant a
+  // Must react to resize/rotation, computing this once at first render meant a
   // phone turned sideways (or any window resize) kept the wrong layout until a
   // full reload.
   const [isMobile, setIsMobile] = React.useState(
@@ -347,7 +347,7 @@ function AppShell() {
   return (
     // Fixed viewport shell: the sidebar and top bar are locked; only each
     // screen's own PageScroll area scrolls. minHeight here (instead of height)
-    // made inner 100% chains collapse, so the whole body scrolled — dragging
+    // made inner 100% chains collapse, so the whole body scrolled, dragging
     // the sidebar with it.
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       {!isMobile && <Sidebar screen={screen} setScreen={go} collapsed={sidebarCollapsed} onToggle={toggleSidebar} counts={navCounts} onHome={() => go('dashboard')} />}
@@ -366,7 +366,7 @@ function AppShell() {
           <ScreenRouter screen={screen} setScreen={go} />
         </div>
       </main>
-      {/* Without this there is literally no way to navigate on a phone — the
+      {/* Without this there is literally no way to navigate on a phone, the
           sidebar is hidden and nothing replaces it. */}
       {isMobile && <MobileNav screen={screen} setScreen={go} counts={navCounts} />}
     </div>
@@ -515,7 +515,7 @@ function ProgressPopup({ onClose }) {
 
   return (
     <div>
-      {/* No close button here — the modal shell already renders one. */}
+      {/* No close button here, the modal shell already renders one. */}
       <div className="display" style={{ fontSize: 22, marginBottom: 20 }}>Your Progress</div>
 
       {/* XP / Level */}
@@ -541,7 +541,7 @@ function ProgressPopup({ onClose }) {
         {[
           { label: 'Streak',  value: `${streak}d`, sub: 'days',   color: 'oklch(0.75 0.18 45)' },
           { label: 'Mastery', value: `${mastery}%`, sub: 'avg',   color: 'var(--brand-3)' },
-          { label: 'Sessions',value: stats?.totalSessions ?? '—', sub: 'total', color: 'var(--brand)' },
+          { label: 'Sessions',value: stats?.totalSessions ?? '-', sub: 'total', color: 'var(--brand)' },
         ].map(s => (
           <div key={s.label} style={{ padding: 12, background: 'var(--surface)', borderRadius: 10, border: '1px solid var(--border)', textAlign: 'center' }}>
             <div className="display" style={{ fontSize: 22, color: s.color }}>{s.value}</div>
@@ -588,7 +588,7 @@ function Sidebar({ screen, setScreen, collapsed, onToggle, counts = {}, onHome }
       transition: 'width var(--dur-normal) var(--ease-smooth)',
       overflow: 'hidden',
     }}>
-      {/* Logo doubles as "go home" — the landing page it used to open now lives
+      {/* Logo doubles as "go home", the landing page it used to open now lives
           in the separate LearnOSWeb repo. */}
       <button
         onClick={() => onHome && onHome()}
@@ -859,7 +859,7 @@ function TopBar({ setScreen, onToggleSidebar, collapsed }) {
   const menuRef  = React.useRef(null);
   const notifRef = React.useRef(null);
 
-  // Notification kinds — deliberately few. If something doesn't fit one of
+  // Notification kinds, deliberately few. If something doesn't fit one of
   // these, it belongs in the activity log, not in the bell.
   const kindMeta = {
     milestone:     { icon: '🏆', color: 'oklch(0.78 0.16 85)', label: 'Milestone' },
@@ -963,7 +963,7 @@ function TopBar({ setScreen, onToggleSidebar, collapsed }) {
                 <div style={{ padding: '28px 24px', textAlign: 'center' }}>
                   <div style={{ fontSize: 13, color: 'var(--ink-2)' }}>You're all caught up</div>
                   <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>
-                    You'll hear from us when something needs you — a module unlocks, a build finishes,
+                    You'll hear from us when something needs you, a module unlocks, a build finishes,
                     or review comes due. Everything else is in Activity.
                   </div>
                 </div>

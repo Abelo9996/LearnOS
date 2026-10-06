@@ -16,7 +16,7 @@ import { decryptSecret } from './crypto.js';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 // Model slug used when no per-agent routing is configured. Any OpenRouter slug
-// works — see https://openrouter.ai/models. Cheap + capable by default.
+// works, see https://openrouter.ai/models. Cheap + capable by default.
 const DEFAULT_MODEL = process.env.LEARNOS_DEFAULT_MODEL || 'anthropic/claude-haiku-4.5';
 
 // Optional env-provided key so a self-hoster can drop one key in and go without
@@ -54,15 +54,15 @@ function resolveKey(userId) {
 }
 
 // Pull a JSON object out of a model response that may be wrapped in prose or
-// ```json fences — different models format structured output differently.
+// ```json fences, different models format structured output differently.
 function parseJson(text) {
   if (!text) return null;
 
   // Try the raw response FIRST. Structured-output models return bare JSON, and
   // when a string field carries Markdown containing ``` code fences, pulling the
   // "fenced" region out instead would slice the object apart and lose the whole
-  // response — which silently emptied every generated lesson body.
-  try { return JSON.parse(text.trim()); } catch { /* not bare JSON — keep going */ }
+  // response, which silently emptied every generated lesson body.
+  try { return JSON.parse(text.trim()); } catch { /* not bare JSON, keep going */ }
 
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   if (fenced) {
@@ -79,13 +79,13 @@ function parseJson(text) {
 }
 
 /**
- * complete — the one call every agent goes through.
+ * complete, the one call every agent goes through.
  * @param {object} opts
- *   userId, agentCode — for key/model resolution + logging
- *   system            — stable system prompt
- *   messages          — string or OpenAI-style message array
- *   model             — explicit model override (OpenRouter slug)
- *   schema            — JSON schema → structured output (returns .json)
+ *   userId, agentCode, for key/model resolution + logging
+ *   system           , stable system prompt
+ *   messages         , string or OpenAI-style message array
+ *   model            , explicit model override (OpenRouter slug)
+ *   schema           , JSON schema → structured output (returns .json)
  *   maxTokens
  * @returns {Promise<{text, json, usage, model, managed, cost, runId, stopReason}>}
  */
@@ -106,6 +106,9 @@ export async function complete(opts = {}) {
   // Build OpenAI-compatible chat messages: system prompt first, then the turns.
   const chat = [];
   let systemText = system ? String(system) : '';
+  // House style, applied to every agent: em dashes are a tell that text was
+  // machine-written, so keep generated prose looking natural without them.
+  systemText += `${systemText ? '\n\n' : ''}Write in plain, natural prose. Do not use em dashes ("—"); use commas, colons, parentheses, or separate sentences instead.`;
   if (schema) {
     // Belt-and-suspenders across models: ask for raw JSON in-prompt AND send a
     // response_format below. Models with native structured output honor the

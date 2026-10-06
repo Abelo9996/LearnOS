@@ -9,7 +9,7 @@ import MarkdownText from './Markdown';
  *
  * Practice is safe: unlimited attempts, every answer explained. Graded costs an
  * attempt, hides explanations until it's passed or attempts run out, and is what
- * moves mastery and unlocks the next module — so the UI has to make which one
+ * moves mastery and unlocks the next module, so the UI has to make which one
  * you're taking unmistakable.
  */
 export default function ModuleQuiz({ moduleId, mode = 'practice', title, onDone, onClose }) {
@@ -92,7 +92,7 @@ export default function ModuleQuiz({ moduleId, mode = 'practice', title, onDone,
               ))}
             </div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, lineHeight: 1.5 }}>
-              Revisit these before spending another attempt — practice quizzes on this module are unlimited and free.
+              Revisit these before spending another attempt, practice quizzes on this module are unlimited and free.
             </div>
           </div>
         )}
@@ -105,7 +105,7 @@ export default function ModuleQuiz({ moduleId, mode = 'practice', title, onDone,
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13, color: 'var(--ink)', lineHeight: 1.5 }}>{r.question}</div>
                   <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>
-                    Your answer: <span style={{ color: r.isCorrect ? 'var(--good)' : 'var(--bad)' }}>{r.chosen == null ? '— skipped —' : (r.choices?.[r.chosen] ?? r.chosen)}</span>
+                    Your answer: <span style={{ color: r.isCorrect ? 'var(--good)' : 'var(--bad)' }}>{r.chosen == null ? '- skipped -' : (r.choices?.[r.chosen] ?? r.chosen)}</span>
                   </div>
                   {!r.isCorrect && result.explanationsRevealed && (
                     <div style={{ fontSize: 12, color: 'var(--ink-2)', marginTop: 3 }}>Correct: {r.choices?.[r.answer_idx]}</div>
@@ -124,7 +124,7 @@ export default function ModuleQuiz({ moduleId, mode = 'practice', title, onDone,
 
         {!result.explanationsRevealed && (
           <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 12, lineHeight: 1.5 }}>
-            Explanations stay hidden during a graded assessment — they're released once you pass or use your last attempt.
+            Explanations stay hidden during a graded assessment, they're released once you pass or use your last attempt.
           </div>
         )}
 
@@ -208,7 +208,7 @@ function ReportProblem({ itemId }) {
   const REASONS = [
     ['wrong_answer', 'The marked answer is wrong'],
     ['factual_error', 'Something here is factually wrong'],
-    ['unclear', 'Ambiguous — more than one answer works'],
+    ['unclear', 'Ambiguous, more than one answer works'],
     ['other', 'Something else'],
   ];
 
@@ -220,7 +220,7 @@ function ReportProblem({ itemId }) {
 
   if (state === 'sent') return (
     <div style={{ fontSize: 11.5, color: 'var(--good)', marginTop: 8 }}>
-      ✓ Reported — this question won't be used to grade you until it's reviewed.
+      ✓ Reported, this question won't be used to grade you until it's reviewed.
     </div>
   );
 

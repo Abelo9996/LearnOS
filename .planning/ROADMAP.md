@@ -8,30 +8,30 @@
 
 LearnOS has a working chassis (auth, DB, gamification) but no AI value loop. The journey: first stand up the
 **AI platform** (provider abstraction, logging, async jobs), then build the **vertical mastery loop** one
-agent at a time — profiling → curriculum → verified content → grounded tutor → assessment + dynamic
+agent at a time, profiling → curriculum → verified content → grounded tutor → assessment + dynamic
 re-routing → certificate (Milestone 1 = MVP). Then make it a real product: wire community, add course
 authoring/forking, and harden for launch (Milestone 2). Polish follows (Milestone 3).
 
 ## Milestones
 
-- 🚧 **v1.0 MVP — Vertical Mastery Loop** — Phases 1–5 (in progress)
-- 📋 **v1.1 Full Product** — Phases 6–8 (planned)
-- 📋 **v1.2 Post-launch Polish** — Phase 9 (planned)
+- 🚧 **v1.0 MVP, Vertical Mastery Loop**, Phases 1–5 (in progress)
+- 📋 **v1.1 Full Product**, Phases 6–8 (planned)
+- 📋 **v1.2 Post-launch Polish**, Phase 9 (planned)
 
-> **De-risk first (recommended):** before generalizing, build a **thin vertical spike** — one hardcoded goal
-> driven through the *real* agent chain end-to-end (CR→RE→extract→TU→AS→AN) — to prove the hardest integration
+> **De-risk first (recommended):** before generalizing, build a **thin vertical spike**, one hardcoded goal
+> driven through the *real* agent chain end-to-end (CR→RE→extract→TU→AS→AN), to prove the hardest integration
 > on a known-good case before trusting generation on arbitrary goals.
 
 ## Phases
 
-- [ ] **Phase 1: AI Platform Plumbing** — provider abstraction (managed+BYOK), agent_runs, async jobs, key encryption
-- [ ] **Phase 2: Profiling & Roadmap Generation** — intake → profile → real generated roadmap
-- [ ] **Phase 3: Verified Course Content** — propose → verify → extract → Node Content view
-- [ ] **Phase 4: Grounded Tutor** — real LLM sessions grounded in node resources, topic-driven
-- [ ] **Phase 5: Assessment, Grading & Dynamic Routing** — generate/grade → mastery → re-route → certificate
-- [ ] **Phase 6: Community (wire + extend)** — persist threads/votes/replies, attachments, references, bug sweep
-- [ ] **Phase 7: Course Authoring, Forking & Publishing** — create/fork/edit/publish real course content
-- [ ] **Phase 8: Launch Hardening** — usage caps, kill hardcoded surfaces, injection sanitization, eval gates
+- [ ] **Phase 1: AI Platform Plumbing**, provider abstraction (managed+BYOK), agent_runs, async jobs, key encryption
+- [ ] **Phase 2: Profiling & Roadmap Generation**, intake → profile → real generated roadmap
+- [ ] **Phase 3: Verified Course Content**, propose → verify → extract → Node Content view
+- [ ] **Phase 4: Grounded Tutor**, real LLM sessions grounded in node resources, topic-driven
+- [ ] **Phase 5: Assessment, Grading & Dynamic Routing**, generate/grade → mastery → re-route → certificate
+- [ ] **Phase 6: Community (wire + extend)**, persist threads/votes/replies, attachments, references, bug sweep
+- [ ] **Phase 7: Course Authoring, Forking & Publishing**, create/fork/edit/publish real course content
+- [ ] **Phase 8: Launch Hardening**, usage caps, kill hardcoded surfaces, injection sanitization, eval gates
 
 ## Phase Details
 
@@ -131,7 +131,7 @@ authoring/forking, and harden for launch (Milestone 2). Polish follows (Mileston
 | 7. Course Authoring | v1.1 | 0/TBD | Not started | - |
 | 8. Launch Hardening | v1.1 | 0/TBD | Not started | - |
 
-## Milestone 3 — Post-launch polish (Phase 9, backlog)
+## Milestone 3, Post-launch polish (Phase 9, backlog)
 Re-verification of stored links (RE-6), public verifiable certificate page (CE-2), community contribution XP
 (CM-4), course↔roadmap UI linkage (CO-4), multi-provider (OpenAI/Gemini) behind the abstraction. See
 [../docs/BACKLOG.md](../docs/BACKLOG.md) P2 items.
