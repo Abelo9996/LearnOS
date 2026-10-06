@@ -1,5 +1,6 @@
 import React from 'react';
 import 'katex/dist/katex.min.css';
+import SandboxBlock from './SandboxBlock.jsx';
 
 /**
  * Markdown rendering for generated course content.
@@ -393,6 +394,7 @@ export default function MarkdownText({ text, citationMap, prose = false, stripTi
       elements.push(
         flang === 'mermaid' ? <Mermaid key={`m-${i}`} code={body} />
         : (flang === 'chart' || flang === 'plot') ? <ChartBlock key={`ch-${i}`} spec={body} />
+        : (flang === 'sandbox' || flang === 'sandpack') ? <SandboxBlock key={`sb-${i}`} spec={body} />
         : <CodeBlock key={`c-${i}`} code={body} lang={fence[1]} />
       );
       continue;
