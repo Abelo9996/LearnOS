@@ -1,6 +1,7 @@
 import React from 'react';
 import { I } from './Icons';
 import { Btn, ProgressBar } from './UI';
+import CodeEditor from './CodeEditor.jsx';
 import API from '../api.js';
 
 /**
@@ -103,27 +104,7 @@ export default function LabRunner({ lessonId }) {
         </div>
       )}
 
-      <textarea
-        value={source}
-        onChange={e => onEdit(e.target.value)}
-        spellCheck={false}
-        onKeyDown={e => {
-          // Tab should indent, not escape the editor.
-          if (e.key === 'Tab') {
-            e.preventDefault();
-            const el = e.target, s = el.selectionStart, en = el.selectionEnd;
-            const next = `${source.slice(0, s)}    ${source.slice(en)}`;
-            onEdit(next);
-            requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = s + 4; });
-          }
-        }}
-        style={{
-          width: '100%', minHeight: 240, padding: 14, borderRadius: 10, resize: 'vertical',
-          background: 'oklch(0.16 0.02 270)', color: 'oklch(0.92 0.02 270)',
-          border: '1px solid var(--border)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-          fontSize: 12.5, lineHeight: 1.6, tabSize: 4,
-        }}
-      />
+      <CodeEditor value={source} onChange={onEdit} language={lab.language} minHeight={240} />
 
       {lab.tests?.length > 0 && !result && (
         <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 10, lineHeight: 1.6 }}>

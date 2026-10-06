@@ -6,6 +6,7 @@ import API, { timeAgo, fmtDate, dueLabel } from '../api.js';
 import { useToast, useModal } from '../App';
 import MarkdownText from '../components/Markdown';
 import ModelPicker from '../components/ModelPicker';
+import CodeEditor from '../components/CodeEditor.jsx';
 
 const SECT_MARGIN = 16;
 
@@ -1096,15 +1097,7 @@ function CodeStepBody({ a, step, answer, setAns, disabled, stepResult }) {
         <span style={{ flex: 1 }} />
         <Btn variant="primary" size="sm" disabled={disabled || running} icon={React.cloneElement(I.play || I.spark, { size: 13 })} onClick={run}>{running ? 'Running…' : 'Run'}</Btn>
       </div>
-      <textarea
-        value={code} disabled={disabled} spellCheck={false}
-        onChange={e => setCode(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Tab') { e.preventDefault(); const el = e.target, s = el.selectionStart, en = el.selectionEnd; const next = `${code.slice(0, s)}    ${code.slice(en)}`; setCode(next); requestAnimationFrame(() => { el.selectionStart = el.selectionEnd = s + 4; }); }
-        }}
-        rows={12}
-        style={{ width: '100%', padding: 14, borderRadius: 10, resize: 'vertical', background: 'oklch(0.16 0.02 270)', color: 'oklch(0.92 0.02 270)', border: '1px solid var(--border)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 12.5, lineHeight: 1.6, tabSize: 4 }}
-      />
+      <CodeEditor value={code} onChange={setCode} language={step.language} disabled={disabled} minHeight={260} />
 
       {runOut && (
         <div style={{ marginTop: 12 }}>
