@@ -10,6 +10,8 @@
 import db from '../../db/database.js';
 import { complete } from '../llm.js';
 import { registerJobHandler, enqueueJob } from '../jobs.js';
+import { getProfile } from './profiling.js';
+import { resourceDirective } from './learningStyle.js';
 import dns from 'dns';
 import { promisify } from 'util';
 
@@ -261,13 +263,14 @@ Cover a MIX of these "kind" values wherever they exist for the topic:
 - paper: scientific papers (arXiv, ACL Anthology, OpenReview, NeurIPS, Nature, journal DOIs)
 - book: canonical textbooks or free online books (author companion sites, well-known publishers, OpenLibrary)
 - blog: high-signal posts (distill.pub, respected research/engineering blogs)
-- article: explainers & tutorials from reputable sites (Wikipedia, official guides)
+- article: explainers & interactive tutorials from reputable sites (official guides, course pages, visual explainers)
 - website: important hubs, tools, or interactive references for the topic
 - docs: official documentation
 - repo: canonical open-source implementations (GitHub)
 
 Strict rules:
 - Only return resources you are HIGHLY confident exist at a canonical, long-stable URL. Do NOT invent URLs — omit anything you are unsure of. A verifier fetches every URL and drops dead links, so precision matters.
+- Lead with sources that actively TEACH: lecture videos and interactive or visual explainers first. Use Wikipedia only when a concept genuinely has no better teaching source, never as the default.
 - Prefer authoritative, evergreen sources over ephemeral ones.
 - Aim for 6-8 resources spanning at least 3 different kinds (always include at least one lecture video and one paper or book when the topic allows).
 - "source" is the human-readable site name (e.g. "arXiv", "YouTube", "MIT OCW", "distill.pub").
@@ -278,12 +281,14 @@ export async function proposeResources({ userId, nodeId, roadmapId, title, objec
   const kindFilter = kind && RESOURCE_KINDS.includes(kind)
     ? `\nFocus on kind="${kind}" only.` : '';
   const objText = (objectives || []).slice(0, 5).map(o => `- ${o}`).join('\n') || '(none)';
+  let styleLine = '';
+  try { styleLine = `\n${resourceDirective(getProfile(userId)?.learning_style || '')}`; } catch { /* no profile yet */ }
   const out = await complete({
     userId, agentCode: 'RE',
     schema: resourceListSchema,
     maxTokens: 2200,
     system: SYSTEM,
-    messages: `Topic: ${title}\nObjectives:\n${objText}${kindFilter}\nPropose 6-8 resources spanning several kinds (include lecture videos, papers/books, and articles/blogs where relevant).`,
+    messages: `Topic: ${title}\nObjectives:\n${objText}${kindFilter}${styleLine}\nPropose 6-8 resources spanning several kinds (include lecture videos, papers/books, and articles/blogs where relevant).`,
   });
 
   const items = (out.json && Array.isArray(out.json.resources)) ? out.json.resources : [];

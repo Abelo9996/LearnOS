@@ -22,6 +22,8 @@ import { complete } from '../llm.js';
 import { checkUrlReachable, checkUrlMatchesClaim } from './research.js';
 import { validateCourseDepth, FLOORS } from '../quality/depthFloors.js';
 import { registerJobHandler, setJobProgress } from '../jobs.js';
+import { getProfile } from './profiling.js';
+import { contentDirective, resourceDirective, videosPerModule } from './learningStyle.js';
 
 const LEVELS = ['beginner', 'intermediate', 'advanced'];
 
@@ -263,8 +265,11 @@ Produce ALL THREE:
  * Build a full course through the staged pipeline.
  * @param {function(number,string)} onProgress called with (0..1, message)
  */
-export async function buildCourse({ userId, topic, level, pathwayContext, onProgress = () => {} }) {
+export async function buildCourse({ userId, topic, level, pathwayContext, learningStyle = '', onProgress = () => {} }) {
   const lvl = LEVELS.includes(level) ? level : 'intermediate';
+  // The learner's stated modality shapes every lesson: a visual learner gets
+  // more diagrams and video, a hands-on learner more runnable practice.
+  const modalityDirective = contentDirective(learningStyle);
 
   onProgress(0.02, 'Designing the course blueprint…');
   const ctxLine = pathwayContext ? `\nPathway context: ${pathwayContext}` : '';
@@ -329,7 +334,7 @@ export async function buildCourse({ userId, topic, level, pathwayContext, onProg
         schema: readingsSchema,
         maxTokens: 8000,
         system: READINGS_SYSTEM,
-        messages: `${context}\n\nWrite the readings and resources for this module.`,
+        messages: `${context}\n\n${modalityDirective}\n\nWrite the readings and resources for this module.`,
       })).json;
 
       if (!teaching || !Array.isArray(teaching.readings) || !teaching.readings.length) {
@@ -371,7 +376,7 @@ export async function buildCourse({ userId, topic, level, pathwayContext, onProg
   const modules = await mapWithConcurrency(bp.modules, MODULE_CONCURRENCY, buildModule);
 
   onProgress(0.92, 'Verifying external resources…');
-  await topUpResources({ userId, bp, modules, level: lvl, onProgress });
+  await topUpResources({ userId, bp, modules, level: lvl, learningStyle, onProgress });
 
   const persisted = await persistRichCourse(userId, { ...bp, modules }, lvl);
 
@@ -637,14 +642,13 @@ const topUpSchema = {
 
 const TOPUP_SYSTEM = `You are the Research agent for LearnOS. A module currently has too few WORKING external resources, because previously suggested URLs failed a reachability check.
 
-Suggest 8 resources whose URLs you are certain exist and are stable. Strongly prefer:
-- Wikipedia articles (https://en.wikipedia.org/wiki/<Exact_Article_Title>)
-- arXiv papers you know the real ID of (https://arxiv.org/abs/XXXX.XXXXX)
-- Official documentation root pages of well-known projects
-- Long-established YouTube channels' well-known videos (3Blue1Brown, MIT OpenCourseWare)
-- Canonical textbook or course homepages at university domains
+Suggest 8 resources whose URLs you are certain exist and are stable. Nobody learns from an encyclopedia dump, so prefer sources that actively TEACH, in this order:
+- Well-known LECTURE VIDEOS on long-established channels (3Blue1Brown, MIT OpenCourseWare, Stanford, StatQuest, freeCodeCamp, Computerphile, conference talks) — only videos famous enough that you are certain of the exact URL.
+- Interactive or visual explainers and tutorials (official "learn"/"getting started" guides, well-regarded course pages).
+- Official documentation root pages of well-known projects.
+- Canonical textbook or course homepages at university domains, and arXiv papers whose real ID you know (https://arxiv.org/abs/XXXX.XXXXX).
 
-Accuracy of the URL matters more than novelty. Do not invent article titles, paper IDs or video IDs. If unsure of an exact URL, prefer a well-known Wikipedia article on the concept.`;
+Use Wikipedia ONLY as a last resort for a concept that genuinely has no better teaching source — never as the default. Accuracy of the URL matters more than novelty: do not invent article titles, paper IDs or video IDs. Omit anything you are not sure exists.`;
 
 /**
  * A resource has to load AND be the thing it claims to be.
@@ -670,10 +674,11 @@ async function verifyReachable(resources, context = '') {
 
 // Lecture videos carry a course visually, but they are also the resource kind
 // the model most often hallucinates — so verified-video count gets its own
-// floor and its own dedicated top-up ask.
-const VIDEOS_PER_MODULE = 2;
+// floor (raised for visual learners) and its own dedicated top-up ask.
 
-async function topUpResources({ userId, bp, modules, level, onProgress }) {
+async function topUpResources({ userId, bp, modules, level, learningStyle = '', onProgress }) {
+  const videoFloor = videosPerModule(learningStyle);
+  const sourceDirective = resourceDirective(learningStyle);
   await mapWithConcurrency(modules, MODULE_CONCURRENCY, async (m) => {
     const have = await verifyReachable(m.resources, m.title);
     m.resources = (m.resources || []).filter(r => have.has(r.url));
@@ -686,7 +691,7 @@ async function topUpResources({ userId, bp, modules, level, onProgress }) {
           schema: topUpSchema,
           maxTokens: 2000,
           system: TOPUP_SYSTEM,
-          messages: `Course: ${bp.title} (${level})\nModule: ${m.title}\nSummary: ${m.summary || ''}\nObjectives: ${(m.objectives || []).join('; ')}\n\nSuggest resources with URLs you are confident exist.`,
+          messages: `Course: ${bp.title} (${level})\nModule: ${m.title}\nSummary: ${m.summary || ''}\nObjectives: ${(m.objectives || []).join('; ')}\n\n${sourceDirective}\n\nSuggest resources with URLs you are confident exist.`,
         })).json;
         const okExtra = await verifyReachable(extra?.resources, m.title);
         const seen = new Set(m.resources.map(r => r.url));
@@ -702,7 +707,7 @@ async function topUpResources({ userId, bp, modules, level, onProgress }) {
     // verifier, so ask specifically for famous lecture videos until the module
     // has enough that actually exist.
     const videos = m.resources.filter(r => r.kind === 'video').length;
-    if (videos < VIDEOS_PER_MODULE) {
+    if (videos < videoFloor) {
       onProgress(0.94, `Finding lecture videos for “${m.title}”…`);
       try {
         const extra = (await complete({
@@ -939,12 +944,18 @@ function attachLabCode(lessonId, lab) {
 
 // A staged build makes one LLM call per module, so it runs as a background job
 // with real progress rather than blocking an HTTP request for minutes.
-registerJobHandler('build-course', async ({ userId, input, jobId }) =>
-  buildCourse({
+registerJobHandler('build-course', async ({ userId, input, jobId }) => {
+  // Thread the learner's stated modality into the build so lessons lean toward
+  // how this person actually learns, not a one-size default.
+  let learningStyle = '';
+  try { learningStyle = getProfile(userId)?.learning_style || ''; } catch { /* no profile yet */ }
+  return buildCourse({
     userId,
     topic: input?.topic,
     level: input?.level,
+    learningStyle,
     onProgress: (pct, msg) => setJobProgress(jobId, pct, msg),
-  }));
+  });
+});
 
 export default { buildCourse, persistRichCourse };

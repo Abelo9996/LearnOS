@@ -16,6 +16,7 @@ import { complete } from '../llm.js';
 import { registerJobHandler } from '../jobs.js';
 import { roadmapSchema } from '../schemas.js';
 import { getProfile } from './profiling.js';
+import { styleText } from './learningStyle.js';
 import { logActivity } from '../../db/database.js';
 
 const SYSTEM = `You are the Curriculum agent for LearnOS. Given a learning goal and learner profile, design a COURSE PATHWAY: an ordered sequence of 5-8 courses that carries the learner from where they are now to their goal.
@@ -43,8 +44,8 @@ export async function generateRoadmap({ userId, goal, profile }) {
         `Learner level: ${prof.level}`,
         `Time per week: ${prof.time_per_week || '?'} hours`,
         prof.background ? `Learner background: ${prof.background}` : null,
-        Array.isArray(prof.learning_style) && prof.learning_style.length
-          ? `Preferred learning style: ${prof.learning_style.join(', ')}` : null,
+        styleText(prof.learning_style)
+          ? `Preferred learning style: ${styleText(prof.learning_style)}` : null,
         prof.background
           ? 'Pitch the roadmap at someone with that background, and do not re-teach what they already say they know.'
           : null,
