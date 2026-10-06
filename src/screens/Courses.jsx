@@ -809,32 +809,61 @@ function GenerateCourseModal({ onDone }) {
   const inp = { width: '100%', padding: '10px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13.5 };
   const suggestions = ['Reinforcement Learning', 'Distributed Systems', 'Real Analysis', 'Modern React', 'Quantum Computing', 'Financial Modeling'];
 
+  // Stays true while the modal is mounted, so the poll loop stops cleanly when
+  // the modal is closed or the page navigated away instead of leaking.
+  const aliveRef = React.useRef(true);
+
+  const keyErr = (msg) => /key/i.test(msg || '')
+    ? 'Add an OpenRouter key in Settings → API Keys to build courses.'
+    : (msg || 'Course build failed, try again.');
+
+  // Poll a build job to completion, driving the progress bar. Guarded so it
+  // stops on unmount rather than setting state on a dead component.
+  const pollBuild = async (jobId) => {
+    for (;;) {
+      await new Promise(r => setTimeout(r, 2000));
+      if (!aliveRef.current) return;
+      const j = await API.getJob(jobId).catch(() => null);
+      if (!aliveRef.current) return;
+      if (!j) continue;
+      if (typeof j.progress === 'number' || j.progress_msg) {
+        setProgress({ pct: j.progress || 0, msg: j.progress_msg || '' });
+      }
+      if (j.status === 'done') {
+        const res = j.result || {};
+        toast(`Course built · ${res.modules} modules · ${res.lessons} lessons · ${res.quizItems} quiz items`, 'success');
+        onDone && onDone(res.slug);
+        return;
+      }
+      if (j.status === 'failed') { setErrMsg(keyErr(j.error)); setPhase('error'); return; }
+    }
+  };
+
+  // Resume a build still running from a previous mount: the jobId lived only in
+  // the old closure, so re-find it from the server and pick the bar back up
+  // instead of showing the form while a build runs in the background.
+  React.useEffect(() => {
+    aliveRef.current = true;
+    API.getActiveCourseBuild().then(info => {
+      if (!aliveRef.current || !info || !info.active || !info.jobId) return;
+      setPhase('generating');
+      setProgress({ pct: info.progress || 0, msg: info.progress_msg || 'Resuming build…' });
+      pollBuild(info.jobId);
+    }).catch(() => {});
+    return () => { aliveRef.current = false; };
+  }, []);
+
   const go = async () => {
     if (!topic.trim()) return;
+    aliveRef.current = true;
     setPhase('generating');
     setProgress({ pct: 0, msg: 'Starting the build…' });
     try {
       // Staged build: one LLM call per module, so it runs as a job we poll.
       const { jobId } = await API.buildCourseAI({ topic: topic.trim(), level });
-      for (;;) {
-        await new Promise(r => setTimeout(r, 2000));
-        const j = await API.getJob(jobId).catch(() => null);
-        if (!j) continue;
-        if (typeof j.progress === 'number' || j.progress_msg) {
-          setProgress({ pct: j.progress || 0, msg: j.progress_msg || '' });
-        }
-        if (j.status === 'done') {
-          const res = j.result || {};
-          toast(`Course built · ${res.modules} modules · ${res.lessons} lessons · ${res.quizItems} quiz items`, 'success');
-          onDone && onDone(res.slug);
-          return;
-        }
-        if (j.status === 'failed') throw Object.assign(new Error(j.error || 'Build failed'), { code: /key/i.test(j.error || '') ? 'NO_KEY' : null });
-      }
+      await pollBuild(jobId);
     } catch (e) {
-      setErrMsg(e.code === 'NO_KEY' || /key/i.test(e.message || '')
-        ? 'Add an OpenRouter key in Settings → API Keys to build courses.'
-        : (e.message || 'Course build failed, try again.'));
+      setErrMsg(e.code === 'NO_KEY' ? keyErr('key') : keyErr(e.message));
       setPhase('error');
     }
   };

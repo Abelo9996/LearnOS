@@ -37,6 +37,27 @@ router.post('/build', requireAuth, (req, res) => {
   res.json({ ok: true, jobId });
 });
 
+// Recover the most recent in-flight (or just-finished) standalone course build
+// for this user, so the generator can resume its progress bar after the modal
+// is closed or the page is navigated away. Read-only, makes no model calls.
+router.get('/build/active', requireAuth, (req, res) => {
+  const job = db.prepare(
+    "SELECT id, status, progress, progress_msg, result_json FROM agent_jobs WHERE user_id = ? AND kind = 'build-course' ORDER BY created_at DESC LIMIT 1"
+  ).get(req.userId);
+  if (!job) return res.json({ ok: true, active: false });
+  let result = null;
+  try { result = job.result_json ? JSON.parse(job.result_json) : null; } catch {}
+  res.json({
+    ok: true,
+    active: job.status === 'queued' || job.status === 'running',
+    jobId: job.id,
+    status: job.status,
+    progress: job.progress,
+    progress_msg: job.progress_msg,
+    result,
+  });
+});
+
 // Deepen an EXISTING thin course in place (readings, quiz items, labs, graded
 // assessments, verified resources) without changing its slug or losing content.
 router.post('/:slug/enrich', requireAuth, (req, res) => {

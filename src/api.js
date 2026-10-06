@@ -153,6 +153,7 @@ const API = {
   // Staged build (M2): returns a jobId to poll, one LLM call per module, so it
   // takes minutes but produces a course with real depth.
   buildCourseAI:      (data) => API.post('/courses/build', data),
+  getActiveCourseBuild: () => API.get('/courses/build/active'),
 
   // Assessments (M3), practice is unlimited and explained; graded costs an
   // attempt, has a pass bar, and moves mastery.
