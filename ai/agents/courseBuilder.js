@@ -238,9 +238,11 @@ Produce:
 Readings must be VISUALLY STRUCTURED, never a wall of text:
 - A ### heading every 150-250 words; no paragraph longer than 4 sentences.
 - At least one fenced code block per reading: a worked, runnable example for code topics.
+- Write ALL mathematics as LaTeX so it typesets: inline as $...$ (e.g. $R^\\top R = I$, $x_1$) and standalone equations as $$...$$ on their own line. NEVER write math as plain ASCII like "R^T", "x_1", or "theta"; the reader renders LaTeX but shows ASCII pseudo-math as ugly raw text.
 - At least one DIAGRAM per reading as a \`\`\`mermaid fenced block, the reader renders it visually. Use whichever Mermaid diagram type fits: flowchart for processes/decisions, sequenceDiagram for interactions, graph for relationships/architecture, timeline for history, mindmap for concept breakdowns. Keep labels short and the syntax valid. A picture of how the pieces connect is worth more than another paragraph.
 - At least one Markdown table per reading (comparison, decision guide, or summary, | Col | Col | rows).
-- Bold the key terms on first use. End every reading with a "**Key takeaways**" bullet list of 3-5 points.
+- Use at least TWO callouts per reading to make the important things pop, with GitHub-style syntax on their own lines: "> [!INTUITION]" for the plain-English mental model, "> [!EXAMPLE]" for a worked example, "> [!WARNING]" for a common mistake or misconception, "> [!TIP]" for a shortcut, "> [!KEY]" for a must-remember fact. Put the real teaching inside them, not filler.
+- Bold the key terms on first use. End every reading with a "> [!KEY]" callout summarizing the 3-5 points to remember.
 
 If the course context names a target language, tool, or domain (e.g. a C++ pathway), EVERY example, code block, and idiom must use that language/tool, never substitute another one.
 

@@ -92,7 +92,7 @@ export function formatInline(text, citationMap) {
       } else {
         parts.push(
           <a key={key++} href={firstMatch[3]} target="_blank" rel="noopener noreferrer"
-            style={{ color: 'oklch(0.78 0.16 195)', textDecoration: 'none', borderBottom: '1px solid oklch(0.78 0.16 195 / 0.4)' }}>{firstMatch[2]}</a>
+            style={{ color: 'var(--brand)', textDecoration: 'none', borderBottom: '1px solid var(--accent-line)' }}>{firstMatch[2]}</a>
         );
       }
     } else if (type === 'cite') {
@@ -101,7 +101,7 @@ export function formatInline(text, citationMap) {
       if (url) {
         parts.push(
           <a key={key++} href={url} target="_blank" rel="noopener noreferrer"
-            style={{ fontSize: 10, verticalAlign: 'super', color: 'oklch(0.78 0.16 195)', textDecoration: 'none', margin: '0 1px', padding: '0 3px', borderRadius: 3, background: 'oklch(0.78 0.16 195 / 0.12)', border: '1px solid oklch(0.78 0.16 195 / 0.3)', lineHeight: 1 }}
+            style={{ fontSize: 10, verticalAlign: 'super', color: 'var(--brand)', textDecoration: 'none', margin: '0 1px', padding: '0 3px', borderRadius: 3, background: 'var(--accent-soft)', border: '1px solid var(--accent-line)', lineHeight: 1 }}
             title={`Source [${num}]`}>{firstMatch[1]}</a>
         );
       } else {
@@ -142,7 +142,9 @@ function loadMermaid() {
   if (mermaidMod) return Promise.resolve(mermaidMod);
   mermaidPromise ||= import('mermaid').then((m) => {
     const mm = m.default || m;
-    mm.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'dark', fontFamily: 'inherit' });
+    // 'neutral' is a light theme that sits correctly on the light paper
+    // background; 'dark' rendered diagrams as dark blocks on a light page.
+    mm.initialize({ startOnLoad: false, securityLevel: 'strict', theme: 'neutral', fontFamily: 'inherit' });
     mermaidMod = mm;
     return mm;
   });
@@ -187,14 +189,45 @@ function CodeBlock({ code, lang }) {
       .catch(() => {});
   };
   return (
-    <div style={{ margin: '16px 0', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden', background: 'oklch(0.14 0.02 270)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
-        <span className="mono" style={{ fontSize: 10, color: 'var(--muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{lang || 'code'}</span>
-        <button onClick={copy} style={{ background: 'none', border: 0, cursor: 'pointer', fontSize: 11, color: copied ? 'var(--good)' : 'var(--muted)', padding: '2px 4px', transition: 'color var(--dur-fast)' }}>
+    <div style={{ margin: '16px 0', borderRadius: 10, border: '1px solid oklch(0.30 0.02 270)', overflow: 'hidden', background: 'oklch(0.20 0.02 270)', boxShadow: 'var(--shadow-sm)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', borderBottom: '1px solid oklch(0.30 0.02 270)', background: 'oklch(0.25 0.02 270)' }}>
+        <span className="mono" style={{ fontSize: 10, color: 'oklch(0.70 0.02 270)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>{lang || 'code'}</span>
+        <button onClick={copy} style={{ background: 'none', border: 0, cursor: 'pointer', fontSize: 11, color: copied ? 'oklch(0.82 0.15 155)' : 'oklch(0.70 0.02 270)', padding: '2px 4px', transition: 'color var(--dur-fast)' }}>
           {copied ? '✓ copied' : 'copy'}
         </button>
       </div>
-      <pre style={{ margin: 0, padding: '13px 15px', fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.65, color: 'var(--ink-2)', overflowX: 'auto', whiteSpace: 'pre' }}>{code}</pre>
+      <pre style={{ margin: 0, padding: '13px 15px', fontFamily: 'var(--font-mono)', fontSize: 12.5, lineHeight: 1.65, color: 'oklch(0.90 0.015 270)', overflowX: 'auto', whiteSpace: 'pre', tabSize: 2 }}>{code}</pre>
+    </div>
+  );
+}
+
+/* ── Callouts ──────────────────────────────────────────────────────────────
+   GitHub-style `> [!TIP]` / `[!NOTE]` / `[!WARNING]` / `[!EXAMPLE]` blocks
+   become colored cards, so key intuition, common pitfalls and worked examples
+   pop out of the prose instead of hiding inside yet another paragraph. This is
+   the main lever for "visual explaining" in text lessons. */
+const CALLOUT_COLOR = {
+  note: 'var(--brand)', info: 'var(--brand)', important: 'var(--brand)', key: 'var(--brand)',
+  tip: 'var(--good)', success: 'var(--good)',
+  warning: 'var(--warn)', caution: 'var(--bad)', danger: 'var(--bad)',
+  example: 'var(--brand-3)', intuition: 'var(--brand-3)',
+};
+const CALLOUT_LABEL = {
+  note: 'Note', info: 'Note', important: 'Important', key: 'Key idea',
+  tip: 'Tip', success: 'Tip', warning: 'Warning', caution: 'Caution',
+  danger: 'Caution', example: 'Example', intuition: 'Intuition',
+};
+function Callout({ type, children }) {
+  const color = CALLOUT_COLOR[type] || CALLOUT_COLOR.note;
+  return (
+    <div style={{
+      margin: '16px 0', borderRadius: 10, padding: '12px 15px',
+      border: `1px solid color-mix(in oklch, ${color} 30%, transparent)`,
+      borderLeft: `3px solid ${color}`,
+      background: `color-mix(in oklch, ${color} 7%, var(--surface))`,
+    }}>
+      <div className="cap" style={{ color, marginBottom: 6 }}>{CALLOUT_LABEL[type] || 'Note'}</div>
+      {children}
     </div>
   );
 }
@@ -384,6 +417,21 @@ export default function MarkdownText({ text, citationMap, prose = false, stripTi
       flushAll();
       const quote = [line.replace(/^\s*>\s?/, '')];
       while (i + 1 < lines.length && /^\s*>\s?/.test(lines[i + 1])) { i++; quote.push(lines[i].replace(/^\s*>\s?/, '')); }
+      // Callout: a first line of `[!TIP]` (optionally with trailing text) turns
+      // the quote into a styled card instead of a plain blockquote.
+      const cm = quote[0].match(/^\[!(\w+)\]\s*(.*)$/);
+      if (cm && CALLOUT_LABEL[cm[1].toLowerCase()]) {
+        const type = cm[1].toLowerCase();
+        const rest = [cm[2], ...quote.slice(1)].map(s => s.trim()).filter(Boolean);
+        elements.push(
+          <Callout key={`co-${i}`} type={type}>
+            {rest.map((bl, bi) => (
+              <p key={bi} style={{ ...body, color: 'var(--ink)', margin: bi ? '8px 0 0' : 0 }}>{formatInline(bl, citationMap)}</p>
+            ))}
+          </Callout>
+        );
+        continue;
+      }
       elements.push(
         <blockquote key={`q-${i}`} style={{ borderLeft: '3px solid var(--accent-line)', background: 'var(--surface)', borderRadius: '0 8px 8px 0', padding: '11px 15px', margin: '16px 0', color: 'var(--ink-2)', ...body }}>
           {formatInline(quote.join(' '), citationMap)}
