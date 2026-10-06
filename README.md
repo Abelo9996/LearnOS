@@ -123,6 +123,18 @@ All agents run through a single LLM layer ([`ai/llm.js`](ai/llm.js)) that talks 
 - **Node.js 18+**
 - An **[OpenRouter API key](https://openrouter.ai/keys)** (optional for the UI; required for AI features, you can also add it in-app under Settings → API Keys)
 
+### Option A: Docker (one command, includes the Judge0 code sandbox)
+
+```bash
+git clone https://github.com/Abelo9996/LearnOS.git
+cd LearnOS
+OPENROUTER_API_KEY=sk-or-... docker compose up -d
+```
+
+Open **http://localhost:3210**. This runs LearnOS plus [Judge0](https://github.com/judge0/judge0), so code labs execute in sandboxed containers (a real security boundary) across many languages. Judge0 needs privileged containers and cgroup access; it runs best on a Linux host (on Docker Desktop, cgroup support varies by version).
+
+### Option B: local Node (no Docker)
+
 ### 1. Install
 
 ```bash

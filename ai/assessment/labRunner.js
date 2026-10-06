@@ -24,6 +24,7 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { runCodeTests } from './grader.js';
+import { judge0Enabled, judge0SupportsLanguage, runViaJudge0 } from './judge0.js';
 
 const MAX_OUTPUT = 20000;      // characters of stdout/stderr kept
 const DEFAULT_TIMEOUT = 5000;
@@ -182,6 +183,15 @@ export async function runLab({ source, language = 'javascript', timeoutMs = DEFA
   if (!lang) return { ok: false, error: `Unsupported language: ${language}`, language, stdout: '', stderr: '', exitCode: null, timedOut: false, durationMs: 0 };
   if (!source || !String(source).trim()) return { ok: false, error: 'Nothing to run, write some code first.', language, stdout: '', stderr: '', exitCode: null, timedOut: false, durationMs: 0 };
 
+  // Sandboxed execution: when Judge0 is configured, run there instead of a local
+  // child process (covers plain runs and the Python test harness, which goes
+  // through runLab). Fall back to the local runner only on an infrastructure
+  // error (Judge0 unreachable), never on a real compile/runtime result.
+  if (judge0Enabled() && judge0SupportsLanguage(language)) {
+    const j = await runViaJudge0({ source, language, stdin, timeoutMs: lang.runTimeoutMs || timeoutMs });
+    if (!(j.error && /Judge0 (request failed|\d{3})/.test(j.error))) return { ...j, language };
+  }
+
   let dir;
   const started = Date.now();
   try {
@@ -215,7 +225,9 @@ export async function runLabWithTests({ source, language = 'javascript', tests, 
   // I/O-tested languages grade by feeding each case's stdin to the compiled
   // program, the plain run happens as case zero, so skip the separate warm-up.
   if (IO_TEST_LANGUAGES.has(language)) {
-    return runIoTests({ source, language, tests, timeoutMs });
+    return (judge0Enabled() && judge0SupportsLanguage(language))
+      ? runIoTestsJudge0({ source, language, tests, timeoutMs })
+      : runIoTests({ source, language, tests, timeoutMs });
   }
 
   const run = await runLab({ source, language, timeoutMs });
@@ -307,6 +319,56 @@ async function runIoTests({ source, language, tests, timeoutMs = DEFAULT_TIMEOUT
   }
 }
 
+/**
+ * Judge0 variant of runIoTests: no local temp dir or compile step, each case is
+ * a fresh sandboxed submission (source + the case's stdin). Judging logic
+ * (trimmed stdout == expected) matches the local path exactly.
+ */
+async function runIoTestsJudge0({ source, language, tests, timeoutMs = DEFAULT_TIMEOUT }) {
+  const list = Array.isArray(tests) ? tests.filter(t => t && t.expected !== undefined) : [];
+  const base = { language, stdout: '', stderr: '', exitCode: null, timedOut: false };
+  const started = Date.now();
+  const runTimeout = LANGUAGES[language]?.runTimeoutMs || timeoutMs;
+
+  const firstStdin = list.length ? String(list[0].args?.[0] ?? '') : '';
+  const firstRun = await runViaJudge0({ source, language, stdin: firstStdin, timeoutMs: runTimeout });
+  const runResult = { ...base, ...firstRun, language, durationMs: Date.now() - started };
+
+  if (firstRun.compileFailed) {
+    return {
+      ...runResult,
+      error: 'Compilation failed, see the compiler output below.',
+      tests: list.length ? { ok: false, error: 'Did not compile', total: list.length, passedCount: 0, score: 0, ratio: 0, passed: false, cases: [] } : null,
+    };
+  }
+  if (!list.length) return { ...runResult, tests: null };
+
+  const cases = [];
+  let passedCount = 0;
+  for (let i = 0; i < list.length; i++) {
+    const t = list[i];
+    const stdin = String(t.args?.[0] ?? '');
+    const out = i === 0 ? firstRun : await runViaJudge0({ source, language, stdin, timeoutMs: runTimeout });
+    const expected = String(t.expected ?? '').replace(/\r\n/g, '\n').trim();
+    const actual = String(out.stdout ?? '').replace(/\r\n/g, '\n').trim();
+    const passed = out.ok && actual === expected;
+    if (passed) passedCount++;
+    const entry = { name: t.name || `case ${i + 1}`, hidden: !!t.hidden, passed };
+    if (!passed) {
+      if (out.error) entry.error = out.error;
+      else if (!out.ok) entry.error = `exited with code ${out.exitCode}${out.stderr ? `, ${out.stderr.slice(0, 200)}` : ''}`;
+    }
+    if (!t.hidden) { entry.expected = expected; entry.actual = actual; }
+    cases.push(entry);
+  }
+  const ratio = passedCount / list.length;
+  return {
+    ...runResult,
+    durationMs: Date.now() - started,
+    tests: { ok: true, error: null, total: list.length, passedCount, score: Math.round(ratio * 100), ratio, passed: ratio >= 0.8, cases },
+  };
+}
+
 // Python grading: the learner's module is imported and each case called with
 // JSON-encoded args. The harness is fixed code we wrote, the only thing that
 // varies is the JSON payload, so no generated string is ever executed.
@@ -369,6 +431,17 @@ _sys.stderr.write("__LEARNOS_TESTS__" + _json.dumps({"passedCount": _passed, "ca
 let runtimesCache = null;
 export async function availableLanguages({ refresh = false } = {}) {
   if (runtimesCache && !refresh) return runtimesCache;
+  // With Judge0 configured, the server provides every mapped language, so skip
+  // the local toolchain probes (which would wrongly report them unavailable).
+  if (judge0Enabled()) {
+    const viaJudge0 = {};
+    for (const [key, lang] of Object.entries(LANGUAGES)) {
+      const ok = judge0SupportsLanguage(key);
+      viaJudge0[key] = { label: lang.label, available: ok, reason: ok ? null : 'Not available on the Judge0 server', install: null };
+    }
+    runtimesCache = viaJudge0;
+    return viaJudge0;
+  }
   const out = {};
   await Promise.all(Object.entries(LANGUAGES).map(async ([key, lang]) => {
     const probe = await runLab({ source: lang.hello, language: key, timeoutMs: 20000 });

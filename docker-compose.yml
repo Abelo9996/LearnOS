@@ -1,0 +1,66 @@
+# LearnOS + Judge0, one command: `docker compose up -d`, then open
+# http://localhost:3210.
+#
+# LearnOS runs code labs in the Judge0 sandbox (Linux namespaces + cgroups), a
+# real security boundary, instead of local child processes. The app finds Judge0
+# through JUDGE0_URL.
+#
+# Judge0 needs privileged containers and cgroup access. It runs well on a Linux
+# host; on Docker Desktop (macOS/Windows) cgroup support varies by version, so
+# if the workers fail to start there, see https://github.com/judge0/judge0.
+# Pin/upgrade the judge0 image via the tag below and its matching judge0.conf.
+
+services:
+  learnos:
+    build: .
+    ports:
+      - "3210:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - JUDGE0_URL=http://judge0-server:2358
+    volumes:
+      - learnos-db:/app/db
+    depends_on:
+      - judge0-server
+    restart: unless-stopped
+
+  judge0-server:
+    image: judge0/judge0:1.13.1
+    volumes:
+      - ./judge0.conf:/judge0.conf:ro
+    ports:
+      - "2358:2358"
+    privileged: true
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    restart: unless-stopped
+
+  judge0-workers:
+    image: judge0/judge0:1.13.1
+    command: ["./scripts/workers"]
+    volumes:
+      - ./judge0.conf:/judge0.conf:ro
+    privileged: true
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    restart: unless-stopped
+
+  judge0-db:
+    image: postgres:16.2
+    env_file: judge0.conf
+    volumes:
+      - judge0-pg:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  judge0-redis:
+    image: redis:7.2.4
+    command: ["redis-server", "--appendonly", "no", "--requirepass", "judge0redis"]
+    restart: unless-stopped
+
+volumes:
+  learnos-db:
+  judge0-pg:

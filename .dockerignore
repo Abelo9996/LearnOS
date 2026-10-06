@@ -1,0 +1,10 @@
+node_modules
+dist
+.git
+.worktrees
+*.log
+db/*.db
+db/*.db-wal
+db/*.db-shm
+.env
+.DS_Store
