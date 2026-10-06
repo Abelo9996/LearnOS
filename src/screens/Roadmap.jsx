@@ -820,43 +820,78 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, open
   // surfaces it so "Build course" isn't a multi-minute wait with no signal.
   const [buildPct, setBuildPct] = React.useState(0);
   const [buildMsg, setBuildMsg] = React.useState('');
-  React.useEffect(() => {
-    let alive = true;
-    setResources([]); setLesson(null);
-    setBuilding(node.build_status === 'building');
-    API.getNodeResources(node.id).then(r => { if (alive) setResources(r || []); }).catch(() => {});
-    API.getNodeLesson(node.id).then(l => { if (alive) setLesson(l?.body_md || null); }).catch(() => {});
-    return () => { alive = false; };
-  }, [node.id, node.build_status]);
+  // Stays true while this node view is mounted. The build runs server-side as a
+  // job, so a poll loop must stop touching state once we navigate away, and the
+  // view must resume against the real job when we come back.
+  const aliveRef = React.useRef(true);
 
   // Pathway nodes are whole courses, planned up front and built on demand.
   const isCourseNode = node.node_kind === 'course';
+
+  // Poll a build job to completion, driving the progress bar. Guarded so it
+  // stops when the view unmounts instead of leaking or setting dead state.
+  // Returns true if the job resolved (done or failed), false if we stopped
+  // polling first (unmounted or hit the time ceiling).
+  const pollBuild = async (jobId) => {
+    for (let i = 0; i < 1200 && aliveRef.current; i++) {
+      await new Promise(r => setTimeout(r, 1500));
+      if (!aliveRef.current) return false;
+      const j = await API.getJob(jobId).catch(() => null);
+      if (!aliveRef.current) return false;
+      if (j && typeof j.progress === 'number') setBuildPct(j.progress);
+      if (j && j.progress_msg) setBuildMsg(j.progress_msg);
+      if (j?.status === 'done') {
+        setBuildPct(1); setBuildMsg('Course ready');
+        toast && toast('Course ready, opening it', 'success');
+        onMasteryChange && onMasteryChange();
+        if (j.result?.slug && onOpenCourse) onOpenCourse(j.result.slug);
+        setBuilding(false);
+        return true;
+      }
+      if (j?.status === 'failed') {
+        toast && toast(j.error || 'Course build failed (an AI key is required)', 'error');
+        onMasteryChange && onMasteryChange();
+        setBuilding(false);
+        return true;
+      }
+    }
+    return false;
+  };
+
+  React.useEffect(() => {
+    aliveRef.current = true;
+    setResources([]); setLesson(null);
+    const wasBuilding = node.build_status === 'building';
+    setBuilding(wasBuilding);
+    setBuildPct(wasBuilding ? 0.02 : 0);
+    setBuildMsg(wasBuilding ? 'Resuming build…' : '');
+    API.getNodeResources(node.id).then(r => { if (aliveRef.current) setResources(r || []); }).catch(() => {});
+    API.getNodeLesson(node.id).then(l => { if (aliveRef.current) setLesson(l?.body_md || null); }).catch(() => {});
+    // Resume an in-flight build: the client forgot the jobId when it unmounted,
+    // so re-find it from the server and pick the progress bar back up from the
+    // real progress rather than showing a frozen 0%.
+    if (wasBuilding && node.node_kind === 'course' && node.roadmap_id) {
+      API.getNodeBuildJob(node.roadmap_id, node.id).then(info => {
+        if (!aliveRef.current || !info) return;
+        if (info.built) { setBuilding(false); return; }
+        if (typeof info.progress === 'number') setBuildPct(info.progress);
+        if (info.progress_msg) setBuildMsg(info.progress_msg);
+        if (info.status === 'done' || info.status === 'failed') { setBuilding(false); return; }
+        if (info.jobId) pollBuild(info.jobId);
+        else if (!info.building) setBuilding(false);
+      }).catch(() => {});
+    }
+    return () => { aliveRef.current = false; };
+  }, [node.id, node.build_status]);
+
   const buildCourse = async () => {
+    aliveRef.current = true;
     setBuilding(true); setBuildPct(0.02); setBuildMsg('Designing the course blueprint…');
     try {
       const res = await API.buildPathwayCourse(node.roadmap_id, node.id);
       if (res.alreadyBuilt) { onMasteryChange && onMasteryChange(); setBuilding(false); return; }
-      for (let i = 0; i < 400; i++) {
-        await new Promise(r => setTimeout(r, 1500));
-        const j = await API.getJob(res.jobId).catch(() => null);
-        if (j && typeof j.progress === 'number') setBuildPct(j.progress);
-        if (j && j.progress_msg) setBuildMsg(j.progress_msg);
-        if (j?.status === 'done') {
-          setBuildPct(1); setBuildMsg('Course ready');
-          toast && toast('Course ready, opening it', 'success');
-          onMasteryChange && onMasteryChange();
-          if (j.result?.slug && onOpenCourse) onOpenCourse(j.result.slug);
-          setBuilding(false);
-          return;
-        }
-        if (j?.status === 'failed') {
-          toast && toast(j.error || 'Course build failed (an AI key is required)', 'error');
-          onMasteryChange && onMasteryChange();
-          setBuilding(false);
-          return;
-        }
-      }
-      toast && toast('Still building, the course will appear on this node when done', 'info');
+      const resolved = await pollBuild(res.jobId);
+      if (aliveRef.current && !resolved) toast && toast('Still building, the course will appear on this node when done', 'info');
     } catch (e) {
       toast && toast(e.message || 'Could not build course', 'error');
       setBuilding(false);

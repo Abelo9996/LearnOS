@@ -184,6 +184,7 @@ const API = {
   getPlacement:       (rmId) => API.get(`/roadmaps/${rmId}/placement`),
   submitPlacement:    (rmId, answers) => API.post(`/roadmaps/${rmId}/placement/submit`, { answers }),
   buildPathwayCourse: (rmId, nodeId, level) => API.post(`/roadmaps/${rmId}/nodes/${nodeId}/build`, { level }),
+  getNodeBuildJob: (rmId, nodeId) => API.get(`/roadmaps/${rmId}/nodes/${nodeId}/build`),
 
   // ── AI ─────────────────────────────────────────────────────────────────────
   postChat:            (data) => API.post('/ai/chat', data),

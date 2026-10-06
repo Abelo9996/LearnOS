@@ -49,6 +49,32 @@ router.post('/:id/nodes/:nodeId/build', (req, res) => {
   res.json({ ok: true, jobId });
 });
 
+// Recover the in-flight (or latest) build job for a node. The build runs
+// server-side as a job, but the client only knew the jobId inside the closure
+// that started it, so navigating away and back (or reloading) lost it and the
+// progress bar reset to 0. This lets the UI re-find the job and resume from the
+// real progress.
+router.get('/:id/nodes/:nodeId/build', (req, res) => {
+  const node = db.prepare('SELECT id, course_slug, build_status FROM roadmap_nodes WHERE id = ? AND roadmap_id = ?').get(req.params.nodeId, req.params.id);
+  if (!node) return res.status(404).json({ error: true, message: 'Node not found' });
+  if (node.course_slug) return res.json({ ok: true, built: true, slug: node.course_slug });
+  const job = db.prepare(
+    "SELECT id, status, progress, progress_msg, result_json FROM agent_jobs WHERE user_id = ? AND kind = 'build-pathway-course' AND json_extract(input_json, '$.node_id') = ? ORDER BY created_at DESC LIMIT 1"
+  ).get(req.userId, node.id);
+  if (!job) return res.json({ ok: true, building: node.build_status === 'building', jobId: null });
+  let slug = null;
+  try { slug = job.result_json ? (JSON.parse(job.result_json)?.slug || null) : null; } catch {}
+  res.json({
+    ok: true,
+    building: job.status === 'queued' || job.status === 'running' || node.build_status === 'building',
+    jobId: job.id,
+    status: job.status,
+    progress: job.progress,
+    progress_msg: job.progress_msg,
+    slug,
+  });
+});
+
 // Generate a real roadmap from a goal (CR-2). Runs async → returns a jobId.
 router.post('/generate', (req, res) => {
   const { goal, profile } = req.body;
