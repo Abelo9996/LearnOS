@@ -1,7 +1,6 @@
 import React from 'react';
 import { I } from '../components/Icons';
-import { Card, StatCard, Btn, ProgressBar, Ring, MiniBars, Tag, Avatar, AgentChip, PageScroll, SectionHead } from '../components/UI';
-import { AGENTS } from '../data/data';
+import { Card, StatCard, Btn, ProgressBar, Ring, MiniBars, AgentChip, PageScroll, SectionHead } from '../components/UI';
 import API, { timeAgo } from '../api.js';
 import { useToast } from '../App';
 import { useUser } from '../UserContext.jsx';
@@ -10,7 +9,6 @@ export default function Dashboard({ onOpenSession, onOpenRoadmap, onOpenCourses,
   const { add: toast } = useToast();
   const user = useUser();
   const [roadmaps, setRoadmaps]   = React.useState([]);
-  const [sessions, setSessions]   = React.useState([]);
   const [activity, setActivity]   = React.useState([]);
   const [stats, setStats]         = React.useState(null);
   const [dailyStats, setDailyStats] = React.useState([]);
@@ -31,19 +29,6 @@ export default function Dashboard({ onOpenSession, onOpenRoadmap, onOpenCourses,
           color:       r.color || 'var(--brand)',
           icon:        r.icon || 'box',
           level:       Math.max(1, Math.ceil(((r.completed_modules || 0) / Math.max(r.total_modules || 1, 1)) * 10)),
-        })));
-      }
-    }).catch(() => {});
-
-    API.getSessions().then(rows => {
-      if (Array.isArray(rows) && rows.length) {
-        setSessions(rows.slice(0, 3).map(s => ({
-          id:    s.id,
-          title: s.title,
-          agent: s.agent || 'TU',
-          when:  'Scheduled',
-          time:  '',
-          length: s.duration_seconds ? Math.round(s.duration_seconds / 60) : 60,
         })));
       }
     }).catch(() => {});
@@ -79,10 +64,10 @@ export default function Dashboard({ onOpenSession, onOpenRoadmap, onOpenCourses,
 
   return (
     <PageScroll>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, marginBottom: 20 }}>
         <div>
-          <div className="display" style={{ fontSize: 32, lineHeight: 1.05, color: 'var(--ink)' }}>Welcome back, {user.name.split(' ')[0]} 👋</div>
-          <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 8 }}>Let's continue your learning journey. You're doing great!</div>
+          <div className="display" style={{ fontSize: 30, lineHeight: 1.05, color: 'var(--ink)' }}>Welcome back, {user.name.split(' ')[0]}</div>
+          <div style={{ fontSize: 14, color: 'var(--muted)', marginTop: 8 }}>Here's where to pick up.</div>
         </div>
         <StreakCard streak={streak} />
       </div>
@@ -90,14 +75,11 @@ export default function Dashboard({ onOpenSession, onOpenRoadmap, onOpenCourses,
       <LearningCoach coach={coach} setScreen={setScreen} />
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.6fr) minmax(0, 1fr)', gap: 16, marginTop: 16 }}>
         <RoadmapsRow setScreen={setScreen} onOpenRoadmap={onOpenRoadmap} roadmaps={roadmaps} />
-        <UpcomingSessionsCard onOpenSession={onOpenSession} setScreen={setScreen} sessions={sessions} />
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, marginTop: 16 }}>
-        <RecentActivityCard activity={activity} setScreen={setScreen} />
-        <LearningProgressCard activity={activity} totalSessions={totalSessions} completedSessions={completedSessions} pending={pending} mastery={mastery} />
         <QuickActionsCard onOpenSession={onOpenSession} onOpenRoadmap={onOpenRoadmap} onOpenCourses={onOpenCourses} onOpenCards={onOpenCards} />
       </div>
-      <AgentActivityStrip setScreen={setScreen} />
+      <div style={{ marginTop: 16 }}>
+        <RecentActivityCard activity={activity} setScreen={setScreen} />
+      </div>
     </PageScroll>
   );
 }
@@ -115,7 +97,7 @@ function LearningCoach({ coach, setScreen }) {
     setScreen(action.screen || 'dashboard');
   };
   return (
-    <Card style={{ padding: 20, marginTop: 16, background: 'linear-gradient(135deg, oklch(0.19 0.035 295), var(--bg-window))', border: '1px solid var(--accent-line)' }}>
+    <Card style={{ padding: 20, marginTop: 16, background: 'linear-gradient(135deg, var(--accent-soft), var(--bg-window))', border: '1px solid var(--accent-line)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <AgentChip code="AN" size={34} />
         <div style={{ flex: 1, minWidth: 0 }}>
@@ -150,8 +132,8 @@ function LearningCoach({ coach, setScreen }) {
 
 function StreakCard({ streak }) {
   return (
-    <Card pad={false} className="hover-lift" style={{ display: 'inline-flex', alignItems: 'center', gap: 14, padding: '12px 16px 12px 14px', background: 'linear-gradient(135deg, oklch(0.22 0.08 35), oklch(0.18 0.05 320))', border: '1px solid oklch(0.5 0.18 35 / 0.4)', minWidth: 230 }}>
-      <span style={{ width: 40, height: 40, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'oklch(0.7 0.22 35 / 0.2)', color: 'oklch(0.85 0.2 60)' }}>{React.cloneElement(I.flame, { size: 22 })}</span>
+    <Card pad={false} className="hover-lift" style={{ display: 'inline-flex', alignItems: 'center', gap: 14, padding: '12px 16px 12px 14px', background: 'linear-gradient(135deg, oklch(0.95 0.05 70), oklch(0.97 0.03 45))', border: '1px solid oklch(0.80 0.10 60 / 0.5)', minWidth: 230 }}>
+      <span style={{ width: 40, height: 40, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'oklch(0.75 0.17 55 / 0.22)', color: 'oklch(0.55 0.16 50)' }}>{React.cloneElement(I.flame, { size: 22 })}</span>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{streak} day streak</div>
         <div style={{ fontSize: 11.5, color: 'var(--muted)' }}>Keep it up!</div>
@@ -191,7 +173,7 @@ function RoadmapsRow({ setScreen, onOpenRoadmap, roadmaps }) {
       <SectionHead title="Current Roadmaps" action={<a href="#" onClick={(e) => { e.preventDefault(); onOpenRoadmap(); }} className="hover-underline" style={{ color: 'var(--brand)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>View all</a>} />
       {display.length === 0 ? (
         <div style={{ padding: '24px 18px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
-          <div style={{ width: 48, height: 48, borderRadius: 12, background: 'var(--brand-grad)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'oklch(0.16 0.02 270)' }}>{React.cloneElement(I.graph, { size: 22 })}</div>
+          <div style={{ width: 48, height: 48, borderRadius: 12, background: 'var(--brand-grad)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-brand)' }}>{React.cloneElement(I.graph, { size: 22 })}</div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)' }}>Let's build your first roadmap</div>
             <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 4, maxWidth: 360 }}>
@@ -225,36 +207,6 @@ function RoadmapsRow({ setScreen, onOpenRoadmap, roadmaps }) {
               <Btn variant="primary" size="sm" full onClick={(e) => { e.stopPropagation(); try { localStorage.setItem('learnos_active_roadmap', r.id); } catch {} onOpenRoadmap(); }}>
                 Continue Roadmap {React.cloneElement(I.arrowR, { size: 13 })}
               </Btn>
-            </div>
-          ))}
-        </div>
-      )}
-    </Card>
-  );
-}
-
-function UpcomingSessionsCard({ onOpenSession, setScreen, sessions }) {
-  return (
-    <Card pad={false} style={{ padding: 18 }}>
-      <SectionHead title="Recent Sessions" action={<a href="#" onClick={(e) => { e.preventDefault(); setScreen('schedule'); }} className="hover-underline" style={{ color: 'var(--brand)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>View schedule</a>} />
-      {sessions.length === 0 ? (
-        <div style={{ padding: '24px 0', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-          No sessions yet — open a module on your roadmap to start one.
-        </div>
-      ) : (
-        <div className="stagger" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {sessions.map((s) => (
-            <div key={s.id} onClick={() => { try { localStorage.setItem('learnos_active_session', s.id); } catch {} onOpenSession(); }} className="hover-lift" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 10, background: 'var(--surface)', border: '1px solid var(--border)', cursor: 'pointer', transition: 'all var(--dur-normal) var(--ease-out)' }}>
-              <AgentChip code={s.agent} size={32} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{s.title}</div>
-                <div className="mono" style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>with {AGENTS[s.agent]?.name || s.agent} Agent</div>
-              </div>
-              <div style={{ textAlign: 'right' }}>
-                <div className="mono" style={{ fontSize: 11.5, color: 'var(--ink-2)' }}>{s.when}</div>
-                <div className="mono" style={{ fontSize: 10.5, color: 'var(--muted)', marginTop: 2 }}>{s.time}</div>
-              </div>
-              <Tag tone="neutral">{s.length}m</Tag>
             </div>
           ))}
         </div>
@@ -299,65 +251,6 @@ function RecentActivityCard({ activity, setScreen }) {
   );
 }
 
-function LearningProgressCard({ activity, totalSessions, completedSessions, pending, mastery }) {
-  const W = 480, H = 180, padX = 28, padY = 28;
-  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  const now = new Date();
-  const pts = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(now);
-    d.setDate(now.getDate() - (6 - i));
-    const dayStr = d.toISOString().split('T')[0];
-    const dayActivity = (activity || []).filter(a => a.created_at && a.created_at.startsWith(dayStr));
-    const xpEarned = dayActivity.reduce((s, a) => s + (a.xp || 0), 0);
-    return { d: dayNames[i], v: Math.max(0.1, xpEarned / 20) };
-  });
-  const max = Math.max(...pts.map(p => p.v));
-  const x = (i) => padX + (i / (pts.length - 1)) * (W - padX * 2);
-  const y = (v) => H - padY - (v / max) * (H - padY * 2);
-  const path = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${x(i)} ${y(p.v)}`).join(' ');
-  const area = path + ` L ${x(pts.length-1)} ${H-padY} L ${x(0)} ${H-padY} Z`;
-  return (
-    <Card pad={false} style={{ padding: 18 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div className="display" style={{ fontSize: 18 }}>Learning Progress</div>
-        <select style={{ appearance: 'none', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 6, padding: '4px 22px 4px 10px', color: 'var(--ink-2)', fontSize: 12 }} defaultValue="week">
-          <option value="week">This Week</option>
-          <option value="month">This Month</option>
-        </select>
-      </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10, marginBottom: 8 }}>
-        {[
-          { v: totalSessions.toString(), l: 'Sessions', sub: `${completedSessions} completed` },
-          { v: `${Math.round((mastery || 0))}%`, l: 'Avg Mastery', sub: 'across roadmaps' },
-          { v: pending.toString(), l: 'Pending', sub: 'assignments' },
-        ].map((s) => (
-          <div key={s.l}>
-            <div className="display" style={{ fontSize: 22, color: 'var(--ink)' }}>{s.v}</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{s.l}</div>
-            <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{s.sub}</div>
-          </div>
-        ))}
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
-        <defs>
-          <linearGradient id="lpArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="oklch(0.68 0.21 295)" stopOpacity="0.5"/><stop offset="100%" stopColor="oklch(0.68 0.21 295)" stopOpacity="0"/></linearGradient>
-          <linearGradient id="lpStroke" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stopColor="oklch(0.78 0.16 195)"/><stop offset="100%" stopColor="oklch(0.74 0.21 295)"/></linearGradient>
-        </defs>
-        {[0, 0.25, 0.5, 0.75, 1].map((g) => (<line key={g} x1={padX} x2={W - padX} y1={padY + g * (H - padY * 2)} y2={padY + g * (H - padY * 2)} stroke="var(--border)" strokeWidth="0.5" strokeDasharray="2 4" />))}
-        <path d={area} fill="url(#lpArea)" />
-        <path d={path} stroke="url(#lpStroke)" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        {pts.map((p, i) => (
-          <g key={i}>
-            <circle cx={x(i)} cy={y(p.v)} r={i === 5 ? 4 : 2.5} fill={i === 5 ? 'var(--brand-3)' : 'var(--bg-window)'} stroke="var(--brand-3)" strokeWidth="1.5" />
-            {i === pts.length - 1 && pts[pts.length-1].v > 0.1 && (<g><rect x={x(i) - 22} y={y(p.v) - 26} width="44" height="18" rx="4" fill="var(--surface-2)" stroke="var(--border)" /><text x={x(i)} y={y(p.v) - 14} textAnchor="middle" fontFamily="var(--font-mono)" fontSize="9" fill="var(--ink)">{Math.round(pts[pts.length-1].v * 20)} XP</text></g>)}
-            <text x={x(i)} y={H - 8} textAnchor="middle" fontFamily="var(--font-mono)" fontSize="10" fill="var(--muted)">{p.d}</text>
-          </g>
-        ))}
-      </svg>
-    </Card>
-  );
-}
-
 function QuickActionsCard({ onOpenSession, onOpenRoadmap, onOpenCourses, onOpenCards }) {
   const actions = [
     { label: 'Start Session',   sub: 'Learn with your AI Tutor',  icon: I.play,  color: 'var(--brand)',              onClick: onOpenSession },
@@ -383,51 +276,3 @@ function QuickActionsCard({ onOpenSession, onOpenRoadmap, onOpenCourses, onOpenC
   );
 }
 
-function AgentActivityStrip({ setScreen }) {
-  const [runs, setRuns] = React.useState([]);
-  React.useEffect(() => {
-    let alive = true;
-    API.get('/ai/runs').then(r => { if (alive) setRuns(r || []); }).catch(() => {});
-    return () => { alive = false; };
-  }, []);
-  const codes = ['PR', 'CR', 'AS', 'RE', 'AN'];
-  const latestByCode = {};
-  for (const r of runs) {
-    if (!r.agent_code || latestByCode[r.agent_code]) continue;
-    latestByCode[r.agent_code] = r;
-  }
-  return (
-    <Card pad={false} style={{ padding: 18, marginTop: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div>
-          <div className="display" style={{ fontSize: 18 }}>Agent Activity</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>
-            {runs.length === 0 ? 'No agent runs yet — start a session to put them to work' : `${runs.length} recent run${runs.length === 1 ? '' : 's'}`}
-          </div>
-        </div>
-        <a href="#" onClick={(e) => { e.preventDefault(); setScreen('agents'); }} className="hover-underline" style={{ color: 'var(--brand)', fontSize: 13, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          View all agents {React.cloneElement(I.arrowR, { size: 13 })}
-        </a>
-      </div>
-      <div className="stagger" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
-        {codes.map((code) => {
-          const last = latestByCode[code];
-          const fresh = last && (Date.now() - new Date(last.created_at).getTime()) < 1000*60*30;
-          const status = last
-            ? (last.status === 'ok' ? `${Math.round((last.latency_ms||0)/100)/10}s · ${(last.cost_usd||0).toFixed(4)}$` : `Error · ${(last.error||'').slice(0,30)}`)
-            : 'Idle — no runs yet';
-          return (
-            <div key={code} className="hover-lift agent-card" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 12, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 10, cursor: 'pointer', transition: 'all var(--dur-normal) var(--ease-out)' }} onClick={() => setScreen('agents')}>
-              <AgentChip code={code} size={32} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink)' }}>{AGENTS[code]?.name} Agent</div>
-                <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{status}</div>
-              </div>
-              <span style={{ width: 8, height: 8, borderRadius: 999, background: fresh ? 'var(--good)' : 'var(--surface-3)', boxShadow: fresh ? '0 0 8px var(--good)' : 'none' }} />
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}

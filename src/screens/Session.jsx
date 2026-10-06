@@ -369,7 +369,7 @@ function ChatColumn({ scrollerRef, messages, thinking, input, setInput, submit, 
       {noKeyBanner && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', background: 'oklch(0.74 0.18 80 / 0.12)', borderBottom: '1px solid oklch(0.74 0.18 80 / 0.3)', color: 'var(--ink-2)', fontSize: 12.5 }}>
           <span style={{ flex: 1 }}>Offline mode — replies are generic. Add an OpenRouter key in Settings for real conversational tutoring.</span>
-          <button onClick={() => setScreen && (localStorage.setItem('settings_tab', 'keys'), setScreen('settings'))} style={{ padding: '4px 10px', fontSize: 11.5, fontWeight: 600, background: 'var(--brand)', color: 'oklch(0.16 0.02 270)', border: 0, borderRadius: 6, cursor: 'pointer' }}>Add key</button>
+          <button onClick={() => setScreen && (localStorage.setItem('settings_tab', 'keys'), setScreen('settings'))} style={{ padding: '4px 10px', fontSize: 11.5, fontWeight: 600, background: 'var(--brand)', color: 'var(--on-brand)', border: 0, borderRadius: 6, cursor: 'pointer' }}>Add key</button>
           <button onClick={dismissBanner} title="Dismiss" style={{ padding: '4px 8px', background: 'transparent', color: 'var(--muted)', border: 0, cursor: 'pointer', fontSize: 14 }}>×</button>
         </div>
       )}
@@ -415,7 +415,7 @@ function ChatMessage({ m, session, user }) {
           <span className="mono" style={{ fontSize: 11, color: 'var(--muted)' }}>{m.t || ''}</span>
           <Avatar name={user.name} size={26} hue={295} />
         </div>
-        <div style={{ maxWidth: '82%', padding: '10px 14px', background: 'var(--brand-grad)', color: 'oklch(0.16 0.02 270)', borderRadius: 14, borderTopRightRadius: 4, fontSize: 13.5, lineHeight: 1.5, fontWeight: 500 }}><MarkdownText text={m.body} /></div>
+        <div style={{ maxWidth: '82%', padding: '10px 14px', background: 'var(--brand-grad)', color: 'var(--on-brand)', borderRadius: 14, borderTopRightRadius: 4, fontSize: 13.5, lineHeight: 1.5, fontWeight: 500 }}><MarkdownText text={m.body} /></div>
         <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
           <IconBtn icon={I.copy} title="Copy" onClick={() => { navigator?.clipboard?.writeText(m.body); toast('Copied to clipboard', 'success'); }} />
           {/* Feedback only persists (and only claims to) for saved messages. */}
@@ -534,7 +534,7 @@ function Composer({ input, setInput, submit, sessionEnded, session }) {
         <button onClick={submit} disabled={sessionEnded} style={{
           width: 38, height: 38, borderRadius: 10, border: 0,
           background: sessionEnded ? 'var(--surface-2)' : 'var(--brand-grad)',
-          color: sessionEnded ? 'var(--muted)' : 'oklch(0.16 0.02 270)',
+          color: sessionEnded ? 'var(--muted)' : 'var(--on-brand)',
           display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: sessionEnded ? 'not-allowed' : 'pointer',
           boxShadow: sessionEnded ? 'none' : '0 0 0 1px oklch(0.68 0.21 295 / 0.5), 0 4px 14px oklch(0.68 0.21 295 / 0.35)',
           transition: 'all var(--dur-fast)',

@@ -12,7 +12,7 @@ import Share from './screens/Share';
 import Onboarding from './screens/Onboarding';
 
 const ACCENT_TOKENS = {
-  '#7c3aed': { accent: 'oklch(0.68 0.21 295)', grad: 'linear-gradient(135deg, oklch(0.68 0.21 295) 0%, oklch(0.78 0.16 195) 100%)', soft: 'oklch(0.68 0.21 295 / 0.13)', line: 'oklch(0.68 0.21 295 / 0.35)' },
+  '#7c3aed': { accent: 'oklch(0.54 0.17 285)', grad: 'linear-gradient(135deg, oklch(0.54 0.17 285) 0%, oklch(0.60 0.10 190) 100%)', soft: 'oklch(0.54 0.17 285 / 0.12)', line: 'oklch(0.54 0.17 285 / 0.30)' },
   '#06b6d4': { accent: 'oklch(0.76 0.17 200)', grad: 'linear-gradient(135deg, oklch(0.76 0.17 200) 0%, oklch(0.72 0.18 295) 100%)', soft: 'oklch(0.76 0.17 200 / 0.13)', line: 'oklch(0.76 0.17 200 / 0.35)' },
   '#e0476a': { accent: 'oklch(0.72 0.19 15)', grad: 'linear-gradient(135deg, oklch(0.72 0.19 15) 0%, oklch(0.78 0.16 75) 100%)', soft: 'oklch(0.72 0.19 15 / 0.13)', line: 'oklch(0.72 0.19 15 / 0.35)' },
   '#10b981': { accent: 'oklch(0.74 0.16 160)', grad: 'linear-gradient(135deg, oklch(0.74 0.16 160) 0%, oklch(0.78 0.16 195) 100%)', soft: 'oklch(0.74 0.16 160 / 0.13)', line: 'oklch(0.74 0.16 160 / 0.35)' },
@@ -73,7 +73,7 @@ function ToastProvider({ children }) {
                 onClick={() => { t.action.onClick(); remove(t.id); }}
                 style={{
                   padding: '4px 10px', fontSize: 11.5, fontWeight: 600,
-                  background: 'var(--brand)', color: 'oklch(0.16 0.02 270)',
+                  background: 'var(--brand)', color: 'var(--on-brand)',
                   border: 0, borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap',
                 }}
               >
@@ -403,7 +403,7 @@ function MobileNav({ screen, setScreen, counts = {} }) {
         {countFor(item?.id) > 0 && (
           <span style={{
             position: 'absolute', top: -4, right: -7, minWidth: 15, height: 15, padding: '0 3px',
-            borderRadius: 999, background: 'var(--brand)', color: 'oklch(0.16 0.02 270)',
+            borderRadius: 999, background: 'var(--brand)', color: 'var(--on-brand)',
             fontSize: 9, fontWeight: 700, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
           }}>{countFor(item.id) > 99 ? '99+' : countFor(item.id)}</span>
         )}
@@ -519,10 +519,10 @@ function ProgressPopup({ onClose }) {
       <div className="display" style={{ fontSize: 22, marginBottom: 20 }}>Your Progress</div>
 
       {/* XP / Level */}
-      <div style={{ padding: 16, background: 'linear-gradient(135deg, oklch(0.22 0.05 295), oklch(0.18 0.05 250))', borderRadius: 12, border: '1px solid var(--accent-line)', marginBottom: 16 }}>
+      <div style={{ padding: 16, background: 'linear-gradient(135deg, var(--accent-soft), var(--surface))', borderRadius: 12, border: '1px solid var(--accent-line)', marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 10 }}>
           <div>
-            <div className="cap" style={{ color: 'oklch(0.82 0.18 295)' }}>Level {level}</div>
+            <div className="cap" style={{ color: 'var(--brand)' }}>Level {level}</div>
             <div className="display" style={{ fontSize: 28, color: 'var(--ink)', marginTop: 2 }}>{xp.toLocaleString()} <span style={{ fontSize: 14, color: 'var(--muted)', fontWeight: 400 }}>XP</span></div>
           </div>
           <div style={{ textAlign: 'right' }}>
@@ -530,10 +530,10 @@ function ProgressPopup({ onClose }) {
             <div className="display" style={{ fontSize: 18, color: 'var(--brand)' }}>{xpToNext.toLocaleString()} XP</div>
           </div>
         </div>
-        <div style={{ background: 'oklch(1 0 0 / 0.1)', height: 6, borderRadius: 999, overflow: 'hidden' }}>
+        <div style={{ background: 'var(--surface-3)', height: 6, borderRadius: 999, overflow: 'hidden' }}>
           <div style={{ width: `${Math.round(pct * 100)}%`, height: '100%', background: 'var(--brand-grad)', borderRadius: 999, transition: 'width var(--dur-slow) var(--ease-out)' }} />
         </div>
-        <div className="mono" style={{ fontSize: 10.5, color: 'oklch(0.82 0.18 295)', marginTop: 6 }}>{Math.round(pct * 100)}% to next level</div>
+        <div className="mono" style={{ fontSize: 10.5, color: 'var(--brand)', marginTop: 6 }}>{Math.round(pct * 100)}% to next level</div>
       </div>
 
       {/* Stats grid */}
@@ -645,14 +645,14 @@ function Sidebar({ screen, setScreen, collapsed, onToggle, counts = {}, onHome }
       {!collapsed && (
         <div className="sidebar-plan-card" style={{
           margin: '6px 12px 10px', padding: 12,
-          background: 'linear-gradient(135deg, oklch(0.22 0.05 295), oklch(0.18 0.05 250))',
+          background: 'linear-gradient(135deg, var(--accent-soft), var(--surface))',
           border: '1px solid var(--accent-line)', borderRadius: 10,
           whiteSpace: 'nowrap', overflow: 'hidden',
           transition: 'border-color var(--dur-normal) var(--ease-smooth), box-shadow var(--dur-normal) var(--ease-smooth)',
           animation: 'labelFadeIn var(--dur-normal) var(--ease-smooth) both',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-            <span className="cap" style={{ color: 'oklch(0.82 0.18 295)' }}>Progress</span>
+            <span className="cap" style={{ color: 'var(--brand)' }}>Progress</span>
             <span className="mono" style={{ fontSize: 10.5, color: 'var(--muted)' }}>{(user.xp || 0).toLocaleString()} XP</span>
           </div>
           <div className="display" style={{ fontSize: 16, color: 'var(--ink)' }}>Level {user.level}</div>
@@ -942,7 +942,7 @@ function TopBar({ setScreen, onToggleSidebar, collapsed }) {
         <button onClick={openNotifs} title="Notifications"
           style={{ width: 36, height: 36, borderRadius: 8, border: 0, background: showNotifs ? 'var(--surface)' : 'transparent', color: 'var(--ink-2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', position: 'relative', transition: 'all var(--dur-fast)' }}>
           {React.cloneElement(I.bell, { size: 18 })}
-          {unread > 0 && <span style={{ position: 'absolute', top: 4, right: 4, background: 'var(--bad)', color: 'oklch(0.16 0.02 270)', fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 999, minWidth: 14, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{unread}</span>}
+          {unread > 0 && <span style={{ position: 'absolute', top: 4, right: 4, background: 'var(--bad)', color: 'var(--on-brand)', fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 999, minWidth: 14, height: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{unread}</span>}
         </button>
 
         {showNotifs && (
@@ -1011,7 +1011,7 @@ function TopBar({ setScreen, onToggleSidebar, collapsed }) {
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--ink)', lineHeight: 1 }}>{user.name}</div>
-              {user.role === 'admin' && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'var(--brand)', color: 'oklch(0.16 0.02 270)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Admin</span>}
+              {user.role === 'admin' && <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4, background: 'var(--brand)', color: 'var(--on-brand)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Admin</span>}
             </div>
             <div className="mono" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Level {user.level} · {(user.xp || 0).toLocaleString()} XP</div>
           </div>

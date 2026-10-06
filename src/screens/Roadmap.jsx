@@ -246,7 +246,7 @@ export default function Roadmap({ onOpenSession, onOpenCourse }) {
                   background: on ? 'var(--accent-soft)' : 'var(--surface)',
                   color: on ? 'var(--ink)' : 'var(--ink-2)',
                 }}>
-                  <span style={{ width: 24, height: 24, borderRadius: 6, background: rm.color || 'var(--brand)', opacity: 0.85, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'oklch(0.16 0.02 270)', flexShrink: 0 }}>{React.cloneElement(I[rm.icon] || I.box, { size: 13 })}</span>
+                  <span style={{ width: 24, height: 24, borderRadius: 6, background: rm.color || 'var(--brand)', opacity: 0.85, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-brand)', flexShrink: 0 }}>{React.cloneElement(I[rm.icon] || I.box, { size: 13 })}</span>
                   <div style={{ textAlign: 'left' }}>
                     <div style={{ fontSize: 12.5, fontWeight: 600, lineHeight: 1.2 }}>{rm.title}</div>
                     <div className="mono" style={{ fontSize: 10, color: 'var(--muted)' }}>{Math.round((rm.mastery || 0) * 100)}% · {rm.completed_modules || 0}/{rm.total_modules || 0}</div>
@@ -1012,7 +1012,7 @@ function ModuleDetail({ node, nodes = [], edges = [], onOpenSession, toast, open
               <AgentChip code="RE" size={16} glow={false} /> Trusted resources
               <span style={{ flex: 1 }} />
               {!isLocked && (
-                <button onClick={proposeMore} disabled={proposing} style={{ fontSize: 10.5, padding: '2px 8px', background: proposing ? 'var(--surface-2)' : 'var(--brand)', color: proposing ? 'var(--muted)' : 'oklch(0.16 0.02 270)', border: 0, borderRadius: 6, cursor: proposing ? 'wait' : 'pointer', fontWeight: 600 }}>
+                <button onClick={proposeMore} disabled={proposing} style={{ fontSize: 10.5, padding: '2px 8px', background: proposing ? 'var(--surface-2)' : 'var(--brand)', color: proposing ? 'var(--muted)' : 'var(--on-brand)', border: 0, borderRadius: 6, cursor: proposing ? 'wait' : 'pointer', fontWeight: 600 }}>
                   {proposing ? 'Researching…' : '+ Propose more'}
                 </button>
               )}

@@ -160,7 +160,7 @@ export default function QuizModal({ nodeId = null, title = 'Module quiz', onClos
               border: `1px solid ${on ? 'var(--accent-line)' : 'var(--border)'}`,
               color: on ? 'oklch(0.82 0.18 295)' : 'var(--ink-2)', fontSize: 13.5,
             }}>
-              <span style={{ width: 22, height: 22, flexShrink: 0, borderRadius: 999, border: `2px solid ${on ? 'var(--brand)' : 'var(--border-strong)'}`, background: on ? 'var(--brand)' : 'transparent', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'oklch(0.16 0.02 270)', fontSize: 12, fontWeight: 700 }}>{String.fromCharCode(65 + oi)}</span>
+              <span style={{ width: 22, height: 22, flexShrink: 0, borderRadius: 999, border: `2px solid ${on ? 'var(--brand)' : 'var(--border-strong)'}`, background: on ? 'var(--brand)' : 'transparent', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-brand)', fontSize: 12, fontWeight: 700 }}>{String.fromCharCode(65 + oi)}</span>
               {opt}
             </button>
           );
