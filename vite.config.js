@@ -13,7 +13,10 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: false
+    sourcemap: false,
+    // The editor, diagram and whiteboard libraries are large but lazy-loaded;
+    // the warning about them is noise on every first run.
+    chunkSizeWarningLimit: 2500,
   },
   test: {
     // Agent worktrees live inside the repo; their copies of the tests are not ours.

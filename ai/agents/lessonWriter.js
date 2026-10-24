@@ -31,7 +31,7 @@ Structure the lesson like this (use these as a guide, with your own ### headings
 2. Build the intuition first, in plain language, then make it precise. Define every term and every symbol the first time you use it.
 3. At least one fully WORKED EXAMPLE with real numbers or a real case, done step by step, ending in the actual answer. Put it in a "> [!EXAMPLE]" callout. Check your own arithmetic.
 4. One "> [!WARNING]" callout for the most common mistake or misconception, and why it is wrong.
-5. "### Try it": 2-3 practice problems of increasing difficulty. Each problem is followed by its full worked solution in a "> [!SOLUTION]" callout, which the reader keeps collapsed until they have tried.
+5. "### Try it": 2-3 practice problems of increasing difficulty. Write each problem as ordinary text (for example "**Problem 1.** ..."), then put ONLY its full worked solution in a "> [!SOLUTION]" callout right below it. The reader sees the problem and keeps the solution folded until they have tried, so the problem itself must never be inside the callout.
 6. End with a "> [!KEY]" callout: the 3-5 things to remember.
 
 Rules:
@@ -81,6 +81,8 @@ const reviewSchema = {
 
 const REVISE_SYSTEM = `You are the instructor who wrote this lesson, revising it after expert review and after its code examples were run. Fix every listed problem. Keep everything that was right. Keep the same structure and rules as before (worked example, warning, "### Try it" problems with "> [!SOLUTION]" callouts, closing "> [!KEY]"). Code blocks marked python or javascript are executed again after you revise, in order, in one session like a notebook, so each must run given the blocks before it and print what the text says it prints.
 
+Fix things silently: the learner never saw the earlier version, so never write "wait", "correction", "typo", "as fixed above", or anything else that refers to a previous draft.
+
 Output ONLY the full revised lesson in Markdown. No commentary about what you changed.`;
 
 /** Mechanical problems a reviewer should not have to spot. */
@@ -91,6 +93,10 @@ export function lintLesson(md) {
   if (!/\[!EXAMPLE\]/i.test(text)) issues.push('There is no worked example in a "> [!EXAMPLE]" callout.');
   if (!/\[!SOLUTION\]/i.test(text)) issues.push('The practice problems have no "> [!SOLUTION]" callouts.');
   if (!/\[!KEY\]/i.test(text)) issues.push('The lesson does not end with a "> [!KEY]" summary callout.');
+  // The problem has to be visible; only its solution is folded away.
+  if (/>\s*\[!SOLUTION\][^\n]*\n>\s*\**(Problem|Exercise|Question)\b/i.test(text)) {
+    issues.push('A "> [!SOLUTION]" callout contains the problem statement, so the problem is hidden. Put each problem above its callout and keep only the solution inside.');
+  }
   const mermaid = (text.match(/```mermaid/g) || []).length;
   if (mermaid > 2) issues.push(`There are ${mermaid} Mermaid diagrams; keep at most the one or two that show real structure.`);
   const outsideCode = text.replace(/```[\s\S]*?```/g, '');
@@ -205,13 +211,17 @@ export async function polishLesson({ userId, plan, draft, review = true }) {
     quality.codeRan = code.ran;
     quality.codeFailures = code.failed;
     quality.lint = lint;
-    if (!issues.length && !code.failed.length && !lint.length) break;
+    // A stray "$" (a price, a shell prompt) is not worth rewriting a lesson for;
+    // it is reported, and fixed if a revision happens for a real reason.
+    const lintThatMatters = lint.filter(l => !/missing its closing \$/.test(l));
+    if (!issues.length && !code.failed.length && !code.mismatched.length && !lintThatMatters.length) break;
     // Code failures are worth a second revision; review notes get one.
     if (round === 1 && !code.failed.length) break;
 
     const problems = [
       ...issues.map(i => `- [${i.severity}] "${i.quote}": ${i.problem} Fix: ${i.fix}`),
       ...code.failed.map(f => `- The ${f.lang} block starting at line ${f.line} fails when run:\n${f.error}`),
+      ...code.mismatched.map(m => `- The output shown after the ${m.lang} block at line ${m.line} is not what that code prints. Replace the shown output with exactly what it prints, and fix any sentence that relies on the wrong numbers:\n${m.printed}`),
       ...lint.map(l => `- ${l}`),
     ].join('\n');
     const revised = await complete({

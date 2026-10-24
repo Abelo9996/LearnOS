@@ -236,3 +236,24 @@ describe('lab grading tolerance', () => {
     expect(r.tests.cases.map(c => c.passed)).toEqual([true, false]);
   });
 });
+
+describe('lint: practice problems stay visible', () => {
+  it('flags a problem statement hidden inside its solution callout', () => {
+    const hidden = GOOD_LESSON.replace('> [!SOLUTION]\n> It is $2$.', '> [!SOLUTION]\n> **Problem 1:** Average 1 and 3.\n> It is $2$.');
+    expect(lintLesson(hidden).join(' ')).toMatch(/problem is hidden/);
+    expect(lintLesson(GOOD_LESSON)).toEqual([]);
+  });
+});
+
+describe('shown output', () => {
+  it('flags an output block that is not what the code prints', async () => {
+    const md = [
+      '```javascript', 'console.log(2 + 2);', '```', '', '```text', '5', '```',
+      'Next:', '```javascript', 'console.log([1, 2].length);', '```', '```output', '2', '```',
+    ].join('\n');
+    const r = await runLessonExamples(md);
+    expect(r.ran).toBe(2);
+    expect(r.mismatched).toHaveLength(1);
+    expect(r.mismatched[0].printed).toBe('4');
+  });
+});

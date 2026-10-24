@@ -51,7 +51,13 @@ function TeX({ tex, display }) {
  * and leave "it costs $30 to $40" as text.
  */
 const MATH_INLINE = /\$(?!\s)((?:[^$\n\\]|\\.)+?)(?<!\s)\$/;
-const looksMathy = (s) => /[\\^_{}]/.test(s) || /^[A-Za-z]'?$/.test(s.trim());
+// Inline $...$ is maths when it reads like maths: TeX commands, sub/superscripts,
+// a single variable, a number, or arithmetic. Lessons write "$2$-vector" and
+// "$2(3) + 1(-2) = 4$", which the stricter rule left as raw dollar signs.
+// Prices stay text: "$5 and $10" never matches (no space may touch a $), and a
+// match followed directly by a digit ("$5-$10") is rejected below.
+const looksMathy = (s) => /[\\^_{}]/.test(s) || /^[A-Za-z]'?$/.test(s.trim())
+  || /^-?\d+(\.\d+)?$/.test(s.trim()) || /[=+*/<>()|]/.test(s);
 
 /**
  * formatInline, bold, italic, strikethrough, code, links, images, citations
@@ -65,7 +71,11 @@ export function formatInline(text, citationMap) {
   let key = 0;
 
   while (remaining.length > 0) {
-    const mathMatch   = (() => { const m = remaining.match(MATH_INLINE); return m && looksMathy(m[1]) ? m : null; })();
+    const mathMatch   = (() => {
+      const m = remaining.match(MATH_INLINE);
+      if (!m || !looksMathy(m[1])) return null;
+      return /\d/.test(remaining[m.index + m[0].length] || '') ? null : m;
+    })();
     const linkMatch   = remaining.match(/(!?)\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/);
     const citeMatch   = citationMap ? remaining.match(/\[(\d+)\]/) : null;
     const boldMatch   = remaining.match(/\*\*(.+?)\*\*/);
@@ -566,7 +576,16 @@ export default function MarkdownText({ text, citationMap, prose = false, stripTi
         const type = cm[1].toLowerCase();
         // The callout body is Markdown in its own right: a worked example needs
         // its steps, its maths and its code, not one paragraph per line.
-        const inner = [cm[2], ...quote.slice(1)].join('\n').trim();
+        let inner = [cm[2], ...quote.slice(1)].join('\n').trim();
+        // A solution that opens with its own problem statement would hide the
+        // problem; show that first paragraph above the fold instead.
+        if (COLLAPSIBLE.has(type) && /^\**(Problem|Exercise|Question)\b/i.test(inner)) {
+          const cut = inner.search(/\n\s*\n/);
+          if (cut > 0) {
+            elements.push(<div key={`cp-${i}`}><MarkdownText text={inner.slice(0, cut)} citationMap={citationMap} prose={prose} /></div>);
+            inner = inner.slice(cut).trim();
+          }
+        }
         elements.push(
           <Callout key={`co-${i}`} type={type}>
             <div className="callout-body"><MarkdownText text={inner} citationMap={citationMap} prose={prose} /></div>

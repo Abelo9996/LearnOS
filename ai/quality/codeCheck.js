@@ -31,7 +31,7 @@ export function extractCodeBlocks(md) {
     const code = [];
     i++;
     while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) { code.push(lines[i]); i++; }
-    out.push({ lang, code: code.join('\n'), line: start + 1 });
+    out.push({ lang, code: code.join('\n'), line: start + 1, end: i + 1 });
   }
   return out;
 }
@@ -41,10 +41,26 @@ const NEEDS_INPUT = /\binput\s*\(|readline\(|process\.stdin|sys\.stdin/;
 
 /**
  * Run every runnable example in a lesson.
- * @returns {Promise<{ran:number, failed:Array<{line,lang,error}>, skipped:Array<{line,lang,reason}>}>}
+ * @returns {Promise<{ran:number, failed:Array<{line,lang,error}>, skipped:Array<{line,lang,reason}>, mismatched:Array<{line,lang,shown,printed}>}>}
  */
+const MARK = '__LEARNOS_BLOCK_OUTPUT__';
+const OUTPUT_LANGS = new Set(['text', 'output', 'console', 'txt', '']);
+const squash = (t) => String(t || '').replace(/\s+/g, ' ').trim();
+
 export async function runLessonExamples(md, { timeoutMs = 10_000, maxBlocks = 8 } = {}) {
-  const blocks = extractCodeBlocks(md).filter(b => RUNNABLE[b.lang] && b.code.trim());
+  const all = extractCodeBlocks(md);
+  const lines = String(md || '').split('\n');
+  // An output block shown right after a code block (nothing but blank lines
+  // between them) is a claim about what the code prints, and is checked.
+  const shownOutput = new Map();
+  all.forEach((b, k) => {
+    const next = all[k + 1];
+    if (!RUNNABLE[b.lang] || !next || !OUTPUT_LANGS.has(next.lang)) return;
+    const between = lines.slice(b.end, next.line - 1).map(l => l.replace(/^\s*(?:>\s?)+/, ''));
+    if (between.every(l => !l.trim())) shownOutput.set(b.line, next.code);
+  });
+  const mismatched = [];
+  const blocks = all.filter(b => RUNNABLE[b.lang] && b.code.trim());
   const failed = [];
   const skipped = [];
   let ran = 0;
@@ -57,12 +73,23 @@ export async function runLessonExamples(md, { timeoutMs = 10_000, maxBlocks = 8 
     const language = RUNNABLE[b.lang];
     if (NEEDS_INPUT.test(b.code)) { skipped.push({ line: b.line, lang: language, reason: 'reads input' }); continue; }
     const prelude = session[language].join('\n\n');
-    let source = prelude ? `${prelude}\n\n${b.code}` : b.code;
+    // The marker separates this block's output from what the earlier blocks print.
+    const mark = language === 'python' ? `print(${JSON.stringify(MARK)})` : `console.log(${JSON.stringify(MARK)});`;
+    let source = prelude ? `${prelude}\n\n${mark}\n${b.code}` : `${mark}\n${b.code}`;
     // Plots should render off-screen rather than try to open a window.
     if (language === 'python' && /matplotlib/.test(source)) source = `import matplotlib\nmatplotlib.use("Agg")\n${source}`;
     const r = await runLab({ source, language, timeoutMs });
     const text = `${r.stderr || ''}\n${r.error || ''}`.trim();
-    if (r.ok) { ran++; session[language].push(b.code); continue; }
+    if (r.ok) {
+      ran++;
+      session[language].push(b.code);
+      const printed = String(r.stdout || '').split(MARK).pop().replace(/^\n/, '').trimEnd();
+      const shown = shownOutput.get(b.line);
+      if (shown != null && squash(shown) !== squash(printed) && printed.length < 2000) {
+        mismatched.push({ line: b.line, lang: language, shown, printed });
+      }
+      continue;
+    }
     if (MISSING_MODULE.test(text)) { skipped.push({ line: b.line, lang: language, reason: 'library not installed here' }); session[language].skippedBefore = true; continue; }
     // A name an earlier block would have defined, had it been able to run here,
     // is not this block's fault.
@@ -75,7 +102,7 @@ export async function runLessonExamples(md, { timeoutMs = 10_000, maxBlocks = 8 
       error: r.timedOut ? `Timed out after ${Math.round(timeoutMs / 1000)}s` : lastLines(text, 12) || `exit code ${r.exitCode}`,
     });
   }
-  return { ran, failed, skipped };
+  return { ran, failed, skipped, mismatched };
 }
 
 function lastLines(s, n) {
