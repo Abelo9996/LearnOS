@@ -81,7 +81,7 @@ export default function Whiteboard({ session }) {
         <span style={{ fontSize: 11, color: 'var(--muted)' }}>shapes · arrows · text · diagrams</span>
         <div style={{ flex: 1 }} />
         <button onClick={() => setOpen(o => !o)}
-          style={{ fontSize: 12, padding: '5px 11px', borderRadius: 7, cursor: 'pointer', background: open ? 'var(--accent-soft)' : 'var(--surface-2)', border: `1px solid ${open ? 'var(--accent-line)' : 'var(--border)'}`, color: open ? 'oklch(0.82 0.18 295)' : 'var(--ink-2)' }}>
+          style={{ fontSize: 12, padding: '5px 11px', borderRadius: 7, cursor: 'pointer', background: open ? 'var(--accent-soft)' : 'var(--surface-2)', border: `1px solid ${open ? 'var(--accent-line)' : 'var(--border)'}`, color: open ? 'var(--brand-ink)' : 'var(--ink-2)' }}>
           Diagram from text
         </button>
       </div>

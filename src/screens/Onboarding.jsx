@@ -151,7 +151,7 @@ export default function Onboarding({ onComplete }) {
     <div style={{
       width: 28, height: 28, borderRadius: 999, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
       background: step >= n ? 'var(--brand-grad)' : 'var(--surface-2)',
-      color: step >= n ? 'oklch(0.16 0.02 270)' : 'var(--muted)',
+      color: step >= n ? 'var(--on-brand)' : 'var(--muted)',
       fontSize: 12, fontWeight: 700, flexShrink: 0,
     }}>{n}</div>
   );
@@ -267,7 +267,7 @@ export default function Onboarding({ onComplete }) {
                 <button key={c} onClick={() => setGoal(c)} style={{
                   padding: '6px 14px', borderRadius: 8, border: '1px solid var(--border)',
                   background: goal === c ? 'var(--accent-soft)' : 'var(--surface)',
-                  color: goal === c ? 'oklch(0.82 0.18 295)' : 'var(--ink-2)',
+                  color: goal === c ? 'var(--brand-ink)' : 'var(--ink-2)',
                   fontSize: 12.5, fontWeight: 500, cursor: 'pointer',
                 }}>{c}</button>
               ))}
@@ -296,7 +296,7 @@ export default function Onboarding({ onComplete }) {
                     flex: 1, padding: '12px 16px', borderRadius: 10, textAlign: 'center',
                     border: `1px solid ${level === l ? 'var(--accent-line)' : 'var(--border)'}`,
                     background: level === l ? 'var(--accent-soft)' : 'var(--surface)',
-                    color: level === l ? 'oklch(0.82 0.18 295)' : 'var(--ink-2)',
+                    color: level === l ? 'var(--brand-ink)' : 'var(--ink-2)',
                     fontSize: 13, fontWeight: 600, cursor: 'pointer', textTransform: 'capitalize',
                   }}>{l}</button>
                 ))}
@@ -338,7 +338,7 @@ export default function Onboarding({ onComplete }) {
                     padding: '14px 16px', borderRadius: 10, textAlign: 'left',
                     border: `1px solid ${on ? 'var(--accent-line)' : 'var(--border)'}`,
                     background: on ? 'var(--accent-soft)' : 'var(--surface)',
-                    color: on ? 'oklch(0.82 0.18 295)' : 'var(--ink-2)',
+                    color: on ? 'var(--brand-ink)' : 'var(--ink-2)',
                     fontSize: 13, fontWeight: 500, cursor: 'pointer',
                   }}>
                     <span style={{ marginRight: 8 }}>{on ? '✓' : '○'}</span>{s}

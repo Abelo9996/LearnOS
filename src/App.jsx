@@ -7,7 +7,7 @@ import Dashboard from './screens/Dashboard';
 import Session from './screens/Session';
 import Roadmap from './screens/Roadmap';
 import Courses from './screens/Courses';
-import { Schedule, Assignments, Flashcards, Certificates, Feed, Starred, Settings, AgentsPage } from './screens/Extras';
+import { Assignments, Flashcards, Settings } from './screens/Extras';
 import Share from './screens/Share';
 import Onboarding from './screens/Onboarding';
 
@@ -18,25 +18,20 @@ const ACCENT_TOKENS = {
   '#10b981': { accent: 'oklch(0.74 0.16 160)', grad: 'linear-gradient(135deg, oklch(0.74 0.16 160) 0%, oklch(0.78 0.16 195) 100%)', soft: 'oklch(0.74 0.16 160 / 0.13)', line: 'oklch(0.74 0.16 160 / 0.35)' },
 };
 
+// What the app is for, and only that. Schedule, Agents, Certificates, the
+// community registry, Activity and Starred were removed: each was either fake
+// (self-issued "verified" certificates, a registry that 502'd on every load,
+// agent "telemetry") or a duplicate of something better elsewhere. Model
+// routing lives in Settings; import and export live under Courses.
 const NAV = [
   { group: 'LEARN', items: [
-    { id: 'dashboard',   label: 'Dashboard',    icon: 'home' },
-    { id: 'roadmaps',    label: 'Roadmaps',     icon: 'graph' },
+    { id: 'dashboard',   label: 'Home',         icon: 'home' },
     { id: 'courses',     label: 'Courses',      icon: 'book' },
+    { id: 'roadmaps',    label: 'Paths',        icon: 'graph' },
+    { id: 'cards',       label: 'Review',       icon: 'card' },
     { id: 'assignments', label: 'Assignments',  icon: 'check' },
-    { id: 'cards',       label: 'Spaced review',icon: 'card' },
-    { id: 'schedule',    label: 'Schedule',     icon: 'calendar' },
   ]},
-  { group: 'BUILD', items: [
-    { id: 'agents',      label: 'Agents',       icon: 'spark' },
-    { id: 'certificates',label: 'Certificates', icon: 'ribbon' },
-  ]},
-  { group: 'LIBRARY', items: [
-    { id: 'share',       label: 'Share',        icon: 'people' },
-    { id: 'feed',        label: 'Activity',     icon: 'rss' },
-    { id: 'starred',     label: 'Starred',      icon: 'star' },
-  ]},
-  { group: 'ANALYTICS', items: [
+  { group: 'YOU', items: [
     { id: 'settings',    label: 'Settings',     icon: 'cog' },
   ]},
 ];
@@ -271,38 +266,7 @@ function AppShell() {
     return () => { alive = false; };
   }, [screen]);
 
-  // §3.8, Schedule reminders: poll every 60s for events starting within 15 min
-  const remindedRef = React.useRef(new Set()); // track already-reminded event ids
-  React.useEffect(() => {
-    let alive = true;
-    const tick = async () => {
-      if (!alive) return;
-      try {
-        const due = await API.getScheduleDue().catch(() => []);
-        if (!alive) return;
-        for (const ev of (due || [])) {
-          if (remindedRef.current.has(ev.id)) continue;
-          remindedRef.current.add(ev.id);
-          // Mark as reminded server-side
-          try {
-            await API.patchScheduleEvent(ev.id, { reminder_sent_at: new Date().toISOString() });
-          } catch {}
-          // Determine deep-link screen
-          const screenMap = { session: 'session', review: 'cards', assign: 'assignments', read: 'courses', project: 'assignments', live: 'session' };
-          const dest = screenMap[ev.event_type] || 'schedule';
-          toast(
-            `⏰ "${ev.title}" starts soon${ev.start_hour ? ` at ${String(Math.floor(ev.start_hour)).padStart(2, '0')}:${String(Math.round((ev.start_hour % 1) * 60)).padStart(2, '0')}` : ''}`,
-            'info',
-            { label: 'Start now →', onClick: () => setScreen(dest) }
-          );
-        }
-      } catch {}
-    };
-    // Run immediately, then every 60s
-    tick();
-    const interval = setInterval(tick, 60000);
-    return () => { alive = false; clearInterval(interval); };
-  }, [toast]);
+
 
   React.useEffect(() => {
     // 'session' is reachable from roadmaps/courses/dashboard but is
@@ -482,14 +446,9 @@ function ScreenRouter({ screen, setScreen }) {
     case 'session':      return wrap(<Session setScreen={setScreen} />);
     case 'roadmaps':     return wrap(<Roadmap onOpenSession={() => setScreen('session')} onOpenCourse={(slug) => { if (slug) { try { localStorage.setItem('learnos_open_course', slug); } catch {} } setScreen('courses'); }} />);
     case 'courses':      return wrap(<Courses setScreen={setScreen} />);
-    case 'schedule':     return wrap(<Schedule setScreen={setScreen} />);
     case 'assignments':  return wrap(<Assignments />);
     case 'cards':        return wrap(<Flashcards />);
-    case 'certificates': return wrap(<Certificates />);
     case 'share':        return wrap(<Share />);
-    case 'feed':         return wrap(<Feed />);
-    case 'starred':      return wrap(<Starred />);
-    case 'agents':       return wrap(<AgentsPage setScreen={setScreen} />);
     case 'settings':     return wrap(<Settings />);
     default:             return wrap(<Dashboard onOpenSession={() => setScreen('session')} onOpenRoadmap={() => setScreen('roadmaps')} onOpenCourses={() => setScreen('courses')} onOpenCards={() => setScreen('cards')} setScreen={setScreen} />);
   }
@@ -696,7 +655,7 @@ function NavItem({ n, active, collapsed, onClick }) {
         justifyContent: collapsed ? 'center' : 'flex-start',
         padding: collapsed ? '10px 0' : '8px 10px',
         background: active ? 'var(--accent-soft)' : 'transparent',
-        color: active ? 'oklch(0.82 0.18 295)' : 'var(--ink-2)',
+        color: active ? 'var(--brand-ink)' : 'var(--ink-2)',
         borderRadius: 8, margin: '2px 0', cursor: 'pointer',
         fontFamily: 'var(--font-body)', fontSize: 13, fontWeight: active ? 600 : 500,
         transition: 'all var(--dur-fast) var(--ease-smooth)',
@@ -709,13 +668,13 @@ function NavItem({ n, active, collapsed, onClick }) {
         <span style={{ flex: 1, textAlign: 'left', whiteSpace: 'nowrap', overflow: 'hidden', transition: 'opacity var(--dur-normal)', animation: 'labelFadeIn var(--dur-normal) var(--ease-smooth) both' }}>{n.label}</span>
       )}
       {!collapsed && n.badge && (
-        <span className="nav-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 999, background: 'var(--accent-soft)', color: 'oklch(0.82 0.18 295)', border: '1px solid var(--accent-line)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 600 }}>{n.badge}</span>
+        <span className="nav-badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 999, background: 'var(--accent-soft)', color: 'var(--brand-ink)', border: '1px solid var(--accent-line)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 600 }}>{n.badge}</span>
       )}
       {!collapsed && n.tag && (
         <span className="nav-tag" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 999, background: 'var(--cyan-soft)', color: 'var(--brand-3)', border: '1px solid var(--cyan-line)', fontFamily: 'var(--font-body)', fontSize: 10, fontWeight: 600 }}>{n.tag}</span>
       )}
       {!collapsed && n.count != null && (
-        <span className="mono" style={{ fontSize: 10.5, color: active ? 'oklch(0.82 0.18 295)' : 'var(--muted)', minWidth: 16, textAlign: 'right', flexShrink: 0 }}>{n.count}</span>
+        <span className="mono" style={{ fontSize: 10.5, color: active ? 'var(--brand-ink)' : 'var(--muted)', minWidth: 16, textAlign: 'right', flexShrink: 0 }}>{n.count}</span>
       )}
     </button>
   );
@@ -921,19 +880,19 @@ function TopBar({ setScreen, onToggleSidebar, collapsed }) {
   }, []);
 
   return (
-    <header style={{
+    <header className="topbar no-wrap" style={{
       height: 58, flexShrink: 0, borderBottom: '1px solid var(--border)',
       background: 'oklch(from var(--bg) calc(l - 0.005) c h)',
       display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px',
     }}>
-      <button onClick={onToggleSidebar} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      <button className="topbar-toggle" onClick={onToggleSidebar} title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--ink-2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, transition: 'all var(--dur-fast) var(--ease-smooth)' }}>
         <span style={{ display: 'inline-flex', transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform var(--dur-normal) var(--ease-spring)' }}>
           {React.cloneElement(I.chevronL, { size: 14 })}
         </span>
       </button>
 
-      <TopBarSearch setScreen={setScreen} />
+      <div className="topbar-search-wrap"><TopBarSearch setScreen={setScreen} /></div>
 
       <div style={{ flex: 1, minWidth: 0 }} />
 

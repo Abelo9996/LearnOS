@@ -75,16 +75,22 @@ router.get('/:slug/depth', requireAuth, async (req, res) => {
   res.json({ ok: true, ...validateCourseDepth(course.slug) });
 });
 
-router.get('/', (req, res) => {
+router.get('/', requireAuth, (req, res) => {
   const search = req.query.search || '';
-  let courses;
-  if (search) {
-    const term = `%${search}%`;
-    courses = db.prepare("SELECT * FROM courses WHERE title LIKE ? OR author LIKE ? OR blurb LIKE ? ORDER BY rating DESC").all(term, term, term);
-  } else {
-    courses = db.prepare('SELECT * FROM courses ORDER BY rating DESC').all();
-  }
-  res.json(courses);
+  // Each course with what the library page needs to show honestly: how many
+  // modules it has, how many were never built, and the learner's progress.
+  const sql = `SELECT c.*,
+      (SELECT COUNT(*) FROM course_modules cm WHERE cm.course_slug = c.slug) AS module_count,
+      (SELECT COUNT(*) FROM course_modules cm WHERE cm.course_slug = c.slug AND cm.title NOT LIKE 'Capstone%'
+         AND NOT EXISTS (SELECT 1 FROM module_lessons ml WHERE ml.module_id = cm.id AND ml.kind = 'reading')) AS empty_modules,
+      (SELECT COUNT(*) FROM module_lessons ml JOIN course_modules cm ON cm.id = ml.module_id WHERE cm.course_slug = c.slug AND COALESCE(ml.is_optional, 0) = 0) AS lesson_count,
+      (SELECT COUNT(*) FROM enrollment_progress ep JOIN module_lessons ml ON ml.id = ep.lesson_id
+         WHERE ep.user_id = @user AND ep.course_slug = c.slug AND COALESCE(ml.is_optional, 0) = 0) AS done_count,
+      (SELECT MAX(ep.completed_at) FROM enrollment_progress ep WHERE ep.user_id = @user AND ep.course_slug = c.slug) AS last_active
+    FROM courses c
+    ${search ? 'WHERE c.title LIKE @term OR c.blurb LIKE @term' : ''}
+    ORDER BY COALESCE(last_active, '') DESC, c.rowid DESC`;
+  res.json(db.prepare(sql).all({ user: req.userId, term: `%${search}%` }));
 });
 
 router.get('/:slug', requireAuth, (req, res) => {
@@ -276,23 +282,33 @@ router.delete('/:slug/modules/:mid/lessons/:lid', requireAuth, (req, res) => {
 router.post('/:slug/progress/:lessonId', requireAuth, (req, res) => {
   const c = getCourse(req.params.slug);
   if (!c) return res.status(404).json({ error: true, message: 'Course not found' });
-  db.prepare('INSERT OR IGNORE INTO enrollment_progress (user_id, course_slug, lesson_id) VALUES (?, ?, ?)')
-    .run(req.userId, req.params.slug, req.params.lessonId);
-  // Recalculate progress
-  const totalLessons = db.prepare('SELECT COUNT(*) as c FROM module_lessons ml JOIN course_modules cm ON ml.module_id = cm.id WHERE cm.course_slug = ?').get(req.params.slug).c;
-  const completedLessons = db.prepare('SELECT COUNT(*) as c FROM enrollment_progress WHERE user_id = ? AND course_slug = ?').get(req.userId, req.params.slug).c;
-  const progress = totalLessons > 0 ? completedLessons / totalLessons : 0;
-  db.prepare('UPDATE enrollments SET progress = ? WHERE user_id = ? AND course_slug = ?').run(progress, req.userId, req.params.slug);
-  logActivity(req.userId, { kind: 'session', text: `Completed lesson in ${c.title}`, sub: `${completedLessons}/${totalLessons} lessons`, xp: 10 });
-  awardXP(req.userId, 10, { silent: true });
-  res.json({ ok: true, progress });
+  const lesson = db.prepare('SELECT ml.id, ml.kind, ml.is_optional FROM module_lessons ml JOIN course_modules cm ON ml.module_id = cm.id WHERE ml.id = ? AND cm.course_slug = ?')
+    .get(req.params.lessonId, req.params.slug);
+  if (!lesson) return res.status(404).json({ error: true, message: 'Lesson not found in this course' });
+  const inserted = db.prepare('INSERT OR IGNORE INTO enrollment_progress (user_id, course_slug, lesson_id) VALUES (?, ?, ?)')
+    .run(req.userId, req.params.slug, req.params.lessonId).changes > 0;
+  const p = courseProgress(req.userId, req.params.slug);
+  db.prepare('UPDATE enrollments SET progress = ? WHERE user_id = ? AND course_slug = ?').run(p.progress, req.userId, req.params.slug);
+  // XP once per lesson: marking the same lesson again used to pay out again.
+  if (inserted && !lesson.is_optional) {
+    logActivity(req.userId, { kind: 'session', text: `Completed lesson in ${c.title}`, sub: `${p.completed}/${p.total} lessons`, xp: 10 });
+    awardXP(req.userId, 10, { silent: true });
+  }
+  res.json({ ok: true, progress: p.progress, xp: inserted && !lesson.is_optional ? 10 : 0 });
 });
 
+// Progress counts the lessons that make up the course; optional extras (videos
+// to watch alongside, further reading) can be done but are never required.
+function courseProgress(userId, slug) {
+  const total = db.prepare('SELECT COUNT(*) as c FROM module_lessons ml JOIN course_modules cm ON ml.module_id = cm.id WHERE cm.course_slug = ? AND COALESCE(ml.is_optional, 0) = 0').get(slug).c;
+  const completedIds = db.prepare('SELECT lesson_id FROM enrollment_progress WHERE user_id = ? AND course_slug = ?').all(userId, slug).map(r => r.lesson_id);
+  const completed = db.prepare(`SELECT COUNT(*) as c FROM enrollment_progress ep JOIN module_lessons ml ON ml.id = ep.lesson_id
+                                WHERE ep.user_id = ? AND ep.course_slug = ? AND COALESCE(ml.is_optional, 0) = 0`).get(userId, slug).c;
+  return { total, completed, completedIds, progress: total > 0 ? Math.min(1, completed / total) : 0 };
+}
+
 router.get('/:slug/progress', requireAuth, (req, res) => {
-  const totalLessons = db.prepare('SELECT COUNT(*) as c FROM module_lessons ml JOIN course_modules cm ON ml.module_id = cm.id WHERE cm.course_slug = ?').get(req.params.slug).c;
-  const completedLessons = db.prepare('SELECT COUNT(*) as c FROM enrollment_progress WHERE user_id = ? AND course_slug = ?').get(req.userId, req.params.slug).c;
-  const completedIds = db.prepare('SELECT lesson_id FROM enrollment_progress WHERE user_id = ? AND course_slug = ?').all(req.userId, req.params.slug).map(r => r.lesson_id);
-  res.json({ total: totalLessons, completed: completedLessons, completedIds, progress: totalLessons > 0 ? completedLessons / totalLessons : 0 });
+  res.json(courseProgress(req.userId, req.params.slug));
 });
 
 // ── Course verification (§3.9) ───────────────────────────────────────────────

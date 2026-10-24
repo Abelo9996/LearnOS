@@ -129,6 +129,9 @@ try { db.exec("ALTER TABLE courses ADD COLUMN outcomes TEXT"); } catch {}
 try { db.exec("ALTER TABLE courses ADD COLUMN prerequisites TEXT"); } catch {}
 // Quality report of an AI build: per-lesson review/revision/code-run results.
 try { db.exec("ALTER TABLE courses ADD COLUMN build_report TEXT"); } catch {}
+// The reference solution a lab was validated against: never sent to the
+// learner with the lab, shown only when they ask for it after trying.
+try { db.exec("ALTER TABLE module_lessons ADD COLUMN lab_solution TEXT"); } catch {}
 try { db.exec("ALTER TABLE courses ADD COLUMN skills TEXT"); } catch {}
 try { db.exec("ALTER TABLE courses ADD COLUMN level TEXT"); } catch {}
 
@@ -353,6 +356,48 @@ try {
 } catch (e) { console.log('lesson_checkpoints migration:', e.message); }
 
 ensureAgentStatus();  // app config, always present
+
+// ── Migration: external links are further reading, not lessons ─────────────
+// Older builds saved every external resource as its own "lesson": a title, a
+// two-line summary and an iframe of somebody else's website, counted toward
+// progress. Half of a generated course was those. Each module's link stubs are
+// folded into one optional "Further reading" page, and external videos become
+// optional. Idempotent: a module that already has its page is skipped.
+function foldResourceLessons() {
+  const stubs = db.prepare(`SELECT ml.id, ml.module_id, ml.title, ml.url, ml.body_md, ml.kind, ml.order_idx, ml.estimated_minutes
+                            FROM module_lessons ml
+                            WHERE ml.url IS NOT NULL AND ml.kind IN ('article','docs','book','website','blog','paper','repo')
+                              AND length(COALESCE(ml.body_md, '')) < 800
+                            ORDER BY ml.module_id, ml.order_idx`).all();
+  const byModule = new Map();
+  for (const l of stubs) {
+    if (!byModule.has(l.module_id)) byModule.set(l.module_id, []);
+    byModule.get(l.module_id).push(l);
+  }
+  const LABEL = { paper: 'Paper', book: 'Book', blog: 'Article', article: 'Article', website: 'Website', docs: 'Documentation', repo: 'Code' };
+  const insert = db.prepare(`INSERT OR IGNORE INTO module_lessons (id, module_id, title, body_md, kind, order_idx, estimated_minutes, is_optional)
+                             VALUES (?, ?, ?, ?, 'resources', ?, 5, 1)`);
+  const del = db.prepare('DELETE FROM module_lessons WHERE id = ?');
+  const delProgress = db.prepare('DELETE FROM enrollment_progress WHERE lesson_id = ?');
+  db.transaction(() => {
+    for (const [mid, list] of byModule) {
+      const mod = db.prepare('SELECT title FROM course_modules WHERE id = ?').get(mid);
+      const lines = ['Optional resources that go well with this module. They do not count toward your progress.', ''];
+      for (const l of list) {
+        const summary = String(l.body_md || '').replace(/_Source:[^_]*_/g, '').replace(/\s+/g, ' ').trim();
+        let host = '';
+        try { host = new URL(l.url).hostname.replace(/^www\./, ''); } catch { /* keep empty */ }
+        lines.push(`- **[${String(l.title).replace(/[\[\]]/g, '')}](${l.url})** · ${LABEL[l.kind] || 'Link'}${host ? `, ${host}` : ''}`);
+        if (summary) lines.push(`  ${summary}`);
+      }
+      insert.run(`ml-${mid}-further`, mid, `Further reading · ${mod?.title || 'this module'}`, lines.join('\n'), Math.max(...list.map(l => l.order_idx || 0)));
+      for (const l of list) { delProgress.run(l.id); del.run(l.id); }
+    }
+    db.prepare("UPDATE module_lessons SET is_optional = 1 WHERE kind = 'video' AND url IS NOT NULL AND COALESCE(is_optional, 0) = 0").run();
+  })();
+  if (byModule.size) console.log(`Folded ${stubs.length} link lessons into further reading for ${byModule.size} module(s).`);
+}
+try { foldResourceLessons(); } catch (e) { console.log('further-reading migration:', e.message); }
 
 // ── Migration: Streak tracking ───────────────────────────────────────────────
 try { db.exec("ALTER TABLE users ADD COLUMN last_activity_date TEXT"); } catch {}
@@ -765,6 +810,22 @@ export function notify(userId, { kind, title, body = null, priority = 'normal', 
 // We export a helper function for awarding XP.
 // Pass { silent: true } when the caller already logs a descriptive activity row
 // (avoids a duplicate generic "Earned N XP" entry in the feed).
+/**
+ * Record a lesson as done for a learner. Returns whether this was the first
+ * time, so callers award XP once instead of on every repeat.
+ */
+export function markLessonDone(userId, lessonId) {
+  const row = db.prepare('SELECT cm.course_slug AS slug, COALESCE(ml.is_optional, 0) AS optional FROM module_lessons ml JOIN course_modules cm ON cm.id = ml.module_id WHERE ml.id = ?').get(lessonId);
+  if (!row) return { inserted: false, slug: null };
+  const inserted = db.prepare('INSERT OR IGNORE INTO enrollment_progress (user_id, course_slug, lesson_id) VALUES (?, ?, ?)').run(userId, row.slug, lessonId).changes > 0;
+  if (inserted) {
+    const total = db.prepare('SELECT COUNT(*) c FROM module_lessons ml JOIN course_modules cm ON cm.id = ml.module_id WHERE cm.course_slug = ? AND COALESCE(ml.is_optional, 0) = 0').get(row.slug).c;
+    const done = db.prepare('SELECT COUNT(*) c FROM enrollment_progress ep JOIN module_lessons ml ON ml.id = ep.lesson_id WHERE ep.user_id = ? AND ep.course_slug = ? AND COALESCE(ml.is_optional, 0) = 0').get(userId, row.slug).c;
+    try { db.prepare('UPDATE enrollments SET progress = ? WHERE user_id = ? AND course_slug = ?').run(total ? Math.min(1, done / total) : 0, userId, row.slug); } catch {}
+  }
+  return { inserted, slug: row.slug, optional: !!row.optional };
+}
+
 export function awardXP(userId, amount, opts = {}) {
   // Get current user state
   const user = db.prepare('SELECT xp, xp_to_next, level FROM users WHERE id = ?').get(userId);

@@ -14,7 +14,7 @@ import db from '../../db/database.js';
 
 export const FLOORS = {
   modulesPerCourse:       6,     // Coursera courses run 3–8 modules; a full pathway needs breadth
-  lessonsPerModule:       6,     // reference module: ~14 videos + quizzes + labs
+  lessonsPerModule:       5,     // required lessons: 2-4 readings + lab + practice quiz + graded work
   readingChars:        1500,     // our old median was 451, a paragraph, not a lesson
   quizItemsPerModule:     8,     // reference: 10–30 questions per graded quiz
   gradedPerModule:        1,     // something that actually counts
@@ -47,7 +47,7 @@ export function validateCourseDepth(slug, floors = FLOORS) {
   let totalMinutes = 0, totalLessons = 0, totalReadingChars = 0, totalItems = 0;
 
   for (const m of modules) {
-    const lessons = db.prepare('SELECT id, title, kind, body_md, url, estimated_minutes, is_graded FROM module_lessons WHERE module_id = ?').all(m.id);
+    const lessons = db.prepare('SELECT id, title, kind, body_md, url, estimated_minutes, is_graded, is_optional FROM module_lessons WHERE module_id = ?').all(m.id);
     totalLessons += lessons.length;
 
     // A capstone is one culminating project by design, not a teaching module, so
@@ -59,8 +59,11 @@ export function validateCourseDepth(slug, floors = FLOORS) {
       continue;
     }
 
-    if (lessons.length < floors.lessonsPerModule) {
-      fail('LESSONS', m.title, `only ${lessons.length} lessons`, lessons.length, floors.lessonsPerModule);
+    // Optional extras (videos to watch alongside, further reading) are not
+    // lessons the module is made of, so they cannot make up for missing ones.
+    const required = lessons.filter(l => !l.is_optional).length;
+    if (required < floors.lessonsPerModule) {
+      fail('LESSONS', m.title, `only ${required} lessons`, required, floors.lessonsPerModule);
     }
 
     // Readings must be substantial, not a stub paragraph.
@@ -78,7 +81,8 @@ export function validateCourseDepth(slug, floors = FLOORS) {
 
     const graded    = lessons.filter(l => l.is_graded).length;
     const practical = lessons.filter(l => PRACTICAL_KINDS.has(l.kind)).length;
-    const resources = lessons.filter(l => l.url && !PRACTICAL_KINDS.has(l.kind)).length;
+    const resources = lessons.filter(l => l.url && !PRACTICAL_KINDS.has(l.kind)).length
+      + lessons.filter(l => l.kind === 'resources').reduce((n, l) => n + ((l.body_md || '').match(/\]\(https?:\/\//g) || []).length, 0);
     const items     = db.prepare('SELECT COUNT(*) c FROM quiz_items WHERE module_id = ?').get(m.id).c;
     totalItems += items;
 

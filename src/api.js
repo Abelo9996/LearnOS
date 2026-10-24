@@ -189,6 +189,9 @@ const API = {
 
   // ── AI ─────────────────────────────────────────────────────────────────────
   postChat:            (data) => API.post('/ai/chat', data),
+  getLessonTutor:      (lessonId) => API.get(`/ai/lesson-tutor/${lessonId}`),
+  askLessonTutor:      (lessonId, message) => API.post(`/ai/lesson-tutor/${lessonId}`, { message }),
+  clearLessonTutor:    (lessonId) => API.del(`/ai/lesson-tutor/${lessonId}`),
   getAIStatus:         () => API.get('/ai/status'),
   getModels:           () => API.get('/ai/models'),
   getCoach:            () => API.get('/ai/coach'),

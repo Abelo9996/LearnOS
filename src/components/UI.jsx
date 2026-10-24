@@ -12,10 +12,10 @@ export function AgentChip({ code, size = 28, showLabel = false, sub, glow = true
         width: size, height: size, borderRadius: size <= 22 ? 6 : 8,
         background: `linear-gradient(135deg, color-mix(in oklch, ${a.color} 80%, transparent), ${a.color})`,
         boxShadow: glow ? `0 0 0 1px ${a.color}33, 0 0 12px ${a.color}33` : `0 0 0 1px ${a.color}22`,
-        color: 'oklch(0.16 0.02 270)',
+        color: 'var(--on-brand)',
         transition: 'transform var(--dur-normal) var(--ease-spring), box-shadow var(--dur-normal) var(--ease-smooth)',
       }}>
-        {I[a.icon] && React.cloneElement(I[a.icon], { size: Math.round(size * 0.55), stroke: 'oklch(0.16 0.02 270)', sw: 2 })}
+        {I[a.icon] && React.cloneElement(I[a.icon], { size: Math.round(size * 0.55), stroke: 'var(--on-brand)', sw: 2 })}
       </span>
       {showLabel && (
         <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
@@ -86,10 +86,12 @@ export function Btn({ children, variant = 'ghost', size = 'sm', icon, iconRight,
     position: 'relative', overflow: 'hidden',
   };
   const variants = {
+    // Solid brand with light text and a quiet shadow. It was dark text on a
+    // gradient with a neon glow, a dark-theme style that read as murky on paper.
     primary: {
-      background: 'var(--brand-grad)',
-      color: 'oklch(0.16 0.02 270)',
-      boxShadow: '0 0 0 1px oklch(0.68 0.21 295 / 0.5), 0 4px 18px oklch(0.68 0.21 295 / 0.35)',
+      background: 'var(--brand)',
+      color: 'var(--on-brand)',
+      boxShadow: 'var(--shadow-sm)',
     },
     outline: { background: 'transparent', color: 'var(--ink)', borderColor: 'var(--border-strong)' },
     ghost:   { background: 'transparent', color: 'var(--ink-2)' },
@@ -209,7 +211,7 @@ export function MiniBars({ values, color = 'var(--brand)', height = 36, width = 
 export function Tag({ children, tone = 'neutral' }) {
   const tones = {
     neutral: { bg: 'var(--surface-2)', fg: 'var(--ink-2)', bd: 'var(--border)' },
-    accent:  { bg: 'var(--accent-soft)', fg: 'oklch(0.82 0.18 295)', bd: 'var(--accent-line)' },
+    accent:  { bg: 'var(--accent-soft)', fg: 'var(--brand-ink)', bd: 'var(--accent-line)' },
     cyan:    { bg: 'var(--cyan-soft)', fg: 'var(--brand-3)', bd: 'var(--cyan-line)' },
     good:    { bg: 'oklch(0.78 0.16 155 / 0.14)', fg: 'var(--good)', bd: 'oklch(0.78 0.16 155 / 0.4)' },
     warn:    { bg: 'oklch(0.78 0.16 75 / 0.14)', fg: 'var(--warn)', bd: 'oklch(0.78 0.16 75 / 0.4)' },

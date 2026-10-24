@@ -7,7 +7,7 @@
  * retake isn't the identical paper and grading is deterministic.
  */
 import { Router } from 'express';
-import db, { logActivity, awardXP, awardBadge, notify } from '../db/database.js';
+import db, { logActivity, awardXP, awardBadge, notify, markLessonDone } from '../db/database.js';
 import { requireAuth } from '../middleware/auth.js';
 import { gradeQuiz, runCodeTests, DEFAULT_PASS_THRESHOLD, DEFAULT_MAX_ATTEMPTS } from '../ai/assessment/grader.js';
 import { runLabWithTests, availableLanguages } from '../ai/assessment/labRunner.js';
@@ -124,14 +124,20 @@ router.post('/module/:moduleId/submit', (req, res) => {
   let unlocked = null;
   try {
     if (mode === 'practice') {
-      // Practice earns a little XP but must never move a grade or mastery.
-      awardXP(req.userId, Math.round(g.correct * 2));
-      logActivity(req.userId, { kind: 'quiz', text: `Practice: ${mod?.title || 'Module'}, ${g.score}%`, sub: `${g.correct}/${g.total} correct · not graded`, xp: Math.round(g.correct * 2), agent: 'AS' });
+      // Practice never moves a grade or mastery. Passing it once completes the
+      // practice lesson and earns its XP; retakes are free practice.
+      const practiceLesson = db.prepare("SELECT id FROM module_lessons WHERE module_id = ? AND kind = 'practice_quiz' LIMIT 1").get(moduleId);
+      const first = g.passed && practiceLesson ? markLessonDone(req.userId, practiceLesson.id).inserted : false;
+      const xp = first ? Math.round(g.correct * 2) : 0;
+      if (xp) awardXP(req.userId, xp);
+      logActivity(req.userId, { kind: 'quiz', text: `Practice: ${mod?.title || 'Module'}, ${g.score}%`, sub: `${g.correct}/${g.total} correct · not graded`, xp, agent: 'AS' });
     } else {
       const xp = g.passed ? g.correct * 5 + 20 : g.correct * 2;
       awardXP(req.userId, xp);
       logActivity(req.userId, { kind: 'quiz', text: `Graded: ${mod?.title || 'Module'}, ${g.score}%`, sub: `${g.passed ? 'PASSED' : 'not passed'} · attempt ${attemptNo}/${maxAttempts}`, xp, agent: 'AS' });
       if (g.passed) {
+        const gradedRow = db.prepare("SELECT id FROM module_lessons WHERE module_id = ? AND is_graded = 1 AND kind = 'graded_quiz' LIMIT 1").get(moduleId);
+        if (gradedRow) markLessonDone(req.userId, gradedRow.id);
         unlocked = applyMasteryForModule(req.userId, moduleId, g.ratio);
         if (unlocked?.nextModules?.length) {
           notify(req.userId, {
@@ -376,13 +382,18 @@ router.post('/lab/:lessonId/run', async (req, res) => {
 
   // Passing a lab's tests is real practice and worth logging, but a lab is
   // formative, it never counts toward a grade the way a graded assessment does.
+  // Passing completes the lab lesson; the XP comes once, not on every re-run.
+  let completed = false;
   if (out.tests?.passed) {
     try {
-      awardXP(req.userId, 15);
-      logActivity(req.userId, { kind: 'session', text: `Lab passed: ${lesson.title}`, sub: `${out.tests.passedCount}/${out.tests.total} tests`, xp: 15, agent: 'AS' });
+      completed = markLessonDone(req.userId, lesson.id).inserted;
+      if (completed) {
+        awardXP(req.userId, 15);
+        logActivity(req.userId, { kind: 'session', text: `Lab passed: ${lesson.title}`, sub: `${out.tests.passedCount}/${out.tests.total} tests`, xp: 15, agent: 'AS' });
+      }
     } catch {}
   }
-  res.json({ ok: true, ...out });
+  res.json({ ok: true, ...out, lessonCompleted: !!out.tests?.passed, firstCompletion: completed });
 });
 
 /** GET /api/assessments/lab/:lessonId, starter code + visible cases. */

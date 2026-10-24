@@ -26,7 +26,7 @@ const LANG_META = {
   go:         { label: 'Go',         io: true },
 };
 
-export default function LabRunner({ lessonId }) {
+export default function LabRunner({ lessonId, onResult }) {
   const [lab, setLab] = React.useState(null);
   const [source, setSource] = React.useState('');
   const [running, setRunning] = React.useState(false);
@@ -61,7 +61,9 @@ export default function LabRunner({ lessonId }) {
   const run = async () => {
     setRunning(true); setResult(null);
     try {
-      setResult(await API.runLab(lessonId, { source, language: lab.language }));
+      const r = await API.runLab(lessonId, { source, language: lab.language });
+      setResult(r);
+      onResult && onResult(r);
     } catch (e) {
       setError(e.message || 'Could not run your code.');
     } finally { setRunning(false); }

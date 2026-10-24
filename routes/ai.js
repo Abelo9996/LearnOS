@@ -215,6 +215,113 @@ router.post('/chat', async (req, res) => {
     res.status(e.code === 'NO_KEY' ? 400 : 502).json({ error: true, code: e.code || null, message: e.message });
   }
 });
+// ── Lesson tutor ─────────────────────────────────────────────────────────────
+// The tutor a learner talks to WHILE reading a lesson. It is given the lesson
+// itself, the module's objectives, the learner's level and what they recently
+// got wrong, so it explains *this* material in *this* course's terms instead of
+// answering like a generic chatbot that has never seen the page.
+const TUTOR_SYSTEM = `You are the tutor inside LearnOS, sitting next to a learner who is reading the lesson below. You know this lesson, its course and this learner.
+
+How you teach:
+- Answer the question that was asked, at the learner's level, in the lesson's own notation and examples. Point to the section of the lesson you are drawing on ("in the worked example above...").
+- When they are stuck, find the specific step they are missing and explain that, rather than re-explaining everything.
+- For the lesson's practice problems: give a hint first, and the full solution only if they ask for it again or show their attempt. Never paste the solution text from the lesson unprompted.
+- When they ask you to check their understanding, ask one focused question at a time and react to their answer.
+- If the question goes beyond the lesson, answer briefly, then connect it back.
+- If the lesson itself looks wrong, say so plainly and explain the correct version.
+- Respect length requests exactly. By default keep replies short: a few sentences or a short list, then offer to go deeper.
+- Use Markdown; write math in LaTeX ($...$ inline, $$...$$ display).`;
+
+try {
+  db.exec(`CREATE TABLE IF NOT EXISTS lesson_chats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id TEXT NOT NULL,
+    lesson_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+  )`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_lesson_chats ON lesson_chats(user_id, lesson_id)');
+} catch { /* already there */ }
+
+function lessonContext(userId, lessonId) {
+  const l = db.prepare(`SELECT ml.id, ml.title, ml.kind, ml.body_md, ml.module_id, cm.title AS module_title, cm.objectives, cm.course_slug,
+                               c.title AS course_title, c.level
+                        FROM module_lessons ml JOIN course_modules cm ON cm.id = ml.module_id JOIN courses c ON c.slug = cm.course_slug
+                        WHERE ml.id = ?`).get(lessonId);
+  if (!l) return null;
+  let objectives = [];
+  try { objectives = JSON.parse(l.objectives || '[]'); } catch {}
+  const profile = db.prepare('SELECT level, background, learning_style FROM user_profiles WHERE user_id = ?').get(userId) || {};
+  // What they got wrong in this module's quizzes lately: the best signal of
+  // where the explanation should aim.
+  const misses = [];
+  try {
+    const attempts = db.prepare("SELECT questions_json, answers_json FROM quiz_attempts WHERE user_id = ? AND module_id = ? ORDER BY created_at DESC LIMIT 3").all(userId, l.module_id);
+    for (const a of attempts) {
+      const ids = JSON.parse(a.questions_json || '[]');
+      const answers = JSON.parse(a.answers_json || '[]');
+      ids.forEach((id, i) => {
+        const q = db.prepare('SELECT question, answer_idx FROM quiz_items WHERE id = ?').get(id);
+        if (q && answers[i] !== q.answer_idx && !misses.includes(q.question)) misses.push(q.question);
+      });
+    }
+  } catch { /* no attempts yet */ }
+  const body = String(l.body_md || '').slice(0, 24000);
+  return {
+    lesson: l,
+    system: [
+      TUTOR_SYSTEM,
+      '',
+      `Course: ${l.course_title}${l.level ? ` (${l.level})` : ''}`,
+      `Module: ${l.module_title}${objectives.length ? `. Objectives: ${objectives.join('; ')}` : ''}`,
+      `Learner: level ${profile.level || 'unknown'}${profile.background ? `; background: ${String(profile.background).slice(0, 300)}` : ''}${profile.learning_style ? `; prefers: ${String(profile.learning_style).slice(0, 120)}` : ''}`,
+      misses.length ? `Recently answered wrong in this module's quizzes: ${misses.slice(0, 5).map(q => `"${q.slice(0, 200)}"`).join('; ')}` : null,
+      '',
+      `--- THE LESSON THE LEARNER IS READING: "${l.title}" ---`,
+      body || '(This lesson has no text; it is an exercise or a resource.)',
+      '--- END OF LESSON ---',
+    ].filter(x => x != null).join('\n'),
+  };
+}
+
+router.get('/lesson-tutor/:lessonId', (req, res) => {
+  const rows = db.prepare('SELECT role, content, created_at FROM lesson_chats WHERE user_id = ? AND lesson_id = ? ORDER BY id').all(req.userId, req.params.lessonId);
+  res.json({ messages: rows });
+});
+
+router.delete('/lesson-tutor/:lessonId', (req, res) => {
+  db.prepare('DELETE FROM lesson_chats WHERE user_id = ? AND lesson_id = ?').run(req.userId, req.params.lessonId);
+  res.json({ ok: true });
+});
+
+router.post('/lesson-tutor/:lessonId', async (req, res) => {
+  const text = String(req.body?.message || '').trim().slice(0, 4000);
+  if (!text) return res.status(400).json({ error: true, message: 'message required' });
+  const ctx = lessonContext(req.userId, req.params.lessonId);
+  if (!ctx) return res.status(404).json({ error: true, message: 'Lesson not found' });
+  const history = db.prepare('SELECT role, content FROM lesson_chats WHERE user_id = ? AND lesson_id = ? ORDER BY id DESC LIMIT 16').all(req.userId, req.params.lessonId).reverse();
+  try {
+    const out = await complete({
+      userId: req.userId,
+      agentCode: 'TU',
+      system: ctx.system,
+      messages: [...history.map(m => ({ role: m.role, content: m.content })), { role: 'user', content: text }],
+      maxTokens: 2500,
+      // A tutor has to answer while the learner is still looking at the page.
+      reasoning: 'off',
+    });
+    const reply = String(out.text || '').trim();
+    if (!reply) throw new Error('The tutor returned an empty reply. Try again.');
+    const ins = db.prepare('INSERT INTO lesson_chats (user_id, lesson_id, role, content) VALUES (?, ?, ?, ?)');
+    ins.run(req.userId, req.params.lessonId, 'user', text);
+    ins.run(req.userId, req.params.lessonId, 'assistant', reply);
+    res.json({ ok: true, reply, model: out.model });
+  } catch (e) {
+    res.status(e.code === 'NO_KEY' ? 400 : 502).json({ error: true, code: e.code || null, message: e.message });
+  }
+});
+
 // AS agent, quiz generation (P8).
 router.post('/quiz/generate', async (req, res) => {
   const { node_id } = req.body || {};

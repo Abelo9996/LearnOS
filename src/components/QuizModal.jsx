@@ -158,7 +158,7 @@ export default function QuizModal({ nodeId = null, title = 'Module quiz', onClos
               padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
               background: on ? 'var(--accent-soft)' : 'var(--surface)',
               border: `1px solid ${on ? 'var(--accent-line)' : 'var(--border)'}`,
-              color: on ? 'oklch(0.82 0.18 295)' : 'var(--ink-2)', fontSize: 13.5,
+              color: on ? 'var(--brand-ink)' : 'var(--ink-2)', fontSize: 13.5,
             }}>
               <span style={{ width: 22, height: 22, flexShrink: 0, borderRadius: 999, border: `2px solid ${on ? 'var(--brand)' : 'var(--border-strong)'}`, background: on ? 'var(--brand)' : 'transparent', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-brand)', fontSize: 12, fontWeight: 700 }}>{String.fromCharCode(65 + oi)}</span>
               {opt}

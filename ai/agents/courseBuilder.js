@@ -26,6 +26,7 @@ import { getProfile } from './profiling.js';
 import { contentDirective, resourceDirective, videosPerModule } from './learningStyle.js';
 import { draftLesson, polishLesson } from './lessonWriter.js';
 import { writeAssessment } from './assessmentWriter.js';
+import { availablePythonLibraries } from '../assessment/labRunner.js';
 
 const LEVELS = ['beginner', 'intermediate', 'advanced'];
 
@@ -119,7 +120,7 @@ Requirements:
 - "audience": one sentence on who this is for and what they already know.
 - "code_language": the one programming language every code example and lab uses ("python" for most technical topics unless the topic or pathway names another; "none" for subjects with no programming such as history or philosophy).
 - "notation": the symbols and naming conventions the whole course will use (e.g. "vectors bold lowercase $\\mathbf{x}$, matrices bold uppercase, joint angles $\\theta_i$, frames {0}..{n}"), or "" if the subject has none.
-- "throughline": one concrete running example the course returns to and extends module by module (a specific system, dataset, text, case or project), so lessons connect instead of starting over.
+- "throughline": one concrete running example the course returns to and extends module by module (a specific system, dataset, text, case or project), so lessons connect instead of starting over. If it is a dataset, describe it so a few lines of code can generate a small synthetic version of it (columns, sizes, how values are distributed); there are no data files.
 - "capstone": a substantial final project synthesizing the whole course into something the learner builds and can show off.
 
 If a "Pathway context" is provided (the specialization this course belongs to and the learner's end goal), anchor the whole course to it: module topics, examples and terminology must serve that goal. An "OOP" course inside a C++ pathway is a C++ OOP course, never drift to a different language or domain.
@@ -359,6 +360,7 @@ export async function buildCourse({ userId, topic, level, pathwayContext, learni
   };
   const outline = bp.modules.map((m, i) => `${i + 1}. ${m.title}: ${plans[i].map(l => l.title).join(' | ')}`).join('\n');
   const totalLessons = plans.reduce((n, ls) => n + ls.length, 0);
+  const pythonLibraries = bp.code_language === 'python' ? await availablePythonLibraries().catch(() => []) : [];
   let lessonsDone = 0;
 
   const buildModule = async (m, i) => {
@@ -366,7 +368,7 @@ export async function buildCourse({ userId, topic, level, pathwayContext, learni
       courseTitle: bp.title, level: lvl, pathwayContext, audience: bp.audience,
       codeLanguage: bp.code_language || 'none', notation: bp.notation, throughline: bp.throughline,
       outline, moduleIndex: i, moduleTitle: m.title, moduleObjectives: m.objectives || [],
-      lessonsInModule: plans[i].length, styleDirective: modalityDirective,
+      lessonsInModule: plans[i].length, styleDirective: modalityDirective, pythonLibraries,
     };
     const tick = (msg) => onProgress(0.05 + 0.85 * (lessonsDone / Math.max(1, totalLessons)), msg);
     try {
@@ -871,24 +873,28 @@ export async function persistRichCourse(userId, c, level = 'intermediate') {
       return id;
     };
 
-    // 1+2. Readings interleaved with verified external resources. All-text-then-
-    // all-links read like a wall of prose with an appendix; alternating a lecture
-    // video or article after each reading paces the module like a real course.
-    // Videos come first in the rotation so each module leads with one early.
+    // 1+2. Readings, with the module's lecture videos interleaved as optional
+    // "watch" lessons. Everything else external (articles, docs, books, papers)
+    // goes on one optional "Further reading" page: a link with a two-line
+    // summary is not a lesson, and counting those as lessons made half of a
+    // course a list of iframes of other people's websites.
     const readings = (m.readings || []).filter(r => r && r.body_md);
-    const extRes = (m.resources || [])
-      .filter(r => r && r.url && reachable.has(r.url))
-      .sort((a, b) => (b.kind === 'video' ? 1 : 0) - (a.kind === 'video' ? 1 : 0));
-    const steps = Math.max(readings.length, extRes.length);
+    const extRes = (m.resources || []).filter(r => r && r.url && reachable.has(r.url));
+    const videos = extRes.filter(r => r.kind === 'video' && youtubeId(r.url));
+    const further = extRes.filter(r => !videos.includes(r));
+    const steps = Math.max(readings.length, videos.length);
     for (let k = 0; k < steps; k++) {
       const rd = readings[k];
       if (rd) addLesson(rd.title || m.title, rd.body_md, 'reading', { minutes: rd.minutes || 12 });
-      const r = extRes[k];
-      if (r) {
-        const body = `${r.summary || ''}\n\n_Source: ${r.source || safeHost(r.url)}_`;
-        addLesson(r.title, body, r.kind || 'article', { url: r.url, minutes: r.minutes || 15 });
+      const v = videos[k];
+      if (v) {
+        addLesson(v.title, `${v.summary || ''}\n\n_Source: ${v.source || safeHost(v.url)}_`, 'video', { url: v.url, minutes: v.minutes || 15, optional: true });
         resourceCount++;
       }
+    }
+    if (further.length) {
+      addLesson(`Further reading · ${m.title}`, furtherReadingMarkdown(further), 'resources', { minutes: 5, optional: true });
+      resourceCount += further.length;
     }
 
     // 3. Hands-on lab, the "doing" half, runnable where the topic allows it.
@@ -1011,6 +1017,29 @@ function createCompanionRoadmap(userId, slug, title, level, pathway) {
 
 function safeHost(url) { try { return new URL(url).hostname; } catch { return null; } }
 
+const RESOURCE_LABEL = { video: 'Video', paper: 'Paper', book: 'Book', blog: 'Article', article: 'Article', website: 'Website', docs: 'Documentation', repo: 'Code' };
+
+/** One module's external resources as a readable list, not as lessons. */
+export function furtherReadingMarkdown(resources) {
+  const lines = ['Optional resources that go well with this module. They do not count toward your progress.', ''];
+  for (const r of resources) {
+    const label = RESOURCE_LABEL[r.kind] || 'Link';
+    const src = r.source || safeHost(r.url) || '';
+    lines.push(`- **[${String(r.title || r.url).replace(/[\[\]]/g, '')}](${r.url})** · ${label}${src ? `, ${src}` : ''}${r.minutes ? `, about ${r.minutes} min` : ''}`);
+    if (r.summary) lines.push(`  ${String(r.summary).replace(/\s+/g, ' ').trim()}`);
+  }
+  return lines.join('\n');
+}
+
+function youtubeId(url) {
+  try {
+    const u = new URL(url);
+    if (/(^|\.)youtu\.be$/.test(u.hostname)) return u.pathname.slice(1) || null;
+    if (/(^|\.)youtube\.com$/.test(u.hostname)) return u.searchParams.get('v') || (u.pathname.match(/^\/(embed|shorts)\/([\w-]+)/) || [])[2] || null;
+  } catch { /* not a URL */ }
+  return null;
+}
+
 // Attach runnable code to a lab lesson, but only when it is actually runnable:
 // a language we support, starter code to edit, and tests shaped as data.
 function attachLabCode(lessonId, lab) {
@@ -1032,8 +1061,8 @@ function attachLabCode(lessonId, lab) {
   });
   if (!lab.starter_code && !tests.length) return;
   try {
-    db.prepare('UPDATE module_lessons SET lab_language = ?, starter_code = ?, lab_tests_json = ? WHERE id = ?')
-      .run(lang, lab.starter_code || '', JSON.stringify(tests), lessonId);
+    db.prepare('UPDATE module_lessons SET lab_language = ?, starter_code = ?, lab_tests_json = ?, lab_solution = ? WHERE id = ?')
+      .run(lang, lab.starter_code || '', JSON.stringify(tests), lab.reference_solution || null, lessonId);
   } catch { /* the lab still reads fine without a runner */ }
 }
 
