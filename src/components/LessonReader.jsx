@@ -162,7 +162,7 @@ function FramedResource({ lessonId, url, meta }) {
 }
 
 // Lessons that complete themselves when passed, rather than by a click.
-const SELF_COMPLETING = { lab: 'Pass the tests to complete this lab.', practice_quiz: 'Score 80% to complete this practice quiz.', graded_quiz: 'Pass the graded assessment to complete it.' };
+const SELF_COMPLETING = { lab: 'Pass the tests to complete this lab.', practice_quiz: 'Score 80% to complete this practice quiz.', graded_quiz: 'Pass the assignment to complete it.', project: 'Pass the project to complete it.' };
 
 function useMedia(query) {
   const [match, setMatch] = React.useState(() => typeof window !== 'undefined' && window.matchMedia(query).matches);
@@ -283,10 +283,19 @@ export default function LessonReader({ course, modules, lesson, completedIds, on
             }} />
           )}
 
-          {(current.kind === 'practice_quiz' || current.kind === 'graded_quiz') && (
+          {current.kind === 'practice_quiz' && (
             <QuizCallout lesson={current} moduleId={current._moduleId} meta={meta} openModal={openModal} closeModal={closeModal}
               onDone={() => onCompleted && onCompleted()} />
           )}
+
+          {current.is_graded ? (
+            <SubmissionPanel assignmentId={`as-${current._moduleId}`} lessonId={current.id}
+              onPassed={() => { onCompleted && onCompleted(); toast('Passed · lesson complete · +50 XP', 'success'); }}
+              quiz={current.kind === 'graded_quiz' ? (
+                <QuizCallout lesson={current} moduleId={current._moduleId} meta={meta} openModal={openModal} closeModal={closeModal}
+                  onDone={() => onCompleted && onCompleted()} compact />
+              ) : null} />
+          ) : null}
 
           <footer className="reader-footer">
             <Btn variant="ghost" disabled={!prev} onClick={() => prev && onOpenLesson(prev)} icon={React.cloneElement(I.chevronL, { size: 14 })}>Previous</Btn>
@@ -378,8 +387,17 @@ function Outline({ modules, currentId, completedIds, doneCount, total, onOpen, c
   );
 }
 
-function QuizCallout({ lesson, moduleId, meta, openModal, closeModal, onDone }) {
+function QuizCallout({ lesson, moduleId, meta, openModal, closeModal, onDone, compact = false }) {
   const isGraded = lesson.kind === 'graded_quiz';
+  if (compact) {
+    return (
+      <div className="submit-alt">
+        Prefer a test? <button onClick={() => moduleId && openModal(
+          <ModuleQuiz moduleId={moduleId} mode="graded" title={lesson.title} onClose={closeModal} onDone={onDone} />
+        )}>Take the graded quiz instead</button> (limited attempts, 80% to pass).
+      </div>
+    );
+  }
   return (
     <div className="reader-callout" style={{ borderColor: `color-mix(in oklch, ${meta.color} 30%, var(--border))` }}>
       <div style={{ fontSize: 14.5, fontWeight: 600, color: 'var(--ink)' }}>{isGraded ? 'This one counts' : 'Practice, no pressure'}</div>
@@ -398,6 +416,95 @@ function QuizCallout({ lesson, moduleId, meta, openModal, closeModal, onDone }) 
         </Btn>
       </div>
     </div>
+  );
+}
+
+/**
+ * Hand in written work for a graded assignment or the capstone, and see it
+ * graded against the rubric: a score per criterion with the reason, overall
+ * feedback, and the chance to revise and resubmit. Passing completes the lesson.
+ */
+function SubmissionPanel({ assignmentId, lessonId, onPassed, quiz }) {
+  const draftKey = `learnos_submission_${assignmentId}`;
+  const [state, setState] = React.useState(null); // { status, submission }
+  const [text, setText] = React.useState(() => { try { return localStorage.getItem(draftKey) || ''; } catch { return ''; } });
+  const [busy, setBusy] = React.useState(false);
+  const [error, setError] = React.useState(null);
+  const [editing, setEditing] = React.useState(false);
+  const poll = React.useRef(null);
+
+  const load = React.useCallback(() => API.getAssignmentSubmission(assignmentId).then(r => { setState(r); return r; }).catch(() => setState({ status: 'none' })), [assignmentId]);
+  React.useEffect(() => { load(); return () => clearInterval(poll.current); }, [load]);
+
+  const watch = () => {
+    clearInterval(poll.current);
+    const started = Date.now();
+    poll.current = setInterval(async () => {
+      const r = await load();
+      if (r?.status === 'graded' || r?.status === 'failed' || Date.now() - started > 240_000) {
+        clearInterval(poll.current);
+        setBusy(false);
+        if (r?.status === 'graded' && r.submission?.grade >= 80) onPassed && onPassed();
+      }
+    }, 3000);
+  };
+
+  const submit = async () => {
+    if (!text.trim() || busy) return;
+    setBusy(true); setError(null); setEditing(false);
+    try {
+      await API.submitAssignment(assignmentId, text.trim());
+      setState({ status: 'pending' });
+      watch();
+    } catch (e) { setError(e.message || 'Could not submit.'); setBusy(false); }
+  };
+  const onEdit = (v) => { setText(v); try { localStorage.setItem(draftKey, v); } catch {} };
+
+  const sub = state?.submission;
+  const graded = state?.status === 'graded' && !editing;
+  const pending = state?.status === 'pending' || busy;
+  const passed = graded && sub.grade >= 80;
+
+  return (
+    <section className="submit">
+      <div className="submit-head">
+        <div>
+          <div className="submit-title">Your submission</div>
+          <div className="submit-sub">Graded against the rubric; 80% passes and completes this lesson. You can revise and resubmit.</div>
+        </div>
+        {graded && <div className={`submit-grade ${passed ? 'pass' : 'fail'}`}>{sub.grade}%<span>{passed ? 'passed' : 'not yet'}</span></div>}
+      </div>
+
+      {graded ? (
+        <>
+          {Array.isArray(sub.rubric) && sub.rubric.length > 0 && (
+            <table className="submit-rubric">
+              <tbody>
+                {sub.rubric.map((c, i) => (
+                  <tr key={i}><th>{c.criterion}</th><td className="num">{c.score}</td><td>{c.why}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {sub.feedback_md && <div className="submit-feedback"><MarkdownText text={sub.feedback_md} /></div>}
+          <Btn variant="outline" size="md" onClick={() => { setText(sub.body_md || text); setEditing(true); }}>Revise and resubmit</Btn>
+        </>
+      ) : pending ? (
+        <div className="submit-pending"><span className="tutor-msg thinking"><span /><span /><span /></span> Grading your work against the rubric. This takes up to a minute.</div>
+      ) : (
+        <>
+          {state?.status === 'failed' && <div className="tutor-error" style={{ margin: '0 0 10px' }}><MarkdownText text={sub.feedback_md} /></div>}
+          <textarea className="submit-text" rows={12} value={text} onChange={e => onEdit(e.target.value)}
+            placeholder="Write your answer here. Markdown works: headings, lists, $LaTeX$, and ``` code blocks." />
+          {error && <div className="tutor-error" style={{ margin: '8px 0 0' }}>{error}</div>}
+          <div className="submit-actions">
+            <Btn variant="primary" size="md" disabled={!text.trim()} onClick={submit}>Submit for grading</Btn>
+            <span className="reader-hint">{text.trim() ? `${text.trim().split(/\s+/).length} words` : 'Your draft is saved as you type.'}</span>
+          </div>
+        </>
+      )}
+      {quiz}
+    </section>
   );
 }
 

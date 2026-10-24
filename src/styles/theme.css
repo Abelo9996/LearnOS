@@ -618,3 +618,24 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
   .topbar-user > *:not(:first-child) { display: none !important; }
 }
 .reader-where { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Graded submission */
+.submit { margin-top: 28px; padding: 20px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); }
+.submit-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 14px; }
+.submit-title { font: 650 15px var(--font-display); color: var(--ink); }
+.submit-sub { font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+.submit-grade { font: 700 28px var(--font-display); text-align: right; line-height: 1; }
+.submit-grade span { display: block; font: 600 11px var(--font-body); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 4px; }
+.submit-grade.pass { color: var(--good); } .submit-grade.fail { color: var(--warn); }
+.submit-text { width: 100%; resize: vertical; min-height: 220px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-window); color: var(--ink); font: 14px/1.6 var(--font-body); outline: none; }
+.submit-text:focus { border-color: var(--accent-line); box-shadow: 0 0 0 3px var(--accent-soft); }
+.submit-actions { display: flex; align-items: center; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+.submit-pending { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--ink-2); padding: 10px 0; }
+.submit-rubric { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 13px; }
+.submit-rubric th { text-align: left; font-weight: 600; color: var(--ink); padding: 8px 10px 8px 0; vertical-align: top; width: 28%; }
+.submit-rubric td { padding: 8px 0; color: var(--ink-2); vertical-align: top; border-top: 1px solid var(--border); line-height: 1.5; }
+.submit-rubric tr:first-child td { border-top: 0; }
+.submit-rubric td.num { width: 48px; font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+.submit-feedback { padding: 14px; border-radius: 10px; background: var(--bg-window); border: 1px solid var(--border); margin-bottom: 14px; }
+.submit-alt { margin-top: 14px; font-size: 12.5px; color: var(--muted); }
+.submit-alt button { border: 0; background: none; padding: 0; color: var(--brand-ink); font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; }

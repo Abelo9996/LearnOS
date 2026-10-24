@@ -3,7 +3,7 @@
  * to a learner's current module and difficulty. Falls back to the static
  * ASSIGNMENT_LIBRARY on the frontend if the agent fails (no key, etc.).
  */
-import db, { logActivity, awardXP } from '../../db/database.js';
+import db, { logActivity, awardXP, markLessonDone } from '../../db/database.js';
 import { complete } from '../llm.js';
 import { registerJobHandler } from '../jobs.js';
 import {
@@ -238,7 +238,6 @@ const gradeSchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    overall_grade: { type: 'integer', minimum: 0, maximum: 100 },
     per_criterion: {
       type: 'array',
       items: {
@@ -254,90 +253,87 @@ const gradeSchema = {
     },
     feedback_md: { type: 'string' },
   },
-  required: ['overall_grade', 'per_criterion', 'feedback_md'],
+  required: ['per_criterion', 'feedback_md'],
 };
 
-const GRADE_SYSTEM = `You are the Assessment agent for LearnOS grading a learner's assignment submission.
-Evaluate the submission against the assignment's objectives and tasks.
-Be fair and constructive, point out what was done well AND what could improve.
-The grade should reflect genuine mastery, not effort alone.`;
+const GRADE_SYSTEM = `You are grading a learner's submitted work for an assignment in a course. Grade it against the assignment's rubric, criterion by criterion: for each criterion, decide which level the work reaches (excellent, adequate, poor, or in between), give a 0-100 score, and say in one or two sentences why, quoting or pointing at the specific part of the submission. Judge what is actually there: an answer that only restates the task, or that is missing a required part, does not earn credit for it. Then write feedback the learner can act on: what is solid, the most important thing to fix, and how. Use Markdown and LaTeX for maths.`;
 
+/**
+ * Grade a submission against its assignment's rubric. The overall grade is the
+ * weighted sum of the per-criterion scores, computed here rather than asked
+ * for, so it always agrees with the breakdown the learner sees.
+ *
+ * There is no fallback grade. When no model is available or grading fails,
+ * the submission is marked as not graded with the reason; the old heuristic
+ * gave anything that mentioned the task titles 60% or more, which taught
+ * learners nothing and made grades meaningless.
+ */
 export async function gradeSubmission({ submissionId }) {
   const sub = db.prepare('SELECT * FROM assignment_submissions WHERE id = ?').get(submissionId);
   if (!sub) return { ok: false, reason: 'not_found' };
   if (sub.grade != null) { return { ok: true, reason: 'already_graded' }; }
 
   const assignment = db.prepare('SELECT * FROM assignments WHERE id = ?').get(sub.assignment_id);
-  const tasks = assignment?.tasks ? JSON.parse(assignment.tasks) : [];
-  const tasksText = tasks.length ? tasks.map((t, i) => `  ${i + 1}. ${t}`).join('\n') : '(no specific tasks)';
+  const tasks = (() => { try { return JSON.parse(assignment?.tasks || '[]'); } catch { return []; } })();
+  let rubric = (() => { try { return JSON.parse(assignment?.rubric_json || '[]'); } catch { return []; } })().filter(r => r && r.criterion);
+  if (!rubric.length) rubric = [{ criterion: 'Completeness and correctness', weight: 1, excellent: 'Every task done correctly', adequate: 'Most tasks done, minor errors', poor: 'Tasks missing or wrong' }];
+  const totalWeight = rubric.reduce((n, r) => n + (Number(r.weight) || 0), 0) || rubric.length;
 
-  // Writes the grade to the submission AND back onto the assignment row, so the
-  // list, the "Graded" tab, the average-grade stat and the pending counts all
-  // update. Previously only the submission was written, so every graded
-  // assignment still displayed as "Not started" forever.
-  const applyGrade = (gradeVal, feedbackMd, rubric) => {
-    db.prepare('UPDATE assignment_submissions SET grade = ?, feedback_md = ?, rubric_json = ? WHERE id = ?')
-      .run(gradeVal, feedbackMd, JSON.stringify(rubric), submissionId);
-    if (sub.assignment_id) {
-      db.prepare("UPDATE assignments SET status = 'graded', grade = ?, progress = 1 WHERE id = ? AND user_id = ?")
-        .run(gradeVal, sub.assignment_id, sub.user_id);
-    }
-    try {
-      logActivity(sub.user_id, {
-        kind: 'assignment_graded',
-        text: `Graded: ${assignment?.title || 'Assignment'}, ${gradeVal}%`,
-        sub: assignment?.course || 'Assignment',
-        xp: 50, agent: 'AS',
-      });
-      awardXP(sub.user_id, 50);
-    } catch { /* grading must not fail on logging */ }
-  };
-
-  let out = null;
+  let out;
   try {
-    out = await complete({
+    out = (await complete({
       userId: sub.user_id,
       agentCode: 'AS',
       schema: gradeSchema,
-      maxTokens: 2048,
+      maxTokens: 6000,
       system: GRADE_SYSTEM,
-      messages: `Assignment: ${assignment?.title || 'Unknown'}
-Description: ${assignment?.description || 'N/A'}
+      messages: `Assignment: ${assignment?.title || 'Assignment'}
+${assignment?.description || ''}
+
 Tasks:
-${tasksText}
+${tasks.map((t, i) => `${i + 1}. ${t}`).join('\n') || '(none listed)'}
 
----
-Learner's submission:
-${sub.body_md}
+Rubric:
+${rubric.map(r => `- ${r.criterion} (weight ${r.weight ?? 'equal'}): excellent = ${r.excellent || '?'}; adequate = ${r.adequate || '?'}; poor = ${r.poor || '?'}`).join('\n')}
 
----
-Grade this submission. Return overall_grade (0-100), per_criterion scores, and feedback_md (markdown).`,
-    });
+--- SUBMISSION ---
+${sub.body_md}`,
+    })).json;
   } catch (e) {
-    // complete() THROWS when no key is configured, so the heuristic fallback
-    // below used to be unreachable, submissions sat ungraded forever with the
-    // UI stuck on "Grading in progress…". Fall through to the heuristic.
-    out = null;
+    db.prepare('UPDATE assignment_submissions SET feedback_md = ? WHERE id = ?')
+      .run(`**Not graded yet.** ${e.code === 'NO_KEY' ? 'Connect a model in Settings, API keys, then submit again.' : `Grading failed: ${String(e.message || e).slice(0, 300)}. Submit again to retry.`}`, submissionId);
+    db.prepare("UPDATE assignments SET status = 'todo' WHERE id = ? AND user_id = ? AND status = 'submitted'").run(sub.assignment_id, sub.user_id);
+    return { ok: false, reason: 'grading_failed' };
   }
 
-  const result = out?.json;
-  if (!result || result.overall_grade == null) {
-    // Fallback heuristic grading
-    const bodyLen = sub.body_md.length;
-    const taskCount = tasks.length;
-    const checkedCount = tasks.filter(t => sub.body_md.toLowerCase().includes(t.toLowerCase().slice(0, 15))).length;
-    const pct = taskCount > 0 ? Math.round((checkedCount / taskCount) * 40 + 60) : Math.min(100, 60 + Math.floor(bodyLen / 100));
-    const fallbackGrade = Math.min(100, Math.max(0, pct));
-    applyGrade(
-      fallbackGrade,
-      `**Auto-graded (no AI key):** ${fallbackGrade}%\n\nYour submission was evaluated heuristically. Add an OpenRouter key in Settings for detailed AI feedback.`,
-      [{ criterion: 'Overall', score: fallbackGrade, why: 'Heuristic grading, add an AI key for detailed feedback' }],
-    );
-    return { ok: true, fallback: true, grade: fallbackGrade };
+  const per = rubric.map((r) => {
+    const hit = (out?.per_criterion || []).find(c => String(c.criterion).toLowerCase().trim() === String(r.criterion).toLowerCase().trim())
+      || (out?.per_criterion || [])[rubric.indexOf(r)];
+    return { criterion: r.criterion, weight: Number(r.weight) || 1 / rubric.length, score: Math.max(0, Math.min(100, Math.round(Number(hit?.score) || 0))), why: hit?.why || '' };
+  });
+  const grade = Math.round(per.reduce((n, c) => n + c.score * (c.weight || 0), 0) / (totalWeight || 1));
+  const passThreshold = Math.round(100 * (assignment?.pass_threshold ?? 0.8));
+  const passed = grade >= passThreshold;
+
+  db.prepare('UPDATE assignment_submissions SET grade = ?, feedback_md = ?, rubric_json = ? WHERE id = ?')
+    .run(grade, out?.feedback_md || '', JSON.stringify(per), submissionId);
+  if (sub.assignment_id) {
+    db.prepare("UPDATE assignments SET status = 'graded', grade = ?, progress = 1 WHERE id = ? AND user_id = ?")
+      .run(grade, sub.assignment_id, sub.user_id);
   }
 
-  applyGrade(result.overall_grade, result.feedback_md, result.per_criterion);
-  return { ok: true, grade: result.overall_grade };
+  // A passing grade completes the course lesson that carries this assignment
+  // (assignment ids are "as-" + the module id), and earns its XP once.
+  let firstPass = false;
+  if (passed && /^as-/.test(sub.assignment_id || '')) {
+    const lesson = db.prepare("SELECT id FROM module_lessons WHERE module_id = ? AND is_graded = 1 ORDER BY order_idx LIMIT 1").get(sub.assignment_id.slice(3));
+    if (lesson) firstPass = markLessonDone(sub.user_id, lesson.id).inserted;
+  }
+  try {
+    logActivity(sub.user_id, { kind: 'assignment_graded', text: `Graded: ${assignment?.title || 'Assignment'}, ${grade}%`, sub: passed ? 'passed' : `${passThreshold}% to pass`, xp: firstPass ? 50 : 0, agent: 'AS' });
+    if (firstPass) awardXP(sub.user_id, 50);
+  } catch { /* grading must not fail on logging */ }
+  return { ok: true, grade, passed };
 }
 
 registerJobHandler('grade-assignment', async ({ input }) => gradeSubmission({ submissionId: input.submissionId }));

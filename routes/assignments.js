@@ -36,30 +36,22 @@ router.post('/', (req, res) => {
 });
 
 router.patch('/:id', (req, res) => {
-  const { title, status, progress, grade, priority, due_date } = req.body;
+  // Grades come from grading, never from the client: this endpoint used to
+  // accept { status: 'graded', grade } and pay 50 XP on every call.
+  const { title, status, progress, priority, due_date } = req.body || {};
+  if (status === 'graded' || req.body?.grade !== undefined) {
+    return res.status(400).json({ error: true, message: 'Grades are set by submitting the assignment, not by editing it.' });
+  }
   const fields = []; const vals = [];
   if (title !== undefined)   { fields.push('title = ?');     vals.push(title); }
   if (status !== undefined)  { fields.push('status = ?');    vals.push(status); }
   if (progress !== undefined){ fields.push('progress = ?');  vals.push(progress); }
-  if (grade !== undefined)   { fields.push('grade = ?');     vals.push(grade); }
   if (priority !== undefined){ fields.push('priority = ?');  vals.push(priority); }
   if (due_date !== undefined){ fields.push('due_date = ?');  vals.push(due_date); }
   if (fields.length === 0) return res.status(400).json({ error: true, message: 'No fields to update' });
   fields.push('updated_at = CURRENT_TIMESTAMP');
   vals.push(req.params.id, req.userId);
   db.prepare(`UPDATE assignments SET ${fields.join(', ')} WHERE id = ? AND user_id = ?`).run(...vals);
-
-  // Feed integration (#25): log real assignment activity.
-  const a = db.prepare('SELECT title, course FROM assignments WHERE id = ?').get(req.params.id);
-  if (a) {
-    if (status === 'graded' && grade !== undefined && grade !== null) {
-      logActivity(req.userId, { kind: 'assignment', text: `Submitted & graded: "${a.title}", ${grade}%`, sub: a.course, xp: 50, agent: 'AS' });
-      awardXP(req.userId, 50, { silent: true });
-    } else if (status === 'submitted' || status === 'done') {
-      logActivity(req.userId, { kind: 'assignment', text: `Submitted assignment: "${a.title}"`, sub: a.course, xp: 50, agent: 'AS' });
-      awardXP(req.userId, 50, { silent: true });
-    }
-  }
   res.json({ ok: true, assignment: db.prepare('SELECT * FROM assignments WHERE id = ?').get(req.params.id) });
 });
 
@@ -79,16 +71,20 @@ router.post('/:id/submit', requireAuth, (req, res) => {
   db.prepare('INSERT INTO assignment_submissions (id, assignment_id, user_id, body_md) VALUES (?, ?, ?, ?)')
     .run(id, req.params.id, req.userId, body_md);
   // Enqueue grading job
+  db.prepare("UPDATE assignments SET status = 'submitted' WHERE id = ? AND user_id = ?").run(req.params.id, req.userId);
   try { enqueueJob(req.userId, 'grade-assignment', { submissionId: id }); } catch {}
-  logActivity(req.userId, { kind: 'assignment', text: `Submitted assignment: "${a.title}"`, sub: a.course, xp: 30, agent: 'AS' });
-  awardXP(req.userId, 30, { silent: true });
+  // XP comes with a passing grade, once, not with every submission.
+  logActivity(req.userId, { kind: 'assignment', text: `Submitted assignment: "${a.title}"`, sub: a.course, xp: 0, agent: 'AS' });
   res.json({ ok: true, submission: db.prepare('SELECT * FROM assignment_submissions WHERE id = ?').get(id) });
 });
 
 router.get('/:id/submission', requireAuth, (req, res) => {
   const sub = db.prepare('SELECT * FROM assignment_submissions WHERE assignment_id = ? AND user_id = ? ORDER BY submitted_at DESC LIMIT 1').get(req.params.id, req.userId);
   if (!sub) return res.json({ status: 'none' });
-  res.json({ status: sub.grade != null ? 'graded' : 'pending', submission: sub });
+  const failed = sub.grade == null && /^\*\*Not graded yet\.\*\*/.test(sub.feedback_md || '');
+  let rubric = [];
+  try { rubric = JSON.parse(sub.rubric_json || '[]'); } catch {}
+  res.json({ status: sub.grade != null ? 'graded' : failed ? 'failed' : 'pending', submission: { ...sub, rubric } });
 });
 
 // ── Interactive step submissions (Phase 1) ───────────────────────────────────
