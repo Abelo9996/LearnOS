@@ -33,18 +33,18 @@
 ## 📸 Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/landing.png" alt="LearnOS Landing Page" width="100%">
-  <br><em>🏠 Landing, AI-powered learning at a glance</em>
+  <img src="docs/screenshots/lesson.png" alt="A lesson with the course outline" width="100%">
+  <br><em>A generated lesson: course outline on the left, LaTeX, runnable code, worked examples, practice with folded solutions</em>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/course_page.png" alt="Course Module View" width="100%">
-  <br><em>📚 Course Modules, structured content with real-world applications</em>
+  <img src="docs/screenshots/tutor.png" alt="The tutor beside a lesson" width="100%">
+  <br><em>The tutor sits beside the lesson it has read; select any passage to ask about it</em>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/ai_tutor.png" alt="AI Tutor" width="100%">
-  <br><em>🧑‍🏫 AI Tutor, pick a module, start a Socratic tutoring session</em>
+  <img src="docs/screenshots/course_page.png" alt="A course page" width="100%">
+  <br><em>A course: what you will be able to do, what you need first, and one button to the next lesson</em>
 </p>
 
 ---
