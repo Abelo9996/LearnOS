@@ -440,7 +440,10 @@ _sys.stderr.write("__LEARNOS_TESTS__" + _json.dumps({"passedCount": _passed, "ca
   const out = await runLab({ source: harness, language: 'python', timeoutMs: timeoutMs * 2 });
   const marker = (out.stderr || '').indexOf('__LEARNOS_TESTS__');
   if (marker === -1) {
-    return { ok: false, error: out.error || 'Tests could not run', total: tests.length, passedCount: 0, score: 0, ratio: 0, passed: false, cases: [] };
+    // Say why: an import error or a crash at module level is what the learner
+    // (and the lab repair step) needs to see, not a generic failure.
+    const why = String(out.stderr || '').trim().split('\n').slice(-6).join('\n');
+    return { ok: false, error: out.error || (why ? `Tests could not run:\n${why}` : 'Tests could not run'), total: tests.length, passedCount: 0, score: 0, ratio: 0, passed: false, cases: [] };
   }
   try {
     const parsed = JSON.parse(out.stderr.slice(marker + '__LEARNOS_TESTS__'.length));
@@ -449,6 +452,22 @@ _sys.stderr.write("__LEARNOS_TESTS__" + _json.dumps({"passedCount": _passed, "ca
   } catch (e) {
     return { ok: false, error: `Could not read test results: ${e.message}`, total: tests.length, passedCount: 0, score: 0, ratio: 0, passed: false, cases: [] };
   }
+}
+
+/**
+ * Which well-known Python libraries this machine's Python can import. Labs run
+ * here, so a lab may only use what is installed here; the course builder tells
+ * the lab writer this list. Probed once per process.
+ */
+const PY_LIBS = ['numpy', 'pandas', 'scipy', 'matplotlib', 'sklearn', 'sympy', 'statsmodels', 'networkx'];
+let pyLibsPromise = null;
+export function availablePythonLibraries() {
+  pyLibsPromise ||= (async () => {
+    const probe = `import importlib, json\nok = []\nfor m in ${JSON.stringify(PY_LIBS)}:\n    try:\n        importlib.import_module(m)\n        ok.append(m)\n    except Exception:\n        pass\nprint(json.dumps(ok))`;
+    const r = await runLab({ source: probe, language: 'python', timeoutMs: 30_000 });
+    try { return JSON.parse(String(r.stdout || '').trim().split('\n').pop()); } catch { return []; }
+  })();
+  return pyLibsPromise;
 }
 
 /**
@@ -486,4 +505,4 @@ export async function availableLanguages({ refresh = false } = {}) {
   return out;
 }
 
-export default { runLab, runLabWithTests, availableLanguages, LANGUAGES };
+export default { runLab, runLabWithTests, availableLanguages, availablePythonLibraries, LANGUAGES };

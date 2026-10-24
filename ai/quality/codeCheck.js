@@ -63,7 +63,10 @@ export async function runLessonExamples(md, { timeoutMs = 10_000, maxBlocks = 8 
     const r = await runLab({ source, language, timeoutMs });
     const text = `${r.stderr || ''}\n${r.error || ''}`.trim();
     if (r.ok) { ran++; session[language].push(b.code); continue; }
-    if (MISSING_MODULE.test(text)) { skipped.push({ line: b.line, lang: language, reason: 'library not installed here' }); continue; }
+    if (MISSING_MODULE.test(text)) { skipped.push({ line: b.line, lang: language, reason: 'library not installed here' }); session[language].skippedBefore = true; continue; }
+    // A name an earlier block would have defined, had it been able to run here,
+    // is not this block's fault.
+    if (session[language].skippedBefore && /NameError|is not defined/.test(text)) { skipped.push({ line: b.line, lang: language, reason: 'depends on a block that could not run here' }); continue; }
     if (r.error && /not installed|Install Python|Install Node/i.test(r.error)) { skipped.push({ line: b.line, lang: language, reason: 'runtime not available' }); continue; }
     ran++;
     failed.push({

@@ -172,11 +172,24 @@ describe('lab validation', () => {
     ],
   };
 
-  it('keeps only tests the reference solution passes', async () => {
+  it('takes expected values from the reference solution, not from the author', async () => {
     const r = await validateLab(lab);
-    expect(r.report.passingOnReference).toBe(2);
+    expect(r.report.passingOnReference).toBe(3);
+    expect(r.report.disagreed).toBe(0); // a wrong number, but the right shape
     expect(r.report.ok).toBe(true);
-    expect(r.lab.tests.map(t => t.name)).toEqual(['two', 'three']);
+    expect(r.lab.tests.find(t => t.name === 'wrong expectation').expected_json).toBe('1');
+  });
+
+  it('drops inputs whose result changes between runs', async () => {
+    const r = await validateLab({ ...lab, reference_solution: 'function mean(xs) { return xs.length > 2 ? Math.random() : xs.reduce((a, b) => a + b, 0) / xs.length; }' });
+    expect(r.report.unstable).toBe(1);
+    expect(r.lab.tests.map(t => t.name)).toEqual(['two', 'wrong expectation']);
+  });
+
+  it('flags a lab whose author expectations mostly contradict its solution', async () => {
+    const r = await validateLab({ ...lab, tests: lab.tests.map(t => ({ ...t, expected_json: '[1, 2]' })) });
+    expect(r.report.suspect).toBe(true);
+    expect(r.report.ok).toBe(false);
   });
 
   it('flags a starter that already passes', async () => {
@@ -189,6 +202,16 @@ describe('lab validation', () => {
     const r = await validateLab({ ...lab, reference_solution: 'function mean() { throw new Error("no") }' });
     expect(r.report.ok).toBe(false);
     expect(r.report.passingOnReference).toBe(0);
+  });
+
+  it('works for Python labs, including numpy-free float results', async () => {
+    const r = await validateLab({
+      ...lab, language: 'python',
+      starter_code: 'def mean(xs):\n    return 0\n',
+      reference_solution: 'def mean(xs):\n    return sum(xs) / len(xs)\n',
+    });
+    expect(r.report.passingOnReference).toBe(3);
+    expect(r.report.ok).toBe(true);
   });
 });
 

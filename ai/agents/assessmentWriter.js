@@ -109,6 +109,7 @@ Produce:
   If the course has code, make it RUNNABLE and auto-graded in the course's language:
   · javascript/python: "starter_code" defines the required function(s) with the signature, a docstring and a TODO body (it must NOT already solve the task). "reference_solution" is the same code fully solved. Each test: "fn" = function name, "args_json" = a JSON ARRAY of arguments (e.g. "[[1,2],[3,4]]"), "expected_json" = the JSON return value (e.g. "5.0"). Return plain JSON values (numbers, strings, lists, dicts, booleans), not numpy arrays or objects, and round floats to 4 decimals in the function so equality is exact. 5-8 tests including edge cases, 2 of them hidden.
   · cpp/c/java/go: "starter_code" is a complete compilable program skeleton with a TODO that reads stdin and prints to stdout (Java class must be Main). "reference_solution" is the solved program. "fn" = "main", "args_json" = a JSON array with exactly ONE string (the stdin), "expected_json" = a JSON string of the exact stdout.
+  Labs run on the learner's own machine: the lab code and its tests must not read files or download data (pass data in as arguments), and Python labs may import only the standard library plus the libraries listed in the brief as installed.
   If the course has no code, set "language" to "none", "starter_code", "reference_solution" to "" and "tests" to [], and make the steps a concrete exercise with a clear deliverable.
 - "graded": the assignment that counts: a realistic task applying the whole module, 4-7 tasks, and a 3-5 criterion rubric whose weights sum to 1, each criterion with what excellent, adequate and poor work look like.
 
@@ -211,31 +212,80 @@ function decodeTests(tests) {
 const RUNNABLE = new Set(['javascript', 'python', 'cpp', 'c', 'java', 'go']);
 
 /**
- * Prove a lab works: its reference solution passes its tests and its starter
- * does not. Returns the lab with only working tests, plus a report.
+ * Do two values have the same shape (type, length, keys), whatever the
+ * numbers inside? An author cannot compute a simulation's exact output in
+ * their head, so a different number is no evidence of a broken lab; a list
+ * where they promised a single number is.
+ */
+export function sameShape(a, b) {
+  if (typeof a === 'number' && typeof b === 'number') return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((x, i) => sameShape(x, b[i]));
+  }
+  if (a && b && typeof a === 'object' && typeof b === 'object') {
+    const ka = Object.keys(a).sort(), kb = Object.keys(b).sort();
+    return ka.length === kb.length && ka.every((k, i) => k === kb[i] && sameShape(a[k], b[k]));
+  }
+  return typeof a === typeof b;
+}
+
+/**
+ * Prove a lab works, by construction.
+ *
+ * A model writing a lab states expected outputs it has not computed, and a
+ * cheap one routinely contradicts its own solution (a function returning a list
+ * of sample means, tested against a single number). So expected values are not
+ * trusted: the reference solution is run on every test input, twice, and what
+ * it returns becomes the expected value. Inputs whose output changes between
+ * runs (unseeded randomness) or that crash are dropped. When most stated
+ * expectations disagree with the solution, the lab is flagged as suspect for a
+ * repair pass, since either the solution or the task description is wrong.
+ * Finally the starter must fail at least one test, or the lab is trivial.
  */
 export async function validateLab(lab) {
   if (!lab || !RUNNABLE.has(lab.language)) return { lab, report: { runnable: false } };
-  const tests = decodeTests(lab.tests);
-  if (!lab.reference_solution || !tests.length) return { lab, report: { runnable: true, ok: false, reason: 'no reference solution or tests' } };
+  const declared = decodeTests(lab.tests);
+  if (!lab.reference_solution || !declared.length) return { lab, report: { runnable: true, ok: false, reason: 'no reference solution or tests' } };
 
-  const ref = await runLabWithTests({ source: lab.reference_solution, language: lab.language, tests });
-  const cases = ref.tests?.cases || [];
-  const working = tests.filter((t, i) => cases[i]?.passed);
-  const report = { runnable: true, declared: tests.length, passingOnReference: working.length };
-  if (!ref.tests?.ok) report.error = ref.tests?.error || ref.error || ref.stderr?.slice(-400) || 'reference solution did not run';
-  if (working.length < 2) return { lab, report: { ...report, ok: false, reason: report.error || 'fewer than two tests pass on the reference solution' }, failures: cases.filter(c => !c.passed) };
-
-  if (lab.starter_code) {
-    const st = await runLabWithTests({ source: lab.starter_code, language: lab.language, tests: working });
-    report.starterPasses = st.tests?.passedCount ?? 0;
-    report.trivial = report.starterPasses === working.length;
+  // Run the reference with every case visible so its actual output comes back.
+  const probe = declared.map(t => ({ ...t, hidden: false }));
+  const [r1, r2] = [
+    await runLabWithTests({ source: lab.reference_solution, language: lab.language, tests: probe }),
+    await runLabWithTests({ source: lab.reference_solution, language: lab.language, tests: probe }),
+  ];
+  const c1 = r1.tests?.cases || [];
+  const c2 = r2.tests?.cases || [];
+  const report = { runnable: true, declared: declared.length };
+  if (!r1.tests?.ok) {
+    report.error = r1.tests?.error || r1.error || String(r1.stderr || '').slice(-400) || 'reference solution did not run';
+    return { lab, report: { ...report, passingOnReference: 0, ok: false, reason: report.error }, failures: [] };
   }
-  const keep = new Set(working.map(t => t.name + '|' + t.args_json));
-  return {
-    lab: { ...lab, tests: (lab.tests || []).filter(t => keep.has(t.name + '|' + t.args_json)) },
-    report: { ...report, ok: !report.trivial },
-  };
+
+  const kept = [];
+  let disagreed = 0, unstable = 0, crashed = 0;
+  declared.forEach((t, i) => {
+    const a = c1[i], b = c2[i];
+    if (!a || a.error || a.actual === undefined || typeof a.actual === 'string' && /^<.*object at 0x/.test(a.actual)) { crashed++; return; }
+    if (JSON.stringify(a.actual) !== JSON.stringify(b?.actual)) { unstable++; return; }
+    // Only a different shape counts against the lab (see sameShape).
+    if (!a.passed && !sameShape(t.expected, a.actual)) disagreed++;
+    kept.push({ ...lab.tests[i], expected_json: JSON.stringify(a.actual) });
+  });
+  Object.assign(report, { passingOnReference: kept.length, disagreed, unstable, crashed });
+  const failures = c1.filter(c => !c.passed).slice(0, 4).map(c => ({ name: c.name, expected: c.expected, actual: c.actual, error: c.error }));
+
+  if (kept.length < 2) return { lab, report: { ...report, ok: false, reason: 'fewer than two test inputs give a stable result on the reference solution', failures }, failures };
+  // Most of the author's own expectations contradict the solution: something
+  // about this lab is wrong, even though it is now self-consistent.
+  const suspect = disagreed > kept.length / 2;
+
+  const fixed = { ...lab, tests: kept };
+  if (lab.starter_code) {
+    const st = await runLabWithTests({ source: lab.starter_code, language: lab.language, tests: decodeTests(kept) });
+    report.starterPasses = st.tests?.passedCount ?? 0;
+    report.trivial = report.starterPasses === kept.length;
+  }
+  return { lab: fixed, report: { ...report, suspect, ok: !report.trivial && !suspect, failures: suspect ? failures : undefined }, failures };
 }
 
 /** Write and check one module's assessment. */
@@ -247,6 +297,7 @@ export async function writeAssessment({ userId, ctx, lessons }) {
     ctx.notation ? `Course notation: ${ctx.notation}` : null,
     `Module ${ctx.moduleIndex + 1}: ${ctx.moduleTitle}`,
     `Module objectives: ${(ctx.moduleObjectives || []).join('; ')}`,
+    ctx.codeLanguage === 'python' ? `Python libraries installed on the learner's machine (labs may import only these and the standard library): ${(ctx.pythonLibraries || []).join(', ') || 'none, standard library only'}` : null,
   ].filter(Boolean).join('\n');
 
   const res = await complete({
@@ -266,23 +317,23 @@ export async function writeAssessment({ userId, ctx, lessons }) {
 
   // Lab: run the reference solution; one repair attempt if it does not hold up.
   let checked = await validateLab(out.lab);
-  if (checked.report.runnable && !checked.report.ok && !checked.report.trivial) {
+  if (checked.report.runnable && !checked.report.ok) {
     try {
       const fixed = (await complete({
         userId, agentCode: 'AS',
         schema: labSchema,
         maxTokens: 8000, reasoning: 'off',
-        system: `${ASSESSMENT_SYSTEM}\n\nYou are fixing ONLY the lab. Its reference solution was run against its tests and they did not hold up. Return a corrected lab whose reference solution passes every test.`,
-        messages: `${brief}\n\n--- LAB ---\n${JSON.stringify(out.lab)}\n\n--- WHAT HAPPENED WHEN THE REFERENCE SOLUTION WAS RUN ---\n${checked.report.reason || ''}\n${JSON.stringify(checked.failures || []).slice(0, 3000)}`,
+        system: `${ASSESSMENT_SYSTEM}\n\nYou are fixing ONLY the lab. Its reference solution was run on its test inputs and the result did not hold up (it crashed, gave unstable results, contradicted the expected values, or the starter already solved it). Return a corrected lab: a task, a reference solution and test inputs that agree, deterministic results (seed any randomness inside the function), and a starter that does not already solve it.`,
+        messages: `${brief}\n\n--- LAB ---\n${JSON.stringify(out.lab)}\n\n--- WHAT HAPPENED WHEN THE REFERENCE SOLUTION WAS RUN ---\n${checked.report.trivial ? 'The starter code already passes every test.' : checked.report.reason || 'Most expected values disagree with what the reference solution returns.'}\n${JSON.stringify(checked.failures || []).slice(0, 3000)}`,
       })).json;
       if (fixed) {
         const again = await validateLab(fixed);
         report.labRepaired = true;
-        if (again.report.ok || (again.report.passingOnReference || 0) > (checked.report.passingOnReference || 0)) checked = again;
+        if (again.report.ok || (!checked.report.passingOnReference && again.report.passingOnReference)) checked = again;
       }
     } catch { /* keep the first attempt's verdict */ }
   }
-  if (checked.report.runnable && !checked.report.ok && !checked.report.trivial) {
+  if (checked.report.runnable && !checked.report.ok) {
     // Better an honest written exercise than a "run tests" button that can never pass.
     checked.lab = { ...checked.lab, language: 'none', starter_code: checked.lab.starter_code || '', tests: [] };
     checked.report.downgraded = true;
