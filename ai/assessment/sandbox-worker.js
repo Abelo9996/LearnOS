@@ -22,7 +22,10 @@ function deepEqual(a, b) {
   if (a === null || b === null) return a === b;
   if (Array.isArray(a) !== Array.isArray(b)) return false;
   if (typeof a === 'number' && typeof b === 'number') {
-    return Number.isNaN(a) && Number.isNaN(b) ? true : Math.abs(a - b) < 1e-9;
+    // Expected values are written rounded (to 4 decimals); a correct answer
+    // computed in full precision must still pass.
+    if (Number.isNaN(a) && Number.isNaN(b)) return true;
+    return Math.abs(a - b) <= Math.max(1e-4, 1e-6 * Math.max(Math.abs(a), Math.abs(b)));
   }
   if (typeof a !== 'object') return false;
   const ka = Object.keys(a), kb = Object.keys(b);

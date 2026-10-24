@@ -21,6 +21,8 @@ RUN npm run build
 
 ENV NODE_ENV=production
 ENV PORT=3001
+# Listen on all interfaces inside the container; the host decides what to publish.
+ENV HOST=0.0.0.0
 EXPOSE 3001
 
 # The DB lives under /app/db; mount a volume there to persist it (compose does).

@@ -191,3 +191,25 @@ describe('lab validation', () => {
     expect(r.report.passingOnReference).toBe(0);
   });
 });
+
+describe('lab grading tolerance', () => {
+  it('passes a correct Python answer computed in full precision', async () => {
+    const { runLabWithTests } = await import('../ai/assessment/labRunner.js');
+    const src = 'import math\ndef pose(t):\n    return (math.cos(t) * 0.5, math.sin(t) * 0.5)\n';
+    const r = await runLabWithTests({ source: src, language: 'python', tests: [
+      { name: 'quarter turn', fn: 'pose', args: [Math.PI / 2], expected: [0, 0.5] },
+      { name: 'rounded', fn: 'pose', args: [1], expected: [0.2702, 0.4207] },
+      { name: 'wrong', fn: 'pose', args: [0], expected: [1, 0] },
+    ] });
+    expect(r.tests.cases.map(c => c.passed)).toEqual([true, true, false]);
+  });
+
+  it('passes a JavaScript float within rounding of the expected value', async () => {
+    const { runLabWithTests } = await import('../ai/assessment/labRunner.js');
+    const r = await runLabWithTests({ source: 'function third(x) { return x / 3; }', language: 'javascript', tests: [
+      { name: 'one third', fn: 'third', args: [1], expected: 0.3333 },
+      { name: 'not close', fn: 'third', args: [1], expected: 0.34 },
+    ] });
+    expect(r.tests.cases.map(c => c.passed)).toEqual([true, false]);
+  });
+});

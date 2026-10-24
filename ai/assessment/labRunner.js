@@ -381,7 +381,33 @@ async function runPythonTests(source, tests, timeoutMs) {
   const harness = `
 ${source}
 
-import json as _json, sys as _sys
+import json as _json, sys as _sys, math as _math
+
+def _plain(v):
+    # numpy arrays and scalars, tuples and sets compare as the JSON they mean.
+    if hasattr(v, "tolist"):
+        v = v.tolist()
+    if isinstance(v, (tuple, list)):
+        return [_plain(x) for x in v]
+    if isinstance(v, dict):
+        return {str(k): _plain(x) for k, x in v.items()}
+    return v
+
+def _same(a, b):
+    a, b = _plain(a), _plain(b)
+    if isinstance(a, bool) or isinstance(b, bool):
+        return a is b if isinstance(a, bool) and isinstance(b, bool) else False
+    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+        if _math.isnan(a) and _math.isnan(b):
+            return True
+        # Expected values are written rounded; full precision must still pass.
+        return _math.isclose(a, b, rel_tol=1e-6, abs_tol=1e-4)
+    if isinstance(a, list) and isinstance(b, list):
+        return len(a) == len(b) and all(_same(x, y) for x, y in zip(a, b))
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(_same(a[k], b[k]) for k in a)
+    return a == b
+
 _cases = _json.loads(${JSON.stringify(payload)})
 _results = []
 _passed = 0
@@ -394,15 +420,15 @@ for _c in _cases:
             _entry["error"] = 'Expected a function named "%s"' % _c["fn"]
         else:
             _actual = _fn(*_c["args"])
-            _ok = _actual == _c["expected"]
+            _ok = _same(_actual, _c["expected"])
             _entry["passed"] = bool(_ok)
             if _ok:
                 _passed += 1
             if not _c["hidden"]:
                 _entry["expected"] = _c["expected"]
                 try:
-                    _json.dumps(_actual)
-                    _entry["actual"] = _actual
+                    _json.dumps(_plain(_actual))
+                    _entry["actual"] = _plain(_actual)
                 except Exception:
                     _entry["actual"] = repr(_actual)
     except Exception as _e:

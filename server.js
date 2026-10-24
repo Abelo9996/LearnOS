@@ -49,13 +49,15 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
+      // jsDelivr serves Pyodide, which runs a lesson's Python in the browser;
+      // it needs to compile WebAssembly, hence 'wasm-unsafe-eval' (not eval).
+      scriptSrc: ["'self'", "'wasm-unsafe-eval'", "https://cdn.jsdelivr.net"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       // esm.sh serves the Excalidraw whiteboard fonts. LearnOS is self-hosted,
       // not air-gapped, so a font CDN is acceptable, allow it for fonts and the
       // fetch the font loader uses.
-      connectSrc: ["'self'", "https://esm.sh"],
+      connectSrc: ["'self'", "https://esm.sh", "https://cdn.jsdelivr.net"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "https://esm.sh", "data:"],
       objectSrc: ["'none'"],
       // A lesson embeds its source directly, the video plays, the article and
@@ -67,10 +69,15 @@ app.use(helmet({
       // that will render and falls back to a link otherwise.
       frameSrc: ["'self'", "https:"],
       imgSrc: ["'self'", "data:", "blob:", "https://i.ytimg.com"],
+      // Helmet's default rewrites every subresource to https. Over plain http
+      // (localhost on another device, a LAN address) that left a blank page.
+      upgradeInsecureRequests: null,
     },
   },
   crossOriginEmbedderPolicy: false,
-  hsts: { maxAge: 31536000, includeSubDomains: true },
+  // HSTS only means something over https; sent over http it can lock a LAN
+  // address into an https that does not exist.
+  hsts: isProd ? { maxAge: 31536000, includeSubDomains: true } : false,
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 }));
 
@@ -78,14 +85,25 @@ app.use(helmet({
 app.use(express.json({ limit: '1mb' }));
 app.use(requestLogger);
 
-// ── S-04: CORS, restrict to APP_URL in prod, open in dev ─────────────────────
+// ── S-04: CORS, same origin plus the dev server ──────────────────────────────
+// The API runs code (labs) and spends the learner's model budget, so no other
+// website may call it from the learner's browser. It used to answer every
+// origin with "*" (a typo read the origin from `process` instead of the
+// request), which let any page the learner visited drive it.
+const ALLOWED_ORIGINS = new Set([
+  process.env.APP_URL,
+  `http://localhost:${PORT}`, `http://127.0.0.1:${PORT}`,
+  ...(isProd ? [] : ['http://localhost:3000', 'http://127.0.0.1:3000']),
+  ...String(process.env.LEARNOS_ALLOWED_ORIGINS || '').split(',').map(s => s.trim()),
+].filter(Boolean));
 app.use((req, res, next) => {
-  const origin = isProd
-    ? (process.env.APP_URL || '')
-    : (process.headers?.origin || '*');
-  if (origin) {
+  const origin = req.headers.origin;
+  res.setHeader('Vary', 'Origin');
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Vary', 'Origin');
+  } else if (origin && req.path.startsWith('/api/') && origin !== `${req.protocol}://${req.headers.host}`) {
+    // A cross-site request to the API: refuse before any handler runs.
+    return res.status(403).json({ error: true, code: 'FORBIDDEN_ORIGIN', message: `Requests from ${origin} are not allowed. Add it to LEARNOS_ALLOWED_ORIGINS to permit it.` });
   }
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -271,7 +289,11 @@ app.use(errorHandler);
 app.use(notFound);
 
 // ── Start ──────────────────────────────────────────────────────────────────────
-app.listen(PORT, '0.0.0.0', () => {
+// Localhost only by default: LearnOS is a personal app with no login, so it
+// should not be reachable from the rest of the network unless asked to be
+// (HOST=0.0.0.0, which the Docker image sets).
+const HOST = process.env.HOST || '127.0.0.1';
+app.listen(PORT, HOST, () => {
   resumeJobs();
   console.log('\n  ✅ LearnOS running at http://localhost:' + PORT);
   const keyed = !!(process.env.OPENROUTER_API_KEY || process.env.LEARNOS_OPENROUTER_KEY);
