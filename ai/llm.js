@@ -12,6 +12,7 @@
  */
 import db, { logAgentRun, bumpUsage } from '../db/database.js';
 import { decryptSecret } from './crypto.js';
+import { isClaudeCodeModel, completeViaClaudeCode } from './providers/claudeCode.js';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
@@ -28,6 +29,13 @@ export function resolveModel(userId, agentCode, explicit) {
   if (userId && agentCode) {
     const row = db.prepare('SELECT model FROM agent_routing WHERE user_id = ? AND agent_code = ?').get(userId, agentCode);
     if (row?.model) return row.model;
+  }
+  // An agent with no routing of its own (a newer agent, e.g. the lesson
+  // reviewer) follows the model the learner picked for course writing, never a
+  // hardcoded default they did not choose and may not want to pay for.
+  if (userId) {
+    const fallback = db.prepare("SELECT model FROM agent_routing WHERE user_id = ? ORDER BY agent_code = 'CR' DESC LIMIT 1").get(userId);
+    if (fallback?.model) return fallback.model;
   }
   return DEFAULT_MODEL;
 }
@@ -93,16 +101,14 @@ export async function complete(opts = {}) {
   const {
     userId = null, agentCode = null, system, messages,
     model: explicitModel, schema = null, maxTokens = 8192,
+    // 'off' asks the model not to think before answering. Long-form writing
+    // sets it: some reasoning models otherwise spend the entire token budget
+    // thinking (DeepSeek V4 Flash wrote 36k characters of reasoning for one
+    // lesson and returned no lesson at all) and ignore reasoning token caps.
+    reasoning = null,
   } = opts;
 
   const model = resolveModel(userId, agentCode, explicitModel);
-  const creds = resolveKey(userId);
-  if (!creds) {
-    const err = new Error('No OpenRouter API key available. Add one in Settings → API Keys, or set OPENROUTER_API_KEY for the server.');
-    err.code = 'NO_KEY';
-    throw err;
-  }
-
   // Build OpenAI-compatible chat messages: system prompt first, then the turns.
   const chat = [];
   let systemText = system ? String(system) : '';
@@ -122,6 +128,15 @@ export async function complete(opts = {}) {
     chat.push({ role: 'user', content: String(messages ?? '') });
   }
 
+  if (isClaudeCodeModel(model)) return completeWithClaudeCode({ opts, model, systemText, chat, schema });
+
+  const creds = resolveKey(userId);
+  if (!creds) {
+    const err = new Error('No model provider is set up. Add an OpenRouter key in Settings → API Keys (or set OPENROUTER_API_KEY), or pick "Claude subscription" as the model to use your Claude plan through Claude Code.');
+    err.code = 'NO_KEY';
+    throw err;
+  }
+
   const body = {
     model,
     messages: chat,
@@ -131,6 +146,8 @@ export async function complete(opts = {}) {
   if (schema) {
     body.response_format = { type: 'json_schema', json_schema: { name: 'result', strict: false, schema } };
   }
+  if (reasoning === 'off') body.reasoning = { enabled: false };
+  else if (reasoning) body.reasoning = { effort: reasoning };
 
   const started = Date.now();
   const runId = `run-${started}-${Math.random().toString(36).slice(2, 8)}`;
@@ -155,6 +172,12 @@ export async function complete(opts = {}) {
     });
     if (!resp.ok) {
       const detail = await resp.text().catch(() => '');
+      // A model whose reasoning cannot be switched off rejects the setting;
+      // answer with its default behaviour instead of failing the call.
+      if (body.reasoning && resp.status === 400 && /reason/i.test(detail)) {
+        clearTimeout(timer);
+        return complete({ ...opts, reasoning: null });
+      }
       throw new Error(`OpenRouter ${resp.status}: ${detail.slice(0, 500)}`);
     }
     data = await resp.json();
@@ -178,7 +201,31 @@ export async function complete(opts = {}) {
   const json = schema ? parseJson(text) : null;
 
   record({ runId, userId, agentCode, model, managed: creds.managed, usage, latency, status: 'ok', error: null, cost });
+  // The whole budget went on thinking and nothing was written: ask again with
+  // thinking off rather than hand an empty answer to the caller.
+  if (!text.trim() && choice.finish_reason === 'length' && reasoning !== 'off' && !opts._noRetry) {
+    return complete({ ...opts, reasoning: 'off', _noRetry: true });
+  }
   return { text, json, usage, model, managed: creds.managed, cost, runId, stopReason: choice.finish_reason };
+}
+
+// The Claude subscription path: same contract as the OpenRouter path, logged
+// the same way, at zero marginal cost (the plan is already paid for).
+async function completeWithClaudeCode({ opts, model, systemText, chat, schema }) {
+  const { userId = null, agentCode = null } = opts;
+  const started = Date.now();
+  const runId = `run-${started}-${Math.random().toString(36).slice(2, 8)}`;
+  const timeoutMs = parseInt(process.env.LEARNOS_CLAUDE_TIMEOUT_MS || '', 10) || 600_000;
+  try {
+    const out = await completeViaClaudeCode({ model, systemText, chat, schema, timeoutMs });
+    const json = schema ? (out.structured ?? parseJson(out.text)) : null;
+    const text = out.text || (out.structured ? JSON.stringify(out.structured) : '');
+    record({ runId, userId, agentCode, model, managed: false, usage: out.usage, latency: Date.now() - started, status: 'ok', error: null, cost: 0, provider: 'claude-code' });
+    return { text, json, usage: out.usage, model, managed: false, cost: 0, runId, stopReason: out.stopReason };
+  } catch (e) {
+    record({ runId, userId, agentCode, model, managed: false, usage: null, latency: Date.now() - started, status: 'error', error: e?.message || String(e), cost: 0, provider: 'claude-code' });
+    throw e;
+  }
 }
 
 function record(r) {
@@ -188,7 +235,7 @@ function record(r) {
     const cacheRead = r.usage?.prompt_tokens_details?.cached_tokens || 0;
     logAgentRun({
       id: r.runId, user_id: r.userId, agent_code: r.agentCode, model: r.model,
-      provider: 'openrouter', managed: r.managed ? 1 : 0,
+      provider: r.provider || 'openrouter', managed: r.managed ? 1 : 0,
       input_tokens: inTok, output_tokens: outTok,
       cache_read_tokens: cacheRead, cache_write_tokens: 0,
       cost_usd: r.cost || 0, latency_ms: r.latency || 0, status: r.status, error: r.error,

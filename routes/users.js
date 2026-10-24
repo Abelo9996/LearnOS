@@ -162,8 +162,13 @@ router.patch('/agent-routing', (req, res) => {
     return res.status(400).json({ error: true, message: 'model required' });
   }
 
-  const known = db.prepare('SELECT agent_code FROM agent_routing WHERE user_id = ?')
-    .all(req.userId).map(r => r.agent_code);
+  // Every agent the app has, not only those this user has routed before: on a
+  // fresh install nobody has routing rows yet, and "use this model for every
+  // agent" must still mean every agent.
+  const known = [...new Set([
+    ...db.prepare('SELECT agent_code FROM agent_routing WHERE user_id = ?').all(req.userId).map(r => r.agent_code),
+    ...db.prepare('SELECT agent_code FROM agent_status').all().map(r => r.agent_code),
+  ])];
 
   let targets = known;
   if (codes !== undefined) {

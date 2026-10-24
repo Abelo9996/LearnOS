@@ -5,16 +5,21 @@
 import { Router } from 'express';
 import db, { awardXP, logActivity, awardBadge } from '../db/database.js';
 import { complete, hasManagedKey } from '../ai/llm.js';
+import { claudeCodeStatus, CLAUDE_CODE_MODELS } from '../ai/providers/claudeCode.js';
 import { generateAssignment, generateQuiz } from '../ai/agents/assessment.js';
 
 const router = Router();
 
-// Is the AI layer usable? (an env OpenRouter key and/or a key added in Settings)
-router.get('/status', (req, res) => {
+// Is the AI layer usable? An OpenRouter key (env or Settings), or the Claude
+// subscription through a signed-in Claude Code CLI.
+router.get('/status', async (req, res) => {
   const byok = db.prepare(
     "SELECT COUNT(*) AS c FROM api_keys WHERE user_id = ? AND provider = 'openrouter' AND is_active = 1"
   ).get(req.userId).c;
-  res.json({ managed: hasManagedKey(), byok: byok > 0, ready: hasManagedKey() || byok > 0 });
+  const claudeCode = await claudeCodeStatus({ refresh: req.query.refresh === '1' }).catch(() => ({ installed: false, loggedIn: false }));
+  const usesClaude = !!db.prepare("SELECT 1 FROM agent_routing WHERE user_id = ? AND model LIKE 'claude-code/%' LIMIT 1").get(req.userId);
+  const claudeReady = usesClaude && claudeCode.installed && claudeCode.loggedIn !== false;
+  res.json({ managed: hasManagedKey(), byok: byok > 0, claudeCode, usesClaude, ready: hasManagedKey() || byok > 0 || claudeReady });
 });
 
 /**
@@ -49,9 +54,16 @@ const FALLBACK_MODELS = [
   { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B', free: false, promptPrice: null, completionPrice: null, context: null },
 ];
 
+// The Claude subscription, offered as its own provider at the top of the
+// picker: no key, no per-token price, runs through the local Claude Code CLI.
+const CLAUDE_PLAN_MODELS = CLAUDE_CODE_MODELS.map(m => ({
+  id: m.id, name: m.name, provider: 'claude-code', slug: m.slug, alias: false,
+  context: 200000, promptPrice: null, completionPrice: null, free: false, subscription: true,
+}));
+
 router.get('/models', async (_req, res) => {
   const now = Date.now();
-  if (_modelCache.data && (now - _modelCache.at) < 3_600_000) return res.json(_modelCache.data);
+  if (_modelCache.data && (now - _modelCache.at) < 3_600_000) return res.json([...CLAUDE_PLAN_MODELS, ..._modelCache.data]);
   try {
     const r = await fetch('https://openrouter.ai/api/v1/models', { headers: { Accept: 'application/json' } });
     if (!r.ok) throw new Error('openrouter ' + r.status);
@@ -89,9 +101,9 @@ router.get('/models', async (_req, res) => {
       .sort((a, b) => (a.free === b.free ? a.id.localeCompare(b.id) : a.free ? -1 : 1));
 
     _modelCache = { at: now, data: models };
-    res.json(models);
+    res.json([...CLAUDE_PLAN_MODELS, ...models]);
   } catch {
-    res.json(_modelCache.data || FALLBACK_MODELS);
+    res.json([...CLAUDE_PLAN_MODELS, ...(_modelCache.data || FALLBACK_MODELS)]);
   }
 });
 

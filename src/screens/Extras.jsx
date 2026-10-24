@@ -1592,6 +1592,69 @@ function CoverVizSmall({ kind }) {
 /* ═══════════════════════════════════════════════════════════════════════════
    SETTINGS
    ═══════════════════════════════════════════════════════════════════════════ */
+/**
+ * Use the Claude plan the learner already pays for. LearnOS runs the Claude
+ * Code CLI (`claude -p`) on this machine with their sign-in, so there is no key
+ * to paste and no per-token bill.
+ */
+function ClaudePlanCard({ routeModels, setRouteModels, toast }) {
+  const [status, setStatus] = React.useState(null);
+  const [busy, setBusy] = React.useState(false);
+  const [model, setModel] = React.useState('claude-code/sonnet');
+  const check = React.useCallback((refresh) => {
+    setStatus(null);
+    API.get(`/ai/status${refresh ? '?refresh=1' : ''}`).then(setStatus).catch(() => setStatus({ claudeCode: { installed: false } }));
+  }, []);
+  React.useEffect(() => { check(false); }, [check]);
+
+  const cc = status?.claudeCode;
+  const inUse = Object.values(routeModels || {}).filter(m => String(m).startsWith('claude-code/')).length;
+  const total = Object.keys(routeModels || {}).length;
+  const useForAll = async () => {
+    setBusy(true);
+    try {
+      await API.setAgentRoutingBulk(model);
+      setRouteModels(Object.fromEntries(Object.keys(routeModels || {}).map(k => [k, model])));
+      toast('Every agent now uses your Claude plan', 'success');
+    } catch (e) {
+      toast(e.message || 'Could not update the agents', 'error');
+    } finally { setBusy(false); }
+  };
+
+  const state = !cc ? 'checking' : !cc.installed ? 'missing' : cc.loggedIn === false ? 'signed-out' : 'ready';
+  return (
+    <Card style={{ padding: 18, marginBottom: 14 }}>
+      <SectionHead title="Claude subscription" subtitle="Use your Claude Pro or Max plan instead of an API key. LearnOS runs Claude Code on this computer with your sign-in, so lessons cost nothing extra." />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '10px 0', borderTop: '1px solid var(--border)' }}>
+        <Tag tone={state === 'ready' ? 'good' : state === 'checking' ? 'neutral' : 'warn'}>
+          {state === 'ready' ? `Claude Code ${cc.version || ''} signed in` : state === 'checking' ? 'Checking…' : state === 'missing' ? 'Claude Code not installed' : 'Claude Code is signed out'}
+        </Tag>
+        {state === 'ready' && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{inUse ? `${inUse} of ${total} agents use it` : 'Not used by any agent yet'}</span>}
+        <Btn variant="ghost" size="sm" onClick={() => check(true)}>Check again</Btn>
+      </div>
+      {state === 'missing' && (
+        <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>
+          Install it with <code>npm install -g @anthropic-ai/claude-code</code> (or see <a href="https://claude.com/claude-code" target="_blank" rel="noreferrer" style={{ color: 'var(--brand)' }}>claude.com/claude-code</a>), run <code>claude</code> once in a terminal to sign in, then press Check again.
+        </div>
+      )}
+      {state === 'signed-out' && (
+        <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.6 }}>Run <code>claude</code> in a terminal on this computer and sign in with your Claude account, then press Check again.</div>
+      )}
+      {state === 'ready' && (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <select value={model} onChange={e => setModel(e.target.value)} style={{ padding: '7px 10px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)', fontSize: 13 }}>
+            <option value="claude-code/sonnet">Sonnet (recommended)</option>
+            <option value="claude-code/opus">Opus (best, uses your limits fastest)</option>
+            <option value="claude-code/haiku">Haiku (fastest)</option>
+          </select>
+          <Btn variant="primary" size="sm" disabled={busy} onClick={useForAll}>{busy ? 'Saving…' : 'Use for every agent'}</Btn>
+          <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Or pick "Claude plan" per agent in the Agents tab. A full course build is about 60-90 calls.</span>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 // Searchable picker over the full OpenRouter model catalog. Lets the user filter
 // by id/name and pick any model, or type a custom slug that isn't listed.
 // The model picker lives in components/ModelPicker.jsx so onboarding and
@@ -1863,6 +1926,8 @@ export function Settings() {
       }
       case 'api':
         return (
+          <>
+          <ClaudePlanCard routeModels={routeModels} setRouteModels={setRouteModels} toast={toast} />
           <Card style={{ padding: 18 }}>
             <SectionHead title="OpenRouter API key" subtitle="LearnOS uses OpenRouter, one key unlocks every model. Stored encrypted, used only for AI calls." />
             {loadingKeys ? (
@@ -1907,6 +1972,7 @@ export function Settings() {
               <div style={{ fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.5 }}>Keys are stored encrypted in the database and used only for AI calls. You can also set <code>OPENROUTER_API_KEY</code> on the server instead.</div>
             </div>
           </Card>
+          </>
         );
       case 'agents':
         return <AgentRouting models={models} routeModels={routeModels} setRouteModels={setRouteModels} toast={toast} />;

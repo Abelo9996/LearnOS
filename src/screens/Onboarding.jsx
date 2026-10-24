@@ -52,6 +52,26 @@ export default function Onboarding({ onComplete }) {
   const [error, setError] = React.useState(null);
   const [pollProgress, setPollProgress] = React.useState(0);
 
+  // A signed-in Claude Code CLI on this machine means the learner can run
+  // everything on their Claude plan with no key at all.
+  const [claude, setClaude] = React.useState(null);
+  React.useEffect(() => { API.getAIStatus().then(s => setClaude(s?.claudeCode || null)).catch(() => {}); }, []);
+  const claudeReady = !!(claude?.installed && claude.loggedIn !== false);
+  const useClaudePlan = async () => {
+    setKeyState('testing'); setKeyMsg('');
+    try {
+      await API.setAgentRoutingBulk('claude-code/sonnet');
+      setModel('claude-code/sonnet');
+      await API.pingAI();
+      setKeyState('ok');
+      setKeyMsg('Connected to your Claude plan through Claude Code. No key needed.');
+      setSkipKey(false);
+    } catch (e) {
+      setKeyState('bad');
+      setKeyMsg(e.message || 'Claude Code did not answer. Run `claude` in a terminal to sign in, then try again.');
+    }
+  };
+
   const toggleStyle = (s) => {
     setStyles(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
   };
@@ -346,14 +366,27 @@ export default function Onboarding({ onComplete }) {
             <div className="cap" style={{ marginBottom: 8, fontSize: 11 }}>Step 5 of 5</div>
             <h2 className="display" style={{ fontSize: 20, marginBottom: 6 }}>Connect your AI</h2>
             <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 18, lineHeight: 1.6 }}>
-              LearnOS runs on your own OpenRouter key. It is encrypted and stored on this
-              machine, there is no LearnOS server to send it to.{' '}
+              LearnOS runs on your Claude plan (through Claude Code) or your own OpenRouter key.
+              Either way it stays on this machine, there is no LearnOS server to send it to.{' '}
               <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand)' }}>
                 Get a key →
               </a>
             </div>
 
-            <label className="cap" style={{ display: 'block', marginBottom: 6, fontSize: 10.5 }}>OpenRouter API key</label>
+            {claudeReady && (
+              <div style={{ padding: 14, borderRadius: 10, border: '1px solid var(--accent-line)', background: 'var(--accent-soft)', marginBottom: 18 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', marginBottom: 4 }}>Use your Claude plan</div>
+                <div style={{ fontSize: 12.5, color: 'var(--ink-2)', lineHeight: 1.55, marginBottom: 10 }}>
+                  Claude Code {claude.version || ''} is signed in on this computer. LearnOS can run on your Claude Pro or Max
+                  plan with no API key and nothing extra to pay.
+                </div>
+                <Btn variant="primary" size="sm" disabled={keyState === 'testing'} onClick={useClaudePlan}>
+                  {keyState === 'testing' ? 'Connecting…' : 'Use my Claude plan'}
+                </Btn>
+              </div>
+            )}
+
+            <label className="cap" style={{ display: 'block', marginBottom: 6, fontSize: 10.5 }}>{claudeReady ? 'Or use an OpenRouter API key' : 'OpenRouter API key'}</label>
             <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
               <input
                 type="password"

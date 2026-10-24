@@ -17,6 +17,7 @@ import React from 'react';
  */
 export function formatPrice(m) {
   if (!m) return '';
+  if (m.subscription) return 'Your Claude plan';
   if (m.free) return 'Free';
   if (m.promptPrice == null) return '';
   const fmt = (v) => (v >= 1 ? `$${v.toFixed(2)}` : `$${v.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')}`);
@@ -24,6 +25,9 @@ export function formatPrice(m) {
   const outM = m.completionPrice != null ? m.completionPrice * 1e6 : null;
   return outM != null ? `${fmt(inM)} in · ${fmt(outM)} out /M` : `${fmt(inM)} /M`;
 }
+
+// Providers that are not OpenRouter vendors get a readable name.
+const PROVIDER_LABEL = { 'claude-code': 'Claude plan' };
 
 const fmtContext = (n) => (!n ? '' : n >= 1000 ? `${Math.round(n / 1000)}K ctx` : `${n} ctx`);
 const providerOf = (id) => (id && id.includes('/') ? id.split('/')[0].replace(/^~/, '') : '');
@@ -52,7 +56,9 @@ export default function ModelPicker({
   const providers = React.useMemo(() => {
     const by = new Map();
     for (const m of models || []) {
-      if (freeOnly && !m.free) continue;
+      // The Claude subscription has no per-token price, so it stays visible
+      // under "Free only" too.
+      if (freeOnly && !m.free && !m.subscription) continue;
       const p = by.get(m.provider) || { id: m.provider, count: 0, free: false, cheapest: null };
       p.count++;
       if (m.free) p.free = true;
@@ -75,7 +81,7 @@ export default function ModelPicker({
   const searching = q.trim().length > 0;
   const list = React.useMemo(() => {
     let arr = models || [];
-    if (freeOnly) arr = arr.filter(m => m.free);
+    if (freeOnly) arr = arr.filter(m => m.free || m.subscription);
     const ql = q.trim().toLowerCase();
     if (ql) return arr.filter(m => m.id.toLowerCase().includes(ql) || (m.name || '').toLowerCase().includes(ql));
     return browse ? arr.filter(m => m.provider === browse) : [];
@@ -159,7 +165,7 @@ export default function ModelPicker({
                     }}
                     onMouseEnter={e => { if (p.id !== browse) e.currentTarget.style.background = 'var(--surface)'; }}
                     onMouseLeave={e => { if (p.id !== browse) e.currentTarget.style.background = 'transparent'; }}>
-                    <span className="mono" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.id}</span>
+                    <span className="mono" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{PROVIDER_LABEL[p.id] || p.id}</span>
                     {p.free && <span style={{ flexShrink: 0, width: 5, height: 5, borderRadius: 999, background: 'var(--good)' }} title="has free models" />}
                     <span className="mono" style={{ flexShrink: 0, fontSize: 10, color: 'var(--faint)' }}>{p.count}</span>
                   </button>
@@ -173,7 +179,7 @@ export default function ModelPicker({
               {!models && <div style={{ padding: 12, fontSize: 12, color: 'var(--muted)' }}>Loading models…</div>}
               {models && !searching && (
                 <div className="cap" style={{ padding: '7px 10px 5px', fontSize: 9.5, color: 'var(--faint)' }}>
-                  {browse ? `${browse} · ${list.length}` : 'Pick a provider'}
+                  {browse ? `${PROVIDER_LABEL[browse] || browse} · ${list.length}` : 'Pick a provider'}
                 </div>
               )}
               {models && searching && (
