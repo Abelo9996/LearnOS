@@ -3,7 +3,7 @@
  * SQLite via better-sqlite3, synchronous, fast, zero-config.
  * Handles connection, schema creation, and provides a shared db instance.
  */
-import Database from 'better-sqlite3';
+import Database from './sqlite.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';

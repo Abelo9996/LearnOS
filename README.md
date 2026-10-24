@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Node.js-18+-339933?style=flat-square&logo=nodedotjs&logoColor=white" />
+  <img src="https://img.shields.io/badge/Node.js-22.13+-339933?style=flat-square&logo=nodedotjs&logoColor=white" />
   <img src="https://img.shields.io/badge/Express-5-000000?style=flat-square&logo=express&logoColor=white" />
   <img src="https://img.shields.io/badge/React-18-61DAFB?style=flat-square&logo=react&logoColor=black" />
   <img src="https://img.shields.io/badge/Vite-6-646CFF?style=flat-square&logo=vite&logoColor=white" />
@@ -26,7 +26,7 @@
 
 > **Education shouldn't be locked behind logins, paywalls, or a single vendor.**
 >
-> LearnOS is an **agentic AI university** you run yourself, where AI agents teach, adapt, and certify. Clone it, drop in an OpenRouter key, and go. No accounts, no paywall, no lock-in. Open-source and community-driven.
+> LearnOS is an **AI university** you run yourself. Name any subject and it writes you a real course: lessons planned in order, worked examples, practice with solutions, labs that check your code, quizzes checked by an independent examiner, and a tutor that has read the lesson you are on. Run it on your **Claude plan** (through Claude Code) or any model on **OpenRouter**. No accounts, no paywall, no lock-in.
 
 ---
 
@@ -64,12 +64,11 @@ LearnOS is an **AI-native university platform** where:
 
 | Traditional Platforms | LearnOS |
 |---|---|
-| Pre-recorded video lectures | AI agents that teach in real-time, adapting to *you* |
-| Locked to one vendor's models | One OpenRouter key, pick any model, pay only for tokens |
-| Static content that ages | Living courses generated on demand |
-| Learn alone, drop out alone | Cohort-based learning with AI + human communities |
-| Certificates that nobody trusts | Mastery-verified certificates backed by AI assessment |
-| Courses created by institutions only | **GitHub of Courses**, anyone can create, star, and share |
+| Pre-recorded lectures, the same for everyone | Courses written for your goal and level, on any subject |
+| Questions go to a forum, answered days later | A tutor beside every lesson that has read it |
+| Content nobody checks after it ships | Every lesson reviewed, every example run, every quiz answer checked, before you see it |
+| Locked to one vendor | Your Claude plan, or any model on OpenRouter |
+| Your progress lives on their servers | Everything stays on your machine |
 
 Read the full [VISION.md](VISION.md) for where this is headed.
 
@@ -80,97 +79,74 @@ LearnOS isn't "a platform with an AI chatbot." It's a **system of specialized AI
 | Agent | Role |
 |---|---|
 | 🗺️ **Curriculum Agent** | Designs personalized learning roadmaps from your goals |
-| 🧑‍🏫 **Tutor** | Teaches via Socratic dialogue in live sessions, adapts in real-time |
-| 📝 **Assessment Agent** | Generates assignments, grades work, and gives targeted feedback |
+| ✍️ **Course writer** | Writes each lesson in order, told what came before, and revises it against review and code runs |
+| 🔎 **Reviewer** | Reads every lesson like a subject expert and answers every quiz question without the key |
+| 🧑‍🏫 **Tutor** | Sits beside the lesson you are reading, knows it and what you got wrong |
+| 📝 **Assessment Agent** | Writes quizzes, labs and graded work from the lessons, and grades submissions against rubrics |
 | 🔍 **Research Agent** | Pulls in supporting resources from the open web |
 | 📊 **Analytics Agent** | Tracks learning patterns and surfaces habit insights |
 | 🎯 **Profiling Agent** | Models your level, style, and goals during onboarding |
 
-All agents run through a single LLM layer ([`ai/llm.js`](ai/llm.js)) that talks to **[OpenRouter](https://openrouter.ai)**, one key unlocks every major model (Claude, GPT, Gemini, Llama, and more) with per-agent model routing and usage metering. Pick whatever balance of quality and cost you want, per agent.
+All agents run through a single LLM layer ([`ai/llm.js`](ai/llm.js)) with two providers: your **Claude plan through Claude Code** ([`ai/providers/claudeCode.js`](ai/providers/claudeCode.js), no API key, no per-token bill) or **[OpenRouter](https://openrouter.ai)**, where one key unlocks every major model. Models are routed per agent, so you can, for example, write with a fast model and review with a strong one. Every call is metered.
 
-## ✨ Features (What Works Today)
+## ✨ What you get
 
-- 🗺️ **AI-Generated Learning Roadmaps**, Describe a goal, get a structured path of milestones and nodes
-- 🧑‍🏫 **Personal AI Tutor**, Live Socratic tutoring sessions that adapt to your understanding
-- 📝 **Smart Assignments**, Auto-generated with rubrics and AI grading
-- 🃏 **Flashcards**, Spaced-repetition review generated from your material
-- 📚 **Courses**, Generate full courses with readings, labs and question banks; star what you keep coming back to
-- 🤝 **Sharing**, A course is a portable file. Export it, send it, import it whole. Optionally publish to a registry so others can find it, LearnOS works completely without one
-- 🏅 **Certificates & Badges**, Mastery-verified certificates and achievement badges
-- 📅 **Study Schedule**, Plan and track your learning cadence
-- 📊 **Learning Analytics**, Daily stats, streaks, XP, and activity history
-- 🎯 **Learner Profiling**, Onboarding that tailors the experience to your level and style
-- 👤 **Local Profile**, Your name, avatar, bio, and links, no account, no login
-- 🔑 **One OpenRouter Key**, A single key unlocks every model; set it in-app or via env
-- 💾 **Persistent Progress**, SQLite storage, your data survives restarts
+- 📚 **Courses that teach.** Every lesson opens with a concrete question, builds intuition before formalism, works a full example, names the common mistake, and ends with practice problems whose solutions stay folded until you have tried.
+- 🧑‍🏫 **A tutor that has read the lesson.** Open it beside any lesson, or select a passage and ask about exactly that. It knows the course, your level and what you got wrong in the quiz, and gives hints before answers.
+- 🧪 **Labs that check your work.** Code runs on your machine against tests; the tests themselves were proven against a reference solution before the course reached you.
+- ✅ **Quizzes, then graded work.** Practice quizzes with every answer explained, graded assignments with rubrics, and spaced review of what you missed.
+- 🔑 **Your Claude plan or any model.** Use your Claude Pro or Max plan through Claude Code (no API key, nothing extra to pay), or one OpenRouter key for any model, set per agent.
+- 🤝 **Courses are files.** Export a course as a single `.learnos.json`, send it, import it.
+- 💾 **Yours.** Runs on your computer, stores everything in one SQLite file, no account and no telemetry.
 
-## 🛣️ Roadmap
+## 🔬 How a course is made
 
-| Phase | Status | Description |
-|---|---|---|
-| **Foundation** | ✅ Done | Roadmaps, tutor, assignments, flashcards, analytics, profiling |
-| **Sharing** | ✅ Done | Courses as portable files, publish/browse via an optional registry, certificates, badges |
-| **Hardening** | ✅ Done | SSRF guard, upload validation, rate limiting, CI |
-| **Scale** | 🔨 Building | Cohort learning, richer course library, streaming responses |
-| **Reach** | 🔮 Vision | Multi-language, mobile, accreditation & employer verification |
+A course is not one big prompt. [`ai/agents/courseBuilder.js`](ai/agents/courseBuilder.js) runs a pipeline where every step is checked by something other than the model that wrote it:
 
-**Currently focused on:** STEM (CS, Math, Data Science, Engineering) → expanding outward.
+1. **Plan.** The syllabus assigns every lesson its objectives and the concepts it introduces, each concept exactly once across the course, plus one notation and one running example the course keeps extending.
+2. **Write, in order.** Each lesson is written alone and told what earlier lessons covered and how the previous one ended, so lessons build instead of repeating.
+3. **Run the code.** Every Python and JavaScript example is executed, notebook style. Failures go back to the writer with the real traceback.
+4. **Review.** A reviewer agent reads each lesson like a subject expert (accuracy, notation, skipped steps, filler) and the lesson is revised against its findings.
+5. **Assess what was taught.** Quizzes, labs and graded work are written from the finished lessons. An independent examiner answers every quiz question without the key, and disputed questions are dropped. Lab tests take their expected values from running the reference solution, and a lab whose starter already passes is rejected.
+6. **Cite what exists.** Further reading is checked to load and to be what it claims to be.
+
+Each build stores a report of revisions, review findings and code runs. A build that leaves modules empty says so, and **Finish building** completes them with the same pipeline.
 
 ## 🏗️ Quick Start
 
 ### Prerequisites
 
-- **Node.js 18+**
-- An **[OpenRouter API key](https://openrouter.ai/keys)** (optional for the UI; required for AI features, you can also add it in-app under Settings → API Keys)
+- **Node.js 22.13 or newer** (SQLite is built in, nothing native to compile)
+- A model: either **[Claude Code](https://claude.com/claude-code)** signed in with your Claude plan, or an **[OpenRouter key](https://openrouter.ai/keys)**. You choose in the app.
+- Optional: Python 3 for Python labs and examples (numpy and pandas recommended)
 
-### Option A: Docker (one command, includes the Judge0 code sandbox)
-
-```bash
-git clone https://github.com/Abelo9996/LearnOS.git
-cd LearnOS
-OPENROUTER_API_KEY=sk-or-... docker compose up -d
-```
-
-Open **http://localhost:3210**. This runs LearnOS plus [Judge0](https://github.com/judge0/judge0), so code labs execute in sandboxed containers (a real security boundary) across many languages. Judge0 needs privileged containers and cgroup access; it runs best on a Linux host (on Docker Desktop, cgroup support varies by version).
-
-### Option B: local Node (no Docker)
-
-### 1. Install
+### Run it
 
 ```bash
 git clone https://github.com/Abelo9996/LearnOS.git
 cd LearnOS
 npm install
-```
-
-> **Native module note:** LearnOS uses `better-sqlite3`, a native addon. If you switch Node versions and see `ERR_DLOPEN_FAILED`, run `npm rebuild better-sqlite3`.
-
-### 2. Run (two terminals)
-
-```bash
-# Terminal 1, API server (http://localhost:3001)
 npm start
-
-# Terminal 2, Vite dev server with hot reload (http://localhost:3000)
-npm run dev
 ```
 
-Open **http://localhost:3000**, there's no login. LearnOS runs as a single local user (it's *your* machine) and starts completely from scratch: no example data, no demo courses. Generate your first roadmap or course and everything grows from there. No `.env` is required for local dev; see [`.env.example`](.env.example) for all configurable options.
+Open **http://localhost:3001**. The first `npm start` builds the app; after that it starts in a second. There is no login: LearnOS runs as you, on your machine, listening on localhost only (set `HOST=0.0.0.0` to open it to your network).
 
-### 3. Start Learning
+Onboarding asks how to connect a model. If Claude Code is installed and signed in, one click uses your Claude plan; otherwise paste an OpenRouter key. You can change this any time in **Settings → API keys**, per agent or for all of them.
 
-1. Go to **⚙️ Settings → API Keys** and add your [OpenRouter key](https://openrouter.ai/keys) (or set `OPENROUTER_API_KEY` for the server)
-2. **Create a course / roadmap** → describe what you want to learn
-3. Work through milestones, start tutor sessions, take assignments, and track your progress
-
-### Production build
+### Develop
 
 ```bash
-npm run build      # builds the React app into dist/
-NODE_ENV=production OPENROUTER_API_KEY=sk-or-... npm start
+npm run dev    # API on :3001 (restarts on change) + Vite with hot reload on :3000
+npm test
 ```
 
-In production the Express server serves the built frontend from `dist/` and the API from the same origin. See [DEPLOYMENT.md](DEPLOYMENT.md).
+### Docker (with the Judge0 code sandbox)
+
+```bash
+OPENROUTER_API_KEY=sk-or-... docker compose up -d
+```
+
+Open **http://localhost:3210**. This adds [Judge0](https://github.com/judge0/judge0), so labs run in sandboxed containers across many languages. Judge0 needs privileged containers and cgroups; it runs best on a Linux host.
 
 ## 🏛️ Architecture
 
@@ -181,7 +157,7 @@ LearnOS/
 ├── server.js             # Express 5 entry point, API + static SPA
 ├── routes/               # REST endpoints (courses, roadmaps, sessions, …)
 ├── middleware/           # local-user resolver, logger, url-safety (SSRF guard)
-├── db/                   # better-sqlite3, schema.sql, database.js
+├── db/                   # node:sqlite (sqlite.js), schema.sql, database.js
 ├── ai/
 │   ├── llm.js            # provider-agnostic LLM layer (Claude) + metering
 │   ├── jobs.js           # async AI job runner
@@ -199,28 +175,11 @@ Frontend talks to the backend via a `/api` proxy in dev ([`vite.config.js`](vite
 
 ## 🤝 Sharing courses
 
-A course you generate is not trapped in your install. **Share → Export** writes the
-whole thing, modules, readings, resources, labs, and the question bank, to a single
+A course you generate is not trapped in your install. **Courses → Import or export**
+writes the whole thing (modules, lessons, labs, the question bank) to a single
 `.learnos.json` file. Anyone with that file gets the entire course by dropping it into
-their own LearnOS. No server, no account, no network involved.
-
-That is the baseline, and it is enough on its own. On top of it, LearnOS can talk to a
-**course registry**: a small optional service (see
-[LearnOSWeb](https://github.com/Abelo9996/LearnOSWeb)) where instances publish courses
-for each other to find. Publishing claims a handle, no account, no email, and the
-registry issues a token that stays on your machine and never reaches the browser; it
-authorises exactly one thing, updating what you published.
-
-The registry is a convenience and never a dependency. Switch it off in
-**Settings → Community** and LearnOS contacts nothing at all; leave it on and it still
-works normally when the registry is down, saying so plainly instead of breaking. Nothing
-imported is trusted either: URLs are re-checked against the same SSRF policy as any other
-outside content, and imported questions arrive **unverified** no matter what the exporter
-believed, because verification is evidence your instance gathered, not a claim that
-travels with a file.
-
-There is no forum, no leaderboard, and no member directory, because a single-user local
-app cannot honestly host one.
+their own LearnOS. No server, no account, no network involved. Nothing imported is
+trusted: links are re-checked, and imported questions arrive unverified.
 
 ## 🔒 Security
 

@@ -1,28 +1,14 @@
 {
   "name": "learnos",
   "version": "1.0.0",
-  "description": "LearnOS, AI-Powered Learning Platform",
+  "description": "LearnOS, a self-hosted AI university",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "start": "node scripts/ensure-build.mjs && node server.js",
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "node server.js",
-    "depth:check": "node scripts/depth-check.mjs",
-    "verify:pipeline": "node scripts/verify-pipeline.mjs",
-    "verify:assessment": "node scripts/verify-assessment.mjs",
-    "verify:specialization": "node scripts/verify-specialization.mjs",
-    "verify:integrity": "node scripts/verify-integrity.mjs",
-    "verify": "node scripts/verify-all.mjs",
-    "enrich": "node scripts/enrich.mjs",
-    "check:resources": "node scripts/check-resources.mjs",
-    "deepen": "node scripts/deepen-courses.mjs",
-    "factcheck": "node scripts/factcheck.mjs",
-    "verify:accuracy": "node scripts/verify-accuracy.mjs",
-    "verify:labs": "node scripts/verify-labs.mjs",
-    "verify:retention": "node scripts/verify-retention.mjs",
-    "verify:plans": "node scripts/verify-plans.mjs",
-    "verify:reach": "node scripts/verify-reach.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -40,7 +26,6 @@
     "@excalidraw/mermaid-to-excalidraw": "^2.2.2",
     "@observablehq/plot": "^0.6.17",
     "@uiw/react-codemirror": "^4.25.12",
-    "better-sqlite3": "^12.10.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.5.2",
     "file-type": "^19.6.0",
@@ -60,5 +45,8 @@
   "main": "server.js",
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.13"
+  }
 }

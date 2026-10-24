@@ -1,14 +1,12 @@
-# LearnOS application image.
-# better-sqlite3 is a native addon, so the build needs python3 + a C/C++
-# toolchain. The app itself does NOT need language compilers for labs when it
-# runs against Judge0 (see docker-compose.yml); code execution happens in the
-# Judge0 sandbox, not in this container.
+# LearnOS application image. SQLite comes with Node (node:sqlite), so nothing
+# is compiled. python3 is here so Python labs and lesson examples can run when
+# Judge0 is not configured; with Judge0 (docker-compose.yml) code runs there.
 FROM node:22-bookworm-slim
 
 WORKDIR /app
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ ca-certificates \
+  && apt-get install -y --no-install-recommends python3 python3-numpy ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies first so the layer caches across code changes.
