@@ -406,7 +406,7 @@ export async function enrichCourse({ userId, slug, onProgress = () => {} }) {
       const saved = persistModuleContent(userId, {
         slug, courseTitle: course.title, mid: m.id, m: { ...m, ...content }, reachable,
         startOrder: m.lessons.length, idPrefix: `ml-${m.id}-f${stamp}-`,
-        dueDate: new Date(Date.now() + 86400000 * (7 + i * 3)).toISOString().split('T')[0],
+        dueDate: null,
       });
       db.prepare('UPDATE course_modules SET estimated_minutes = estimated_minutes + ? WHERE id = ?').run(saved.minutes, m.id);
     } catch (e) {
@@ -692,7 +692,7 @@ export async function persistRichCourse(userId, c, level = 'intermediate') {
 
     const saved = persistModuleContent(userId, {
       slug, courseTitle: c.title, mid, m, reachable, idPrefix: `ml-${mid}-`,
-      dueDate: new Date(dueBase + 86400000 * (7 + i * 3)).toISOString().split('T')[0],
+      dueDate: null, // the learner sets deadlines; the builder does not invent them
     });
     lessonCount += saved.lessons; itemCount += saved.items; resourceCount += saved.resources; assignmentCount += saved.assignments;
     const moduleMinutes = saved.minutes;
@@ -715,8 +715,7 @@ export async function persistRichCourse(userId, c, level = 'intermediate') {
       .run(`ml-${mid}-0`, mid, cap.title, body);
     db.prepare(`INSERT INTO assignments (id, user_id, title, course, status, progress, priority, estimated_minutes, kind, description, tasks, due_date, pass_threshold, max_attempts)
                 VALUES (?, ?, ?, ?, 'todo', 0, 'high', 300, 'project', ?, ?, ?, 0.8, 3)`)
-      .run(`as-${mid}`, userId, cap.title, c.title, cap.description || '', JSON.stringify(cap.tasks),
-        new Date(dueBase + 86400000 * (7 + c.modules.length * 3 + 7)).toISOString().split('T')[0]);
+      .run(`as-${mid}`, userId, cap.title, c.title, cap.description || '', JSON.stringify(cap.tasks), null);
     lessonCount++; assignmentCount++; totalMinutes += 300;
     pathway.push({ title: `Capstone · ${cap.title}`, objectives: [], resources: [] });
   }

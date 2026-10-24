@@ -45,7 +45,7 @@ function ErrorBanner({ error, onRetry }) {
 // A real, varied catalogue the Assessment agent draws from, coding projects,
 // larger homeworks, quizzes, and analyses, each with concrete tasks (#11, #16).
 
-export function Assignments() {
+export function Assignments({ setScreen }) {
   const { add: toast } = useToast();
   const { open: openModal } = useModal();
   const { data: rawAssignments, loading, error, reload } = useApi(() => API.getAssignments());
@@ -75,6 +75,21 @@ export function Assignments() {
   const [expandedId, setExpandedId]   = React.useState(null);
   const [filterPriority, setFilterPriority] = React.useState('all');
   const [examId, setExamId]           = React.useState(null);
+
+  // A course's assignment lives in its lesson, where the brief, the
+  // submission box and the rubric feedback are; open it there.
+  const openAssignment = (a) => {
+    const m = /^as-(cm-(.+)-(\d+|capstone))$/.exec(a.id || '');
+    if (m && setScreen) {
+      try {
+        localStorage.setItem('learnos_open_course', m[2]);
+        localStorage.setItem('learnos_open_graded_module', m[1]);
+      } catch {}
+      setScreen('courses');
+      return;
+    }
+    setExamId(a.id);
+  };
 
   // Full-page examination view (replaces the cramped popup).
   const openExam = assignments.find(a => a.id === examId);
@@ -156,13 +171,13 @@ export function Assignments() {
                   </div>
                 )}
               </div>
-              <div className="mono" style={{ fontSize: 11.5, color: a.due === 'Yesterday' ? 'var(--bad)' : 'var(--ink-2)' }}>Due {a.due}</div>
+              <div className="mono" style={{ fontSize: 11.5, color: a.due === 'Yesterday' ? 'var(--bad)' : 'var(--ink-2)' }}>{a.due === '-' ? '' : `Due ${a.due}`}</div>
               <div style={{ textAlign: 'right', display: 'flex', gap: 4, justifyContent: 'flex-end', alignItems: 'center' }}>
                 {a.status === 'graded' ? (
-                  <Btn variant="ghost" iconRight={React.cloneElement(I.arrowR, { size: 13 })} onClick={(e) => { e.stopPropagation(); setExamId(a.id); }}>Review</Btn>
+                  <Btn variant="ghost" iconRight={React.cloneElement(I.arrowR, { size: 13 })} onClick={(e) => { e.stopPropagation(); openAssignment(a); }}>Review</Btn>
                 ) : (
                   <Btn variant={a.status === 'in-progress' ? 'outline' : 'primary'} iconRight={React.cloneElement(I.arrowR, { size: 13 })}
-                    onClick={(e) => { e.stopPropagation(); setExamId(a.id); }}>
+                    onClick={(e) => { e.stopPropagation(); openAssignment(a); }}>
                     {a.status === 'in-progress' ? 'Continue' : 'Open'}
                   </Btn>
                 )}

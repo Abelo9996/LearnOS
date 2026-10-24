@@ -152,10 +152,11 @@ export default function Roadmap({ onOpenSession, onOpenCourse }) {
         <span style={{ width: 56, height: 56, borderRadius: 16, background: 'var(--accent-soft)', border: '1px solid var(--accent-line)', color: 'var(--brand)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
           {React.cloneElement(I.graph, { size: 26 })}
         </span>
-        <div className="display" style={{ fontSize: 22, color: 'var(--ink)' }}>Start your first roadmap</div>
-        <div style={{ fontSize: 13.5, color: 'var(--muted)', maxWidth: 420, lineHeight: 1.6 }}>
-          Tell the Curriculum agent what you want to master and it will design a
-          personalized path of modules, from fundamentals to advanced.
+        <div className="display" style={{ fontSize: 22, color: 'var(--ink)' }}>Plan a path to a bigger goal</div>
+        <div style={{ fontSize: 13.5, color: 'var(--muted)', maxWidth: 440, lineHeight: 1.6 }}>
+          A path is a sequence of courses toward something larger than one subject, like
+          "become a data scientist" or "build my own compiler". LearnOS plans the courses in
+          order and builds each one when you reach it.
         </div>
         {generating ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 6 }}>

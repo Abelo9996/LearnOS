@@ -446,7 +446,7 @@ function ScreenRouter({ screen, setScreen }) {
     case 'session':      return wrap(<Session setScreen={setScreen} />);
     case 'roadmaps':     return wrap(<Roadmap onOpenSession={() => setScreen('session')} onOpenCourse={(slug) => { if (slug) { try { localStorage.setItem('learnos_open_course', slug); } catch {} } setScreen('courses'); }} />);
     case 'courses':      return wrap(<Courses setScreen={setScreen} />);
-    case 'assignments':  return wrap(<Assignments />);
+    case 'assignments':  return wrap(<Assignments setScreen={setScreen} />);
     case 'cards':        return wrap(<Flashcards />);
     case 'share':        return wrap(<Share />);
     case 'settings':     return wrap(<Settings />);

@@ -73,6 +73,20 @@ export default function Courses({ setScreen }) {
     if (hit) setSelectedCourse(hit);
   }, [loading, courses]);
 
+  // Handoff from Assignments: open the graded lesson of a module once the
+  // course's modules have loaded.
+  React.useEffect(() => {
+    if (!courseModules.length) return;
+    let mid;
+    try { mid = localStorage.getItem('learnos_open_graded_module'); } catch { mid = null; }
+    if (!mid) return;
+    const mod = courseModules.find(m => m.id === mid);
+    if (!mod) return;
+    try { localStorage.removeItem('learnos_open_graded_module'); } catch {}
+    const lesson = (mod.lessons || []).find(l => l.is_graded) || (mod.lessons || [])[0];
+    if (lesson) setSelectedLesson(lesson);
+  }, [courseModules]);
+
   // Keep the catalog row and the open detail in sync after verify/unverify.
   const applyVerified = (slug, verified) => {
     setSelectedCourse(prev => (prev && prev.slug === slug ? { ...prev, verified } : prev));
