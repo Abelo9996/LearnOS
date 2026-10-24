@@ -33,28 +33,39 @@ export function setJobProgress(jobId, pct, msg) {
   } catch { /* progress is best-effort, never fails the job */ }
 }
 
-let running = false;
-async function drain() {
-  if (running) return;
-  running = true;
-  try {
-    for (;;) {
-      const job = db.prepare("SELECT * FROM agent_jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1").get();
+// Two lanes. Course builds take minutes and run one at a time; everything
+// else (grading a submission, finding resources, analysing a session) is
+// short and must not wait behind them: a single serial queue left a learner's
+// assignment ungraded for the ten minutes a course build took.
+const HEAVY = ['build-course', 'enrich-course', 'build-pathway-course', 'plan-specialization'];
+const LANES = {
+  heavy: { limit: 1, active: 0, where: `kind IN (${HEAVY.map(() => '?').join(',')})` },
+  light: { limit: 3, active: 0, where: `kind NOT IN (${HEAVY.map(() => '?').join(',')})` },
+};
+
+function drain() {
+  for (const lane of Object.values(LANES)) {
+    while (lane.active < lane.limit) {
+      const job = db.prepare(`SELECT * FROM agent_jobs WHERE status = 'queued' AND ${lane.where} ORDER BY created_at LIMIT 1`).get(...HEAVY);
       if (!job) break;
+      // Claim it before anything awaits, so a second drain cannot take it too.
       db.prepare("UPDATE agent_jobs SET status = 'running', updated_at = datetime('now') WHERE id = ?").run(job.id);
-      try {
-        const fn = handlers.get(job.kind);
-        if (!fn) throw new Error(`No handler registered for job kind: ${job.kind}`);
-        const result = await fn({ userId: job.user_id, input: parse(job.input_json), jobId: job.id });
-        db.prepare("UPDATE agent_jobs SET status = 'done', result_json = ?, updated_at = datetime('now') WHERE id = ?")
-          .run(JSON.stringify(result ?? {}), job.id);
-      } catch (e) {
-        db.prepare("UPDATE agent_jobs SET status = 'failed', error = ?, updated_at = datetime('now') WHERE id = ?")
-          .run(e?.message || String(e), job.id);
-      }
+      lane.active++;
+      run(job).finally(() => { lane.active--; setImmediate(drain); });
     }
-  } finally {
-    running = false;
+  }
+}
+
+async function run(job) {
+  try {
+    const fn = handlers.get(job.kind);
+    if (!fn) throw new Error(`No handler registered for job kind: ${job.kind}`);
+    const result = await fn({ userId: job.user_id, input: parse(job.input_json), jobId: job.id });
+    db.prepare("UPDATE agent_jobs SET status = 'done', result_json = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(JSON.stringify(result ?? {}), job.id);
+  } catch (e) {
+    db.prepare("UPDATE agent_jobs SET status = 'failed', error = ?, updated_at = datetime('now') WHERE id = ?")
+      .run(e?.message || String(e), job.id);
   }
 }
 
