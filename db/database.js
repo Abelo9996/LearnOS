@@ -51,6 +51,7 @@ function ensureAgentStatus() {
     ['AS', 'Assessment',    'Generates quizzes and evaluates mastery.',              '--agent-as', 'check',  1],
     ['RE', 'Research',      'Finds, summarizes, and cites the best resources.',      '--agent-re', 'search', 1],
     ['AN', 'Analytics',     'Tracks progress and surfaces insights.',                '--agent-an', 'chart',  1],
+    ['RV', 'Reviewer',      'Checks every lesson and quiz like a subject expert before you see it.', '--agent-as', 'shield', 1],
     ['CE', 'Certification', 'Issues verifiable certificates and badges.',            '--agent-ce', 'ribbon', 0],
   ];
   const stmt = db.prepare("INSERT OR IGNORE INTO agent_status (agent_code, display_name, short_desc, color, icon, status_text, is_active) VALUES (?, ?, ?, ?, ?, '', ?)");
@@ -126,6 +127,8 @@ try { db.exec("ALTER TABLE course_modules ADD COLUMN objectives TEXT"); } catch 
 // Course-level framing: what you can DO after, what you need first, skills tracked.
 try { db.exec("ALTER TABLE courses ADD COLUMN outcomes TEXT"); } catch {}
 try { db.exec("ALTER TABLE courses ADD COLUMN prerequisites TEXT"); } catch {}
+// Quality report of an AI build: per-lesson review/revision/code-run results.
+try { db.exec("ALTER TABLE courses ADD COLUMN build_report TEXT"); } catch {}
 try { db.exec("ALTER TABLE courses ADD COLUMN skills TEXT"); } catch {}
 try { db.exec("ALTER TABLE courses ADD COLUMN level TEXT"); } catch {}
 

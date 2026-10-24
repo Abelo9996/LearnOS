@@ -45,7 +45,11 @@ export const LANGUAGES = {
   },
   python: {
     label: 'Python', file: 'main.py',
-    run: (dir) => ({ cmd: pythonCmd(), args: ['-I', join(dir, 'main.py')] }),
+    // -E ignores PYTHON* variables. Not -I: isolated mode also hides the user's
+    // site-packages, so numpy (which lessons teach with) was "not installed"
+    // for every lab and every lesson example on a normal pip --user setup. The
+    // script runs from a fresh temp directory, so nothing can be planted next to it.
+    run: (dir) => ({ cmd: pythonCmd(), args: ['-E', join(dir, 'main.py')] }),
     hello: 'print("ok")',
     install: 'Install Python 3 from python.org or your package manager.',
   },

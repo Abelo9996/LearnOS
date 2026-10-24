@@ -332,14 +332,31 @@ const CALLOUT_COLOR = {
   tip: 'var(--good)', success: 'var(--good)',
   warning: 'var(--warn)', caution: 'var(--bad)', danger: 'var(--bad)',
   example: 'var(--brand-3)', intuition: 'var(--brand-3)',
+  solution: 'var(--good)', answer: 'var(--good)', question: 'var(--brand)', try: 'var(--brand)',
 };
 const CALLOUT_LABEL = {
   note: 'Note', info: 'Note', important: 'Important', key: 'Key idea',
   tip: 'Tip', success: 'Tip', warning: 'Warning', caution: 'Caution',
-  danger: 'Caution', example: 'Example', intuition: 'Intuition',
+  danger: 'Caution', example: 'Worked example', intuition: 'Intuition',
+  solution: 'Solution', answer: 'Answer', question: 'Question', try: 'Try it',
 };
+// Solutions stay folded until the learner has had a go: a practice problem
+// whose answer sits right under it is a worked example, not practice.
+const COLLAPSIBLE = new Set(['solution', 'answer']);
 function Callout({ type, children }) {
   const color = CALLOUT_COLOR[type] || CALLOUT_COLOR.note;
+  if (COLLAPSIBLE.has(type)) {
+    return (
+      <details style={{
+        margin: '12px 0 16px', borderRadius: 10, padding: '10px 15px',
+        border: `1px solid color-mix(in oklch, ${color} 30%, transparent)`,
+        background: `color-mix(in oklch, ${color} 5%, var(--surface))`,
+      }}>
+        <summary className="cap" style={{ color, cursor: 'pointer', userSelect: 'none' }}>Show {CALLOUT_LABEL[type].toLowerCase()}</summary>
+        <div style={{ marginTop: 10 }}>{children}</div>
+      </details>
+    );
+  }
   return (
     <div style={{
       margin: '16px 0', borderRadius: 10, padding: '12px 15px',
@@ -547,12 +564,12 @@ export default function MarkdownText({ text, citationMap, prose = false, stripTi
       const cm = quote[0].match(/^\[!(\w+)\]\s*(.*)$/);
       if (cm && CALLOUT_LABEL[cm[1].toLowerCase()]) {
         const type = cm[1].toLowerCase();
-        const rest = [cm[2], ...quote.slice(1)].map(s => s.trim()).filter(Boolean);
+        // The callout body is Markdown in its own right: a worked example needs
+        // its steps, its maths and its code, not one paragraph per line.
+        const inner = [cm[2], ...quote.slice(1)].join('\n').trim();
         elements.push(
           <Callout key={`co-${i}`} type={type}>
-            {rest.map((bl, bi) => (
-              <p key={bi} style={{ ...body, color: 'var(--ink)', margin: bi ? '8px 0 0' : 0 }}>{formatInline(bl, citationMap)}</p>
-            ))}
+            <div className="callout-body"><MarkdownText text={inner} citationMap={citationMap} prose={prose} /></div>
           </Callout>
         );
         continue;

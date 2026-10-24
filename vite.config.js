@@ -14,5 +14,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false
-  }
+  },
+  test: {
+    // Agent worktrees live inside the repo; their copies of the tests are not ours.
+    exclude: ['**/node_modules/**', '**/dist/**', '.worktrees/**'],
+  },
 });

@@ -24,13 +24,15 @@ import { validateCourseDepth, FLOORS } from '../quality/depthFloors.js';
 import { registerJobHandler, setJobProgress } from '../jobs.js';
 import { getProfile } from './profiling.js';
 import { contentDirective, resourceDirective, videosPerModule } from './learningStyle.js';
+import { draftLesson, polishLesson } from './lessonWriter.js';
+import { writeAssessment } from './assessmentWriter.js';
 
 const LEVELS = ['beginner', 'intermediate', 'advanced'];
 
 // How many modules are written at once. Modules are independent given the
 // blueprint, so this is pure wall-clock win; kept modest to stay well inside
 // provider rate limits.
-const MODULE_CONCURRENCY = 4;
+const MODULE_CONCURRENCY = Math.max(1, parseInt(process.env.LEARNOS_BUILD_CONCURRENCY || '', 10) || 6);
 
 /** Bounded-concurrency map that preserves input order in the output. */
 async function mapWithConcurrency(items, limit, fn) {
@@ -67,8 +69,21 @@ const blueprintSchema = {
           title: { type: 'string' },
           summary: { type: 'string' },
           objectives: { type: 'array', items: { type: 'string' } },
+          lessons: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                title: { type: 'string' },
+                objectives: { type: 'array', items: { type: 'string' } },
+                concepts: { type: 'array', items: { type: 'string' } },
+              },
+              required: ['title', 'objectives', 'concepts'],
+            },
+          },
         },
-        required: ['title', 'summary', 'objectives'],
+        required: ['title', 'summary', 'objectives', 'lessons'],
       },
     },
     capstone: {
@@ -82,8 +97,14 @@ const blueprintSchema = {
       required: ['title', 'description', 'tasks'],
     },
   },
-  required: ['title', 'blurb', 'tags', 'outcomes', 'prerequisites', 'skills', 'modules', 'capstone'],
+  required: ['title', 'blurb', 'tags', 'outcomes', 'prerequisites', 'skills', 'audience', 'code_language', 'notation', 'throughline', 'modules', 'capstone'],
 };
+Object.assign(blueprintSchema.properties, {
+  audience: { type: 'string' },
+  code_language: { type: 'string', enum: ['python', 'javascript', 'cpp', 'c', 'java', 'go', 'none'] },
+  notation: { type: 'string' },
+  throughline: { type: 'string' },
+});
 
 const BLUEPRINT_SYSTEM = `You are the Curriculum agent for LearnOS, designing a course that must stand next to a top Coursera specialization and win.
 
@@ -94,7 +115,11 @@ Requirements:
 - "outcomes": 4-6 things the learner can DO afterwards (capabilities, not topics). Start each with a verb.
 - "prerequisites": what they genuinely need first (empty array if none).
 - "skills": 5-10 named skills this course builds, each trackable to mastery.
-- Each module: a clear title, a 1-2 sentence summary, and 3-5 measurable objectives.
+- Each module: a clear title, a 1-2 sentence summary, 3-5 measurable objectives, and its "lessons": 2-4 lessons in teaching order. Each lesson has a specific title, 2-3 objectives (what the learner can do after it), and "concepts": the new concepts it introduces. Plan the concepts across the WHOLE course so each concept is introduced exactly once, in the lesson where it is first needed, and only after the concepts it depends on. No two lessons may cover the same ground.
+- "audience": one sentence on who this is for and what they already know.
+- "code_language": the one programming language every code example and lab uses ("python" for most technical topics unless the topic or pathway names another; "none" for subjects with no programming such as history or philosophy).
+- "notation": the symbols and naming conventions the whole course will use (e.g. "vectors bold lowercase $\\mathbf{x}$, matrices bold uppercase, joint angles $\\theta_i$, frames {0}..{n}"), or "" if the subject has none.
+- "throughline": one concrete running example the course returns to and extends module by module (a specific system, dataset, text, case or project), so lessons connect instead of starting over.
 - "capstone": a substantial final project synthesizing the whole course into something the learner builds and can show off.
 
 If a "Pathway context" is provided (the specialization this course belongs to and the learner's end goal), anchor the whole course to it: module topics, examples and terminology must serve that goal. An "OOP" course inside a C++ pathway is a C++ OOP course, never drift to a different language or domain.
@@ -291,7 +316,7 @@ export async function buildCourse({ userId, topic, level, pathwayContext, learni
       const res = await complete({
         userId, agentCode: 'CR',
         schema: blueprintSchema,
-        maxTokens: 4000 + attempt * 2000, // 4k → 6k → 8k as we retry
+        maxTokens: 16000 + attempt * 4000, // a planned syllabus is long, and reasoning models think first
         system: BLUEPRINT_SYSTEM,
         messages: `Topic: ${topic}\nTarget level: ${lvl}${ctxLine}\nDesign the blueprint.`,
       });
@@ -316,67 +341,111 @@ export async function buildCourse({ userId, topic, level, pathwayContext, learni
   // each other's output (only on the blueprint), so a bounded pool cuts that to
   // a few minutes without hammering the provider.
   const failures = [];
+  const quality = [];
   const N = bp.modules.length;
-  let finished = 0;
+
+  // Lesson plan: every lesson knows which concepts came before it, so lessons
+  // build on each other instead of each starting from scratch.
+  const plans = bp.modules.map((m) => {
+    const lessons = (Array.isArray(m.lessons) && m.lessons.length ? m.lessons : [{ title: m.title, objectives: m.objectives || [], concepts: [] }])
+      .filter(l => l && l.title)
+      .slice(0, 4);
+    return lessons.map((l, k) => ({ ...l, index: k, objectives: Array.isArray(l.objectives) ? l.objectives : [], concepts: Array.isArray(l.concepts) ? l.concepts : [] }));
+  });
+  const conceptsBefore = (mi, li) => {
+    const out = [];
+    plans.forEach((ls, i) => ls.forEach((l, k) => { if (i < mi || (i === mi && k < li)) out.push(...l.concepts); }));
+    return out.slice(-60);
+  };
+  const outline = bp.modules.map((m, i) => `${i + 1}. ${m.title}: ${plans[i].map(l => l.title).join(' | ')}`).join('\n');
+  const totalLessons = plans.reduce((n, ls) => n + ls.length, 0);
+  let lessonsDone = 0;
 
   const buildModule = async (m, i) => {
-    const context = [
-      `Course: ${bp.title} (${lvl})`,
-      pathwayContext ? `Pathway context: ${pathwayContext}` : null,
-      `Course outcomes: ${(bp.outcomes || []).join('; ')}`,
-      `This module (${i + 1} of ${N}): ${m.title}`,
-      `Module summary: ${m.summary}`,
-      `Module objectives: ${(m.objectives || []).join('; ')}`,
-      i > 0 ? `Already covered: ${bp.modules.slice(0, i).map(x => x.title).join('; ')}` : 'This is the first module.',
-    ].filter(Boolean).join('\n');
-
-    const tick = (msg) => onProgress(0.05 + 0.85 * (finished / N), msg);
+    const ctx = {
+      courseTitle: bp.title, level: lvl, pathwayContext, audience: bp.audience,
+      codeLanguage: bp.code_language || 'none', notation: bp.notation, throughline: bp.throughline,
+      outline, moduleIndex: i, moduleTitle: m.title, moduleObjectives: m.objectives || [],
+      lessonsInModule: plans[i].length, styleDirective: modalityDirective,
+    };
+    const tick = (msg) => onProgress(0.05 + 0.85 * (lessonsDone / Math.max(1, totalLessons)), msg);
     try {
-      tick(`Writing module ${i + 1}/${N}: ${m.title}`);
-      const teaching = (await complete({
-        userId, agentCode: 'CR',
-        schema: readingsSchema,
-        maxTokens: 8000,
-        system: READINGS_SYSTEM,
-        messages: `${context}\n\n${modalityDirective}\n\nWrite the readings and resources for this module.`,
-      })).json;
-
-      if (!teaching || !Array.isArray(teaching.readings) || !teaching.readings.length) {
-        throw new Error('module readings came back empty');
+      // Lessons inside a module are written in order: each one is handed what
+      // the previous one actually taught.
+      const drafts = [];
+      let prev = null;
+      for (const plan of plans[i]) {
+        tick(`Module ${i + 1}/${N}: drafting "${plan.title}"`);
+        try {
+          const d = await draftLesson({ userId, ctx: { ...ctx, taughtBefore: conceptsBefore(i, plan.index) }, plan, prev });
+          drafts.push({ plan, draft: d });
+          prev = { title: plan.title, summary: d.summary };
+        } catch (e) {
+          failures.push({ module: m.title, lesson: plan.title, stage: 'lesson', error: e?.message || String(e) });
+        }
       }
+      if (!drafts.length) throw new Error('every lesson in the module failed');
+      // Review, code runs and revisions for the module's lessons, all at once.
+      tick(`Module ${i + 1}/${N}: reviewing ${drafts.length} lessons`);
+      const polished = await Promise.all(drafts.map(async ({ plan, draft }) => {
+        try {
+          const l = await polishLesson({ userId, plan, draft });
+          return { ...l, objectives: plan.objectives };
+        } catch (e) {
+          // A failed review keeps the draft rather than losing the lesson.
+          failures.push({ module: m.title, lesson: plan.title, stage: 'review', error: e?.message || String(e) });
+          return { title: plan.title, body_md: draft.body, minutes: 15, summary: draft.summary, objectives: plan.objectives, quality: { revisions: 0, reviewIssues: [], codeFailures: [], codeRan: 0, lint: [], reviewError: e?.message } };
+        } finally {
+          lessonsDone++;
+          tick(`Module ${i + 1}/${N}: ${lessonsDone} of ${totalLessons} lessons done`);
+        }
+      }));
+      const lessons = polished;
 
-      // Second call: assessment gets its own budget, so readings can't starve it.
+      tick(`Module ${i + 1}/${N}: writing the quiz and lab`);
       let assessment = {};
       try {
-        assessment = (await complete({
-          userId, agentCode: 'AS',
-          schema: assessmentSchema,
-          maxTokens: 6000,
-          system: ASSESSMENT_SYSTEM,
-          messages: `${context}\n\nWrite the quiz items, lab and graded assessment for this module.`,
-        })).json || {};
+        assessment = await writeAssessment({ userId, ctx, lessons });
       } catch (e) {
         console.warn(`[courseBuilder] assessment for module ${i + 1} failed: ${e?.message || e}`);
         failures.push({ module: m.title, stage: 'assessment', error: e?.message || String(e) });
       }
 
-      finished++;
-      tick(`Finished ${finished}/${N} modules`);
-      return { ...m, ...teaching, ...assessment };
+      // Resources come after the lessons, chosen to complement what was written.
+      let resources = [];
+      try {
+        resources = (await complete({
+          userId, agentCode: 'RE',
+          schema: topUpSchema,
+          maxTokens: 2500,
+          system: RESOURCE_SYSTEM,
+          messages: `Course: ${bp.title} (${lvl})\nModule: ${m.title}\nLessons: ${lessons.map(l => l.title).join('; ')}\nObjectives: ${(m.objectives || []).join('; ')}\n\n${resourceDirective(learningStyle)}\n\nSuggest the resources.`,
+        })).json?.resources || [];
+      } catch (e) {
+        failures.push({ module: m.title, stage: 'resources', error: e?.message || String(e) });
+      }
+
+      tick(`Finished module ${i + 1}/${N}`);
+      quality.push({
+        module: m.title,
+        lessons: lessons.map(l => ({ title: l.title, revisions: l.quality.revisions, issues: l.quality.reviewIssues.length, codeRan: l.quality.codeRan, codeFailures: l.quality.codeFailures.length, lint: l.quality.lint })),
+        assessment: assessment.report || null,
+      });
+      return {
+        ...m,
+        readings: lessons.map(l => ({ title: l.title, body_md: l.body_md, minutes: l.minutes })),
+        resources,
+        quiz_items: assessment.quiz_items || [],
+        lab: assessment.lab || null,
+        graded: assessment.graded || null,
+      };
     } catch (e) {
-      // One weak module must not sink the course, but the failure must be
-      // visible, silently pushing an empty module is how a "successful" build
-      // shipped 1 lesson across 8 modules.
       console.warn(`[courseBuilder] module ${i + 1} (${m.title}) failed: ${e?.message || e}`);
       failures.push({ module: m.title, stage: 'teaching', error: e?.message || String(e) });
-      finished++;
-      tick(`Finished ${finished}/${N} modules`);
       return { ...m, readings: [], quiz_items: [], lab: null, graded: null, resources: [] };
     }
   };
 
-  // Order is preserved regardless of completion order, a course's modules must
-  // stay in their taught sequence.
   const modules = await mapWithConcurrency(bp.modules, MODULE_CONCURRENCY, buildModule);
 
   onProgress(0.92, 'Verifying external resources…');
@@ -388,7 +457,9 @@ export async function buildCourse({ userId, topic, level, pathwayContext, learni
   const depth = validateCourseDepth(persisted.slug);
   onProgress(1, depth.ok ? 'Course ready' : `Course ready (${depth.violations.length} depth warnings)`);
 
-  return { ...persisted, failures, depth: { ok: depth.ok, violations: depth.violations.length, stats: depth.stats } };
+  const report = { failures, quality, depth: { ok: depth.ok, violations: depth.violations.length, stats: depth.stats } };
+  try { db.prepare('UPDATE courses SET build_report = ? WHERE slug = ?').run(JSON.stringify(report), persisted.slug); } catch { /* older schema */ }
+  return { ...persisted, ...report };
 }
 
 // ── Enrichment ───────────────────────────────────────────────────────────────
@@ -644,6 +715,12 @@ const topUpSchema = {
   required: ['resources'],
 };
 
+const RESOURCE_SYSTEM = `You are the Research agent for LearnOS. The module's lessons are already written; pick 5-7 external resources that a learner would genuinely use NEXT TO them: a different explanation of the hardest idea, a lecture that shows it, a reference to keep open, a place to practice.
+
+Prefer, in this order: lecture videos from well-known courses and channels (MIT OpenCourseWare, Stanford, 3Blue1Brown, StatQuest, freeCodeCamp, Computerphile, CrashCourse, Khan Academy, conference talks); free textbooks and course notes at university or author domains; official documentation and tutorials; interactive explainers; landmark papers (arXiv IDs you know exactly). At most ONE Wikipedia page, and only when nothing better exists.
+
+The title must be the resource's REAL title, exactly as it appears on the page (a verifier compares them), and the summary says what the learner gets from it for THIS module. Never invent a URL, a video ID, a paper ID or a title; leave a resource out if you are not certain it exists at that address.`;
+
 const TOPUP_SYSTEM = `You are the Research agent for LearnOS. A module currently has too few WORKING external resources, because previously suggested URLs failed a reachability check.
 
 Suggest 8 resources whose URLs you are certain exist and are stable. Nobody learns from an encyclopedia dump, so prefer sources that actively TEACH, in this order:
@@ -686,6 +763,7 @@ async function topUpResources({ userId, bp, modules, level, learningStyle = '', 
   await mapWithConcurrency(modules, MODULE_CONCURRENCY, async (m) => {
     const have = await verifyReachable(m.resources, m.title);
     m.resources = (m.resources || []).filter(r => have.has(r.url));
+    capWikipedia(m);
 
     if (m.resources.length < FLOORS.resourcesPerModule) {
       onProgress(0.92, `Finding working resources for “${m.title}”…`);
@@ -732,6 +810,18 @@ async function topUpResources({ userId, bp, modules, level, learningStyle = '', 
         console.warn(`[courseBuilder] video top-up failed for ${m.title}: ${e?.message || e}`);
       }
     }
+    capWikipedia(m);
+  });
+}
+
+// One encyclopedia page per module at most: nobody learns a subject from a
+// stack of Wikipedia links, and it was the generator's default for everything.
+function capWikipedia(m) {
+  let wiki = 0;
+  m.resources = (m.resources || []).filter((r) => {
+    if (!/wikipedia\.org/i.test(r.url || '')) return true;
+    wiki++;
+    return wiki <= 1;
   });
 }
 
@@ -817,11 +907,12 @@ export async function persistRichCourse(userId, c, level = 'intermediate') {
         'practice_quiz', { minutes: Math.max(5, Math.round(items.length * 1.5)) });
       items.forEach((q, k) => {
         try {
-          db.prepare(`INSERT INTO quiz_items (id, course_slug, module_id, lesson_id, question, choices_json, answer_idx, explanation, difficulty, skill)
-                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          db.prepare(`INSERT INTO quiz_items (id, course_slug, module_id, lesson_id, question, choices_json, answer_idx, explanation, difficulty, skill, verification_status, verification_note, verified_at)
+                      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? = 'unverified' THEN NULL ELSE datetime('now') END)`)
             .run(`qi-${mid}-${k}`, slug, mid, quizLessonId, q.question, JSON.stringify(q.choices),
               Math.max(0, Math.min(q.choices.length - 1, Number(q.answer_idx) || 0)),
-              q.explanation || null, q.difficulty || 'medium', q.skill || null);
+              q.explanation || null, q.difficulty || 'medium', q.skill || null,
+              q.verification_status || 'unverified', q.verification_note || null, q.verification_status || 'unverified');
           itemCount++;
         } catch { /* skip a malformed item */ }
       });

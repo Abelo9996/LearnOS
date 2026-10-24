@@ -419,3 +419,7 @@ input:focus, textarea:focus, select:focus { outline: none; border-color: var(--a
   outline-offset: 2px;
   border-radius: 6px;
 }
+
+/* Callout bodies are rendered Markdown; their last block should not add a gap. */
+.callout-body > div > :last-child { margin-bottom: 0 !important; }
+.callout-body > div { max-width: none !important; }
